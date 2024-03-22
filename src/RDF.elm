@@ -7,7 +7,6 @@ module RDF exposing
     , forgetCompatible
     , unwrap
     , blankNode, iriAbsolute, literalWithDatatype, literal, bool, string, int
-    , dash, dcterms, owl, qudt, rdf, rdfs, sh, xsd, a, prov
     , toIri, toUrl, toBlankNodeOrIri, toString, toLangString, toInt, toFloat, toDecimal, toDate, toDateTime, toAnyLiteral, toBool
     , serializeNode, serializeNTriple, serializeNodeHelp
     , encodeNTriple
@@ -35,11 +34,6 @@ module RDF exposing
 ## Create
 
 @docs blankNode, iriAbsolute, literalWithDatatype, literal, bool, string, int
-
-
-### Namespaces
-
-@docs dash, dcterms, owl, qudt, rdf, rdfs, sh, xsd, a, prov
 
 
 ## Transform
@@ -1160,75 +1154,11 @@ addHex char total =
         16 * total + (10 + code - 0x61)
 
 
-
--- NAMESPACES
-
-
-{-| TODO Add documentation
--}
-dash : String -> Iri
-dash name =
-    Node (Iri ("http://datashapes.org/dash#" ++ name))
-
-
-{-| TODO Add documentation
--}
-dcterms : String -> Iri
-dcterms name =
-    Node (Iri ("http://purl.org/dc/terms/" ++ name))
-
-
-{-| TODO Add documentation
--}
-owl : String -> Iri
-owl name =
-    Node (Iri ("http://www.w3.org/2002/07/owl#" ++ name))
-
-
-{-| TODO Add documentation
--}
-qudt : String -> Iri
-qudt name =
-    Node (Iri ("http://qudt.org/schema/qudt/" ++ name))
-
-
-{-| TODO Add documentation
--}
-rdf : String -> Iri
-rdf name =
-    Node (Iri ("http://www.w3.org/1999/02/22-rdf-syntax-ns#" ++ name))
-
-
-{-| TODO Add documentation
--}
-rdfs : String -> Iri
-rdfs name =
-    Node (Iri ("http://www.w3.org/2000/01/rdf-schema#" ++ name))
-
-
-{-| TODO Add documentation
--}
-sh : String -> Iri
-sh name =
-    Node (Iri ("http://www.w3.org/ns/shacl#" ++ name))
-
-
-{-| TODO Add documentation
--}
 xsd : String -> Iri
 xsd name =
     Node (Iri ("http://www.w3.org/2001/XMLSchema#" ++ name))
 
 
-{-| TODO Add documentation
--}
-prov : String -> Iri
-prov name =
-    Node (Iri ("http://www.w3.org/ns/prov#" ++ name))
-
-
-{-| TODO Add documentation
--}
-a : Iri
-a =
-    rdf "type"
+rdf : String -> Iri
+rdf name =
+    Node (Iri ("http://www.w3.org/1999/02/22-rdf-syntax-ns#" ++ name))

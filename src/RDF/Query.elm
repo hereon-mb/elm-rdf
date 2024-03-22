@@ -41,11 +41,8 @@ import RDF
         , NodeInternal(..)
         , StringOrLangString(..)
         , forgetCompatible
-        , rdf
-        , rdfs
         , serializeNode
         , serializeNodeHelp
-        , sh
         , toAnyLiteral
         , toBool
         , toDate
@@ -54,9 +51,9 @@ import RDF
         , toLangString
         , toString
         , unwrap
-        , xsd
         )
 import RDF.Graph exposing (Graph(..), GraphData)
+import RDF.Namespaces exposing (rdf, rdfs, sh, xsd)
 import RDF.PropertyPath exposing (PropertyPath(..))
 import Time exposing (Posix)
 
