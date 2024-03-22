@@ -5,29 +5,17 @@ module RDF exposing
     , NTriple
     , Node(..), Yes, No, NodeInternal(..)
     , forgetCompatible
+    , unwrap
     , blankNode, iriAbsolute, literalWithDatatype, literal, bool, string, int
     , dash, dcterms, owl, qudt, rdf, rdfs, sh, xsd, a, prov
-    , toIri, toUrl, toBlankNodeOrIri, toString, toLangString, toInt, toFloat, toDecimal, toDate, toDateTime
-    , serialize, serializeNode
-    , Graph(..), GraphData
-    , union
-    , emptyGraph, singleton, fromNTriples
-    , decoder, encode
-    , parse, Error
-    , Seed, initialSeed
-    , insert, insertAt, generateBlankNode
-    , isEmpty
-    , Query, emptyQuery
-    , withSubject, withPredicate, withObject
-    , PropertyPath(..), withPropertyPath, serializePropertyPath
-    , exists
-    , getSubjects, getIriSubjects
-    , getSubject, getBlankNodeOrIriSubject, getIriSubject
-    , getObjects, getBlankNodeOrIriObjects, getIriObjects, getInts, getFloats, getBools, getDates, getDateTimes, getListObjects, getListIriObjects, getListBlankNodeOrIriObjects
-    , getObject, getBlankNodeOrIriObject, getIriObject, getAnyLiteralObject, getInt, getBool, getString, getDate, getDateTime, getPropertyPathObject
+    , toIri, toUrl, toBlankNodeOrIri, toString, toLangString, toInt, toFloat, toDecimal, toDate, toDateTime, toAnyLiteral, toBool
+    , serializeNode, serializeNTriple, serializeNodeHelp
+    , encodeNTriple
+    , nTripleDecoder
+    , parseNTriples
+    , Error
     , toValue
-    , rdfsLabelFor, rdfsCommentFor
-    , StringOrLangString, localize, nonLocalized, getStringOrLangString, stringOrLangStringFrom, stringOrLangStringFromList, mergeStringOrLangStrings
+    , StringOrLangString(..), localize, nonLocalized, stringOrLangStringFrom, stringOrLangStringFromList, mergeStringOrLangStrings
     )
 
 {-|
@@ -41,6 +29,7 @@ module RDF exposing
 @docs NTriple
 @docs Node, Yes, No, NodeInternal
 @docs forgetCompatible
+@docs unwrap
 
 
 ## Create
@@ -55,56 +44,27 @@ module RDF exposing
 
 ## Transform
 
-@docs toIri, toUrl, toBlankNodeOrIri, toString, toLangString, toInt, toFloat, toDecimal, toDate, toDateTime
+@docs toIri, toUrl, toBlankNodeOrIri, toString, toLangString, toInt, toFloat, toDecimal, toDate, toDateTime, toAnyLiteral, toBool
 
 
 ## Serialize
 
-@docs serialize, serializeNode
+@docs serializeNode, serializeNTriple, serializeNodeHelp
+@docs encodeNTriple
+@docs nTripleDecoder
+@docs parseNTriples
 
-
-# Graph
-
-@docs Graph, GraphData
-@docs union
-
-
-## Create
-
-@docs emptyGraph, singleton, fromNTriples
-@docs decoder, encode
-@docs parse, Error
-
-
-## Update
-
-@docs Seed, initialSeed
-@docs insert, insertAt, generateBlankNode
+@docs Error
 
 
 ## Retrieve
 
-@docs isEmpty
-
 
 ## Filter
 
-@docs Query, emptyQuery
-@docs withSubject, withPredicate, withObject
-@docs PropertyPath, withPropertyPath, serializePropertyPath
-
-
-## Query
-
-@docs exists
-@docs getSubjects, getIriSubjects
-@docs getSubject, getBlankNodeOrIriSubject, getIriSubject
-@docs getObjects, getBlankNodeOrIriObjects, getIriObjects, getInts, getFloats, getBools, getDates, getDateTimes, getListObjects, getListIriObjects, getListBlankNodeOrIriObjects
-@docs getObject, getBlankNodeOrIriObject, getIriObject, getAnyLiteralObject, getInt, getBool, getString, getDate, getDateTime, getPropertyPathObject
 @docs toValue
 
-@docs rdfsLabelFor, rdfsCommentFor
-@docs StringOrLangString, localize, nonLocalized, getStringOrLangString, stringOrLangStringFrom, stringOrLangStringFromList, mergeStringOrLangStrings
+@docs StringOrLangString, localize, nonLocalized, stringOrLangStringFrom, stringOrLangStringFromList, mergeStringOrLangStrings
 
 -}
 
@@ -114,14 +74,10 @@ import Iso8601
 import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline as Decode
 import Json.Encode as Encode exposing (Value)
-import List.Extra as List
 import Maybe.Extra as Maybe
 import Parser exposing ((|.), (|=), Parser)
-import Random
 import Set
 import Time exposing (Posix)
-import Tuple.Extra as Tuple
-import UUID
 
 
 {-| TODO Add documentation
@@ -586,6 +542,8 @@ forgetCompatible (Node node) =
     Node node
 
 
+{-| TODO Add documentation
+-}
 unwrap : Node compatible -> NodeInternal
 unwrap (Node node) =
     node
@@ -593,16 +551,6 @@ unwrap (Node node) =
 
 {-| TODO Add documentation
 -}
-serialize : Graph -> String
-serialize (Graph data) =
-    data.bySubjectByPredicate
-        |> Dict.values
-        |> List.concatMap Dict.values
-        |> List.concat
-        |> List.map serializeNTriple
-        |> String.join "\n"
-
-
 serializeNTriple : NTriple -> String
 serializeNTriple { subject, predicate, object } =
     [ serializeNode subject
@@ -620,6 +568,8 @@ serializeNode (Node node) =
     serializeNodeHelp node
 
 
+{-| TODO Add documentation
+-}
 serializeNodeHelp : NodeInternal -> String
 serializeNodeHelp node =
     case node of
@@ -645,938 +595,6 @@ serializeNodeHelp node =
                     "@" ++ languageTag
             ]
                 |> String.concat
-
-
-{-| FIXME internals exposed for benchmarks
--}
-type Graph
-    = Graph GraphData
-
-
-{-| TODO Add documentation
--}
-type alias GraphData =
-    { nTriples : List NTriple
-    , subjects : List BlankNodeOrIri
-    , objects : List BlankNodeOrIriOrAnyLiteral
-    , bySubjectByPredicate : Dict String (Dict String (List NTriple))
-    , byPredicateBySubject : Dict String (Dict String (List NTriple))
-    }
-
-
-{-| FIXME Input graphs are expected to be disjoint on blank nodes. Otherwise, behavior is undefined.
--}
-union : Graph -> Graph -> Graph
-union (Graph g) (Graph h) =
-    let
-        merge dictLeft dictRight =
-            Dict.merge
-                Dict.insert
-                (\keyOuter valueLeftOuter valueRightOuter ->
-                    Dict.insert keyOuter
-                        (Dict.merge Dict.insert
-                            (\keyInner valueLeftInnter valueRightInner ->
-                                Dict.insert keyInner
-                                    (List.append valueLeftInnter valueRightInner)
-                            )
-                            Dict.insert
-                            valueLeftOuter
-                            valueRightOuter
-                            Dict.empty
-                        )
-                )
-                Dict.insert
-                dictLeft
-                dictRight
-                Dict.empty
-    in
-    Graph
-        { g
-            | nTriples = g.nTriples ++ h.nTriples
-            , subjects = g.subjects ++ h.subjects
-            , objects = g.objects ++ h.objects
-            , bySubjectByPredicate = merge g.bySubjectByPredicate h.bySubjectByPredicate
-            , byPredicateBySubject = merge g.byPredicateBySubject h.byPredicateBySubject
-        }
-
-
-{-| TODO Add documentation
--}
-type Seed
-    = Seed UUID.Seeds
-
-
-{-| TODO Add documentation
--}
-type Query
-    = Query QueryData
-
-
-type alias QueryData =
-    { subject : Maybe BlankNodeOrIri
-    , propertyPath : Maybe PropertyPath
-    , object : Maybe BlankNodeOrIriOrAnyLiteral
-    }
-
-
-{-| TODO Add documentation
--}
-emptyQuery : Query
-emptyQuery =
-    Query
-        { subject = Nothing
-        , propertyPath = Nothing
-        , object = Nothing
-        }
-
-
-{-| TODO Add documentation
--}
-type PropertyPath
-    = PredicatePath Iri
-    | SequencePath PropertyPath (List PropertyPath)
-    | AlternativePath PropertyPath (List PropertyPath)
-    | InversePath PropertyPath
-    | ZeroOrMorePath PropertyPath
-    | OneOrMorePath PropertyPath
-    | ZeroOrOnePath PropertyPath
-
-
-{-| TODO Add documentation
--}
-serializePropertyPath : PropertyPath -> String
-serializePropertyPath propertyPath =
-    case propertyPath of
-        PredicatePath iri ->
-            serializeNode iri
-
-        SequencePath first rest ->
-            (serializePropertyPath first :: List.map serializePropertyPath rest)
-                |> String.join "/"
-
-        AlternativePath first rest ->
-            (serializePropertyPath first :: List.map serializePropertyPath rest)
-                |> String.join "|"
-
-        InversePath nested ->
-            "^" ++ serializePropertyPath nested
-
-        ZeroOrMorePath nested ->
-            serializePropertyPath nested ++ "*"
-
-        OneOrMorePath nested ->
-            serializePropertyPath nested ++ "+"
-
-        ZeroOrOnePath nested ->
-            serializePropertyPath nested ++ "?"
-
-
-{-| TODO Add documentation
--}
-emptyGraph : Graph
-emptyGraph =
-    Graph
-        { nTriples = []
-        , subjects = []
-        , objects = []
-        , bySubjectByPredicate = Dict.empty
-        , byPredicateBySubject = Dict.empty
-        }
-
-
-{-| TODO Add documentation
--}
-isEmpty : Graph -> Bool
-isEmpty (Graph data) =
-    List.isEmpty data.nTriples
-
-
-{-| TODO Add documentation
--}
-initialSeed : Seed
-initialSeed =
-    Seed
-        { seed1 = Random.initialSeed 1
-        , seed2 = Random.initialSeed 2
-        , seed3 = Random.initialSeed 3
-        , seed4 = Random.initialSeed 4
-        }
-
-
-{-| TODO Add documentation
--}
-singleton : IsBlankNodeOrIri compatible1 -> IsIri compatible2 -> Node compatible3 -> Graph
-singleton subject predicate object =
-    fromNTriples
-        [ NTriple
-            (forgetCompatible subject)
-            (forgetCompatible predicate)
-            (forgetCompatible object)
-        ]
-
-
-{-| TODO Add documentation
--}
-insert : IsBlankNodeOrIri compatible1 -> IsIri compatible2 -> Node compatible3 -> Graph -> Graph
-insert subject predicate object (Graph graph) =
-    let
-        keySubject =
-            serializeNode subject
-
-        keyPredicate =
-            serializeNode predicate
-
-        triple =
-            { subject = forgetCompatible subject
-            , predicate = forgetCompatible predicate
-            , object = forgetCompatible object
-            }
-    in
-    Graph
-        { graph
-            | nTriples = triple :: graph.nTriples
-            , subjects = forgetCompatible subject :: graph.subjects
-            , objects = forgetCompatible object :: graph.objects
-            , bySubjectByPredicate =
-                Dict.update keySubject
-                    (Maybe.map
-                        (Dict.update keyPredicate
-                            (Maybe.map (\triples -> triple :: triples)
-                                >> Maybe.withDefault [ triple ]
-                                >> Just
-                            )
-                        )
-                        >> Maybe.withDefault (Dict.singleton keyPredicate [ triple ])
-                        >> Just
-                    )
-                    graph.bySubjectByPredicate
-            , byPredicateBySubject =
-                Dict.update keyPredicate
-                    (Maybe.map
-                        (Dict.update keySubject
-                            (Maybe.map (\triples -> triple :: triples)
-                                >> Maybe.withDefault [ triple ]
-                                >> Just
-                            )
-                        )
-                        >> Maybe.withDefault (Dict.singleton keySubject [ triple ])
-                        >> Just
-                    )
-                    graph.byPredicateBySubject
-        }
-
-
-{-| TODO Add documentation
--}
-insertAt : IsBlankNodeOrIri compatible1 -> PropertyPath -> Node compatible2 -> Graph -> Seed -> ( Graph, Seed )
-insertAt subject path object graph seed =
-    case path of
-        PredicatePath predicate ->
-            ( insert subject predicate object graph, seed )
-
-        SequencePath (PredicatePath predicate) propertyPaths ->
-            let
-                insertAtNext idFocusNodeNext graphNext seedNext =
-                    case propertyPaths of
-                        [] ->
-                            ( graphNext, seedNext )
-
-                        [ first ] ->
-                            insertAt idFocusNodeNext first object graphNext seedNext
-
-                        first :: rest ->
-                            insertAt idFocusNodeNext (SequencePath first rest) object graphNext seedNext
-            in
-            case
-                emptyQuery
-                    |> withSubject subject
-                    |> withPredicate predicate
-                    |> getBlankNodeOrIriObject graph
-            of
-                Nothing ->
-                    let
-                        ( idFocusNodeNext, seedUpdated ) =
-                            generateBlankNode seed
-                    in
-                    ( insert subject predicate idFocusNodeNext graph, seedUpdated )
-                        |> Tuple.apply (insertAtNext (forgetCompatible idFocusNodeNext))
-
-                Just idFocusNodeNext ->
-                    insertAtNext (forgetCompatible idFocusNodeNext) graph seed
-
-        _ ->
-            ( graph, seed )
-
-
-{-| TODO Add documentation
--}
-generateBlankNode : Seed -> ( BlankNode, Seed )
-generateBlankNode (Seed seed) =
-    let
-        ( uuid, seedUpdated ) =
-            UUID.step seed
-    in
-    ( Node (BlankNode (UUID.toString uuid))
-    , Seed seedUpdated
-    )
-
-
-
--- QUERY
-
-
-{-| TODO Add documentation
--}
-withSubject : IsBlankNodeOrIri compatible -> Query -> Query
-withSubject node (Query query) =
-    Query { query | subject = Just (forgetCompatible node) }
-
-
-{-| TODO Add documentation
--}
-withPredicate : IsIri compatible -> Query -> Query
-withPredicate node (Query query) =
-    Query { query | propertyPath = Just (PredicatePath (forgetCompatible node)) }
-
-
-{-| TODO Add documentation
--}
-withPropertyPath : PropertyPath -> Query -> Query
-withPropertyPath propertyPath (Query data) =
-    Query { data | propertyPath = Just propertyPath }
-
-
-{-| TODO Add documentation
--}
-withObject : Node compatible -> Query -> Query
-withObject node (Query query) =
-    Query { query | object = Just (forgetCompatible node) }
-
-
-{-| Resturns if any matching triple exists.
--}
-exists : Graph -> Query -> Bool
-exists (Graph graph) (Query query) =
-    let
-        subjectMatches triple =
-            case query.subject of
-                Nothing ->
-                    True
-
-                Just subject ->
-                    triple.subject == subject
-
-        predicateMatches triple =
-            case query.propertyPath of
-                Just (PredicatePath predicate) ->
-                    triple.predicate == predicate
-
-                Just _ ->
-                    False
-
-                Nothing ->
-                    True
-
-        objectMatches triple =
-            case query.object of
-                Nothing ->
-                    True
-
-                Just object ->
-                    triple.object == object
-    in
-    graph.nTriples
-        |> List.filter objectMatches
-        |> List.filter predicateMatches
-        |> List.filter subjectMatches
-        |> List.isEmpty
-        |> not
-
-
-{-| Return the subjects of all remaining triples.
--}
-getSubjects : Graph -> Query -> List BlankNodeOrIri
-getSubjects (Graph graph) (Query query) =
-    List.unique
-        (let
-            filterByObject result =
-                case query.object of
-                    Nothing ->
-                        result
-
-                    Just object ->
-                        List.filter (\nTriple -> nTriple.object == object) result
-         in
-         if query.subject == Nothing then
-            case query.propertyPath of
-                Just (PredicatePath iriPredicate) ->
-                    graph.byPredicateBySubject
-                        |> Dict.get (serializeNode iriPredicate)
-                        |> Maybe.withDefault Dict.empty
-                        |> Dict.values
-                        |> List.concat
-                        |> filterByObject
-                        |> List.map .subject
-
-                _ ->
-                    graph.nTriples
-                        |> filterByObject
-                        |> List.map .subject
-
-         else
-            []
-        )
-
-
-{-| TODO Add documentation
--}
-getIriSubjects : Graph -> Query -> List Iri
-getIriSubjects graph query =
-    query
-        |> getSubjects graph
-        |> List.filterMap toIri
-
-
-{-| If there is only one triple left, return it's subject. Otherwise return
-`Nothing`.
--}
-getSubject : Graph -> Query -> Maybe BlankNodeOrIri
-getSubject graph query =
-    case query |> getSubjects graph of
-        [ subject ] ->
-            Just subject
-
-        _ ->
-            Nothing
-
-
-{-| TODO Add documentation
--}
-getBlankNodeOrIriSubject : Graph -> Query -> Maybe BlankNodeOrIri
-getBlankNodeOrIriSubject graph query =
-    let
-        toBlankNodeOrIriSafe (Node node) =
-            case node of
-                BlankNode _ ->
-                    Just (Node node)
-
-                Iri _ ->
-                    Just (Node node)
-
-                Literal _ ->
-                    Nothing
-    in
-    query
-        |> getSubject graph
-        |> Maybe.andThen toBlankNodeOrIriSafe
-
-
-{-| TODO Add documentation
--}
-getIriSubject : Graph -> Query -> Maybe Iri
-getIriSubject graph query =
-    query
-        |> getSubject graph
-        |> Maybe.andThen toIri
-
-
-{-| Return the objects of all remaining triples.
--}
-getObjects : Graph -> Query -> List BlankNodeOrIriOrAnyLiteral
-getObjects (Graph graph) (Query query) =
-    List.unique
-        (if query.object == Nothing then
-            case query.subject of
-                Nothing ->
-                    case query.propertyPath of
-                        Just propertyPath ->
-                            List.concatMap (unwrap >> followPropertyPath graph propertyPath >> List.map Node) graph.subjects
-
-                        Nothing ->
-                            graph.objects
-
-                Just subject ->
-                    case query.propertyPath of
-                        Just propertyPath ->
-                            List.map Node (followPropertyPath graph propertyPath (unwrap subject))
-
-                        Nothing ->
-                            graph.bySubjectByPredicate
-                                |> Dict.get (serializeNode subject)
-                                |> Maybe.withDefault Dict.empty
-                                |> Dict.values
-                                |> List.concat
-                                |> List.map .object
-
-         else
-            []
-        )
-
-
-followPropertyPath : GraphData -> PropertyPath -> NodeInternal -> List NodeInternal
-followPropertyPath data propertyPath subject =
-    case propertyPath of
-        PredicatePath iri ->
-            data.bySubjectByPredicate
-                |> Dict.get (serializeNodeHelp subject)
-                |> Maybe.withDefault Dict.empty
-                |> Dict.get (serializeNode iri)
-                |> Maybe.withDefault []
-                |> List.map (.object >> unwrap)
-
-        SequencePath first rest ->
-            List.foldl
-                (\next -> List.concatMap (followPropertyPath data next))
-                (followPropertyPath data first subject)
-                rest
-
-        _ ->
-            []
-
-
-{-| TODO Add documentation
--}
-getBlankNodeOrIriObjects : Graph -> Query -> List BlankNodeOrIri
-getBlankNodeOrIriObjects graph query =
-    let
-        onlyBlankNodeOrIri (Node node) =
-            case node of
-                BlankNode _ ->
-                    Just (Node node)
-
-                Iri _ ->
-                    Just (Node node)
-
-                Literal _ ->
-                    Nothing
-    in
-    query
-        |> getObjects graph
-        |> List.filterMap onlyBlankNodeOrIri
-
-
-{-| TODO Add documentation
--}
-getIriObjects : Graph -> Query -> List Iri
-getIriObjects graph query =
-    query
-        |> getObjects graph
-        |> List.filterMap toIri
-
-
-{-| If there is only one triple left, return it's object. Otherwise return
-`Nothing`.
--}
-getObject : Graph -> Query -> Maybe BlankNodeOrIriOrAnyLiteral
-getObject graph query =
-    case query |> getObjects graph of
-        [ object ] ->
-            Just object
-
-        _ ->
-            Nothing
-
-
-{-| TODO Add documentation
--}
-getBlankNodeOrIriObject : Graph -> Query -> Maybe BlankNodeOrIri
-getBlankNodeOrIriObject graph query =
-    let
-        toBlankNodeOrIriSafe (Node node) =
-            case node of
-                BlankNode _ ->
-                    Just (Node node)
-
-                Iri _ ->
-                    Just (Node node)
-
-                Literal _ ->
-                    Nothing
-    in
-    query
-        |> getObject graph
-        |> Maybe.andThen toBlankNodeOrIriSafe
-
-
-{-| TODO Add documentation
--}
-getIriObject : Graph -> Query -> Maybe Iri
-getIriObject graph query =
-    query
-        |> getObject graph
-        |> Maybe.andThen toIri
-
-
-{-| TODO Add documentation
--}
-getAnyLiteralObject : Graph -> Query -> Maybe AnyLiteral
-getAnyLiteralObject graph query =
-    query
-        |> getObject graph
-        |> Maybe.andThen toAnyLiteral
-
-
-{-| TODO Add documentation
--}
-getPropertyPathObject : Graph -> Query -> Maybe PropertyPath
-getPropertyPathObject graph query =
-    query
-        |> getBlankNodeOrIriObject graph
-        |> Maybe.andThen (objectToPropertyPath graph)
-
-
-objectToPropertyPath : Graph -> BlankNodeOrIri -> Maybe PropertyPath
-objectToPropertyPath graph object =
-    [ objectToPredicatePath object
-    , objectToSequencePath graph object
-    , objectToAlternativePath graph object
-    , objectToInversePath graph object
-    , objectToZeroOrMorePath graph object
-    , objectToOneOrMorePath graph object
-    , objectToZeroOrOnePath graph object
-    ]
-        |> Maybe.orList
-
-
-objectToPredicatePath : BlankNodeOrIri -> Maybe PropertyPath
-objectToPredicatePath object =
-    toIri object
-        |> Maybe.map PredicatePath
-
-
-objectToSequencePath : Graph -> BlankNodeOrIri -> Maybe PropertyPath
-objectToSequencePath graph object =
-    objectToListBlankNodeOrIri graph object
-        |> Maybe.andThen (objectListToSequencePath graph)
-
-
-objectListToSequencePath : Graph -> List BlankNodeOrIri -> Maybe PropertyPath
-objectListToSequencePath graph objects =
-    case objects of
-        [] ->
-            Nothing
-
-        first :: rest ->
-            Maybe.map2 SequencePath
-                (objectToPropertyPath graph first)
-                (rest
-                    |> List.map (objectToPropertyPath graph)
-                    |> Maybe.combine
-                )
-
-
-objectToAlternativePath : Graph -> BlankNodeOrIri -> Maybe PropertyPath
-objectToAlternativePath graph object =
-    emptyQuery
-        |> withSubject object
-        |> withPredicate (sh "alternativePath")
-        |> getBlankNodeOrIriObject graph
-        |> Maybe.andThen (objectToListBlankNodeOrIri graph)
-        |> Maybe.andThen (objectListToAlternativePath graph)
-
-
-objectListToAlternativePath : Graph -> List BlankNodeOrIri -> Maybe PropertyPath
-objectListToAlternativePath triples list =
-    case list of
-        [] ->
-            Nothing
-
-        first :: rest ->
-            Maybe.map2 AlternativePath
-                (objectToPropertyPath triples first)
-                (rest
-                    |> List.map (objectToPropertyPath triples)
-                    |> Maybe.combine
-                )
-
-
-objectToInversePath : Graph -> BlankNodeOrIri -> Maybe PropertyPath
-objectToInversePath graph object =
-    emptyQuery
-        |> withSubject object
-        |> withPredicate (sh "inversePath")
-        |> getBlankNodeOrIriObject graph
-        |> Maybe.andThen (objectToPropertyPath graph)
-        |> Maybe.map InversePath
-
-
-objectToZeroOrMorePath : Graph -> BlankNodeOrIri -> Maybe PropertyPath
-objectToZeroOrMorePath graph object =
-    emptyQuery
-        |> withSubject object
-        |> withPredicate (sh "zeroOrMorePath")
-        |> getBlankNodeOrIriObject graph
-        |> Maybe.andThen (objectToPropertyPath graph)
-        |> Maybe.map ZeroOrMorePath
-
-
-objectToOneOrMorePath : Graph -> BlankNodeOrIri -> Maybe PropertyPath
-objectToOneOrMorePath graph object =
-    emptyQuery
-        |> withSubject object
-        |> withPredicate (sh "oneOrMorePath")
-        |> getBlankNodeOrIriObject graph
-        |> Maybe.andThen (objectToPropertyPath graph)
-        |> Maybe.map OneOrMorePath
-
-
-objectToZeroOrOnePath : Graph -> BlankNodeOrIri -> Maybe PropertyPath
-objectToZeroOrOnePath graph object =
-    emptyQuery
-        |> withSubject object
-        |> withPredicate (sh "zeroOrOnePath")
-        |> getBlankNodeOrIriObject graph
-        |> Maybe.andThen (objectToPropertyPath graph)
-        |> Maybe.map ZeroOrOnePath
-
-
-{-| TODO Add documentation
--}
-getBools : Graph -> Query -> List Bool
-getBools graph query =
-    query
-        |> getObjects graph
-        |> List.filterMap toBool
-
-
-{-| TODO Add documentation
--}
-getBool : Graph -> Query -> Maybe Bool
-getBool graph query =
-    query
-        |> getObject graph
-        |> Maybe.andThen toBool
-
-
-{-| TODO Add documentation
--}
-getString : Graph -> Query -> Maybe String
-getString graph query =
-    query
-        |> getObject graph
-        |> Maybe.andThen toString
-
-
-{-| TODO Add documentation
--}
-getDates : Graph -> Query -> List Posix
-getDates graph query =
-    query
-        |> getObjects graph
-        |> List.filterMap toDate
-
-
-{-| TODO Add documentation
--}
-getDate : Graph -> Query -> Maybe Posix
-getDate graph query =
-    query
-        |> getObject graph
-        |> Maybe.andThen toDate
-
-
-{-| TODO Add documentation
--}
-getDateTimes : Graph -> Query -> List Posix
-getDateTimes graph query =
-    query
-        |> getObjects graph
-        |> List.filterMap toDateTime
-
-
-{-| TODO Add documentation
--}
-getDateTime : Graph -> Query -> Maybe Posix
-getDateTime graph query =
-    query
-        |> getObject graph
-        |> Maybe.andThen toDateTime
-
-
-{-| TODO Add documentation
--}
-getInts : Graph -> Query -> List Int
-getInts graph query =
-    let
-        onlyInt (Node node) =
-            case node of
-                BlankNode _ ->
-                    Nothing
-
-                Iri _ ->
-                    Nothing
-
-                Literal data ->
-                    if data.datatype == xsd "integer" then
-                        String.toInt data.value
-
-                    else if data.datatype == xsd "int" then
-                        String.toInt data.value
-
-                    else
-                        Nothing
-    in
-    query
-        |> getObjects graph
-        |> List.filterMap onlyInt
-
-
-{-| TODO Add documentation
--}
-getInt : Graph -> Query -> Maybe Int
-getInt graph query =
-    List.head (getInts graph query)
-
-
-{-| TODO Add documentation
--}
-getFloats : Graph -> Query -> List Float
-getFloats graph query =
-    let
-        onlyFloat (Node node) =
-            case node of
-                BlankNode _ ->
-                    Nothing
-
-                Iri _ ->
-                    Nothing
-
-                Literal data ->
-                    if
-                        (data.datatype == xsd "float")
-                            || (data.datatype == xsd "double")
-                            || (data.datatype == xsd "decimal")
-                    then
-                        String.toFloat data.value
-
-                    else
-                        Nothing
-    in
-    query
-        |> getObjects graph
-        |> List.filterMap onlyFloat
-
-
-{-| TODO Add documentation
--}
-getListObjects : Graph -> Query -> List (List BlankNodeOrIriOrAnyLiteral)
-getListObjects graph query =
-    query
-        |> getBlankNodeOrIriObjects graph
-        |> List.filterMap (objectToList graph)
-
-
-{-| TODO Add documentation
--}
-objectToList : Graph -> BlankNodeOrIri -> Maybe (List BlankNodeOrIriOrAnyLiteral)
-objectToList graph object =
-    if toIri object == Just (rdf "nil") then
-        Just []
-
-    else
-        Maybe.map2
-            (\first rest ->
-                first :: rest
-            )
-            (emptyQuery
-                |> withSubject object
-                |> withPredicate (rdf "first")
-                |> getObject graph
-            )
-            (emptyQuery
-                |> withSubject object
-                |> withPredicate (rdf "rest")
-                |> getBlankNodeOrIriObject graph
-                |> Maybe.andThen (objectToList graph)
-            )
-
-
-{-| TODO Add documentation
--}
-getListIriObjects : Graph -> Query -> List (List Iri)
-getListIriObjects graph query =
-    query
-        |> getBlankNodeOrIriObjects graph
-        |> List.filterMap (objectToListIri graph)
-
-
-{-| TODO Add documentation
--}
-getListBlankNodeOrIriObjects : Graph -> Query -> List (List BlankNodeOrIri)
-getListBlankNodeOrIriObjects graph query =
-    query
-        |> getBlankNodeOrIriObjects graph
-        |> List.filterMap (objectToListBlankNodeOrIri graph)
-
-
-{-| TODO Add documentation
--}
-objectToListIri : Graph -> BlankNodeOrIri -> Maybe (List Iri)
-objectToListIri graph object =
-    if toIri object == Just (rdf "nil") then
-        Just []
-
-    else
-        Maybe.map2
-            (\first rest ->
-                first :: rest
-            )
-            (emptyQuery
-                |> withSubject object
-                |> withPredicate (rdf "first")
-                |> getIriObject graph
-            )
-            (emptyQuery
-                |> withSubject object
-                |> withPredicate (rdf "rest")
-                |> getBlankNodeOrIriObject graph
-                |> Maybe.andThen (objectToListIri graph)
-            )
-
-
-{-| TODO Add documentation
--}
-objectToListBlankNodeOrIri : Graph -> BlankNodeOrIri -> Maybe (List BlankNodeOrIri)
-objectToListBlankNodeOrIri graph object =
-    if toIri object == Just (rdf "nil") then
-        Just []
-
-    else
-        Maybe.map2
-            (\first rest ->
-                first :: rest
-            )
-            (emptyQuery
-                |> withSubject object
-                |> withPredicate (rdf "first")
-                |> getBlankNodeOrIriObject graph
-            )
-            (emptyQuery
-                |> withSubject object
-                |> withPredicate (rdf "rest")
-                |> getBlankNodeOrIriObject graph
-                |> Maybe.andThen (objectToListBlankNodeOrIri graph)
-            )
-
-
-{-| TODO Add documentation
--}
-rdfsLabelFor : Graph -> IsBlankNodeOrIri compatible -> Maybe StringOrLangString
-rdfsLabelFor graph blankNodeOrIri =
-    emptyQuery
-        |> withSubject blankNodeOrIri
-        |> withPredicate (rdfs "label")
-        |> getStringOrLangString graph
-
-
-{-| TODO Add documentation
--}
-rdfsCommentFor : Graph -> IsBlankNodeOrIri compatible -> Maybe StringOrLangString
-rdfsCommentFor graph blankNodeOrIri =
-    emptyQuery
-        |> withSubject blankNodeOrIri
-        |> withPredicate (rdfs "comment")
-        |> getStringOrLangString graph
 
 
 {-| TODO Add documentation
@@ -1628,38 +646,6 @@ stringOrLangStringFromList langStrings =
 
 {-| TODO Add documentation
 -}
-getStringOrLangString : Graph -> Query -> Maybe StringOrLangString
-getStringOrLangString graph query =
-    let
-        getStringOrLangStringHelp objects =
-            let
-                maybeString =
-                    objects
-                        |> List.filterMap toString
-                        |> List.head
-
-                langStrings =
-                    objects
-                        |> List.filterMap toLangString
-                        |> Dict.fromList
-            in
-            if maybeString == Nothing && Dict.isEmpty langStrings then
-                Nothing
-
-            else
-                { string = maybeString
-                , langStrings = langStrings
-                }
-                    |> StringOrLangString
-                    |> Just
-    in
-    query
-        |> getObjects graph
-        |> getStringOrLangStringHelp
-
-
-{-| TODO Add documentation
--}
 mergeStringOrLangStrings : List StringOrLangString -> Maybe StringOrLangString
 mergeStringOrLangStrings stringOrLangStrings =
     if List.isEmpty stringOrLangStrings then
@@ -1690,12 +676,6 @@ type alias Error =
 
 {-| TODO Add documentation
 -}
-decoder : Decoder Graph
-decoder =
-    Decode.list nTripleDecoder
-        |> Decode.map fromNTriples
-
-
 nTripleDecoder : Decoder NTriple
 nTripleDecoder =
     Decode.succeed NTriple
@@ -1794,15 +774,6 @@ literalDecoder =
 
 {-| TODO Add documentation
 -}
-encode : Graph -> Value
-encode (Graph data) =
-    data.bySubjectByPredicate
-        |> Dict.values
-        |> List.concatMap Dict.values
-        |> List.concat
-        |> Encode.list encodeNTriple
-
-
 encodeNTriple : NTriple -> Value
 encodeNTriple nTriple =
     [ ( "subject", encodeSubject nTriple.subject )
@@ -1893,15 +864,6 @@ encodeLiteral data =
 
 {-| Get all N-Triples from a n-triple text file.
 -}
-parse : String -> Result (List Error) Graph
-parse raw =
-    raw
-        |> parseNTriples
-        |> Result.map fromNTriples
-
-
-{-| Get all N-Triples from a n-triple text file.
--}
 parseNTriples : String -> Result (List Error) (List NTriple)
 parseNTriples raw =
     let
@@ -1945,72 +907,6 @@ parseNTriples raw =
         |> List.foldl collect ( 1, Ok [] )
         |> Tuple.second
         |> Result.map List.reverse
-
-
-{-| TODO Add documentation
--}
-fromNTriples : List NTriple -> Graph
-fromNTriples nTriples =
-    Graph
-        { nTriples = nTriples
-        , subjects = List.map .subject nTriples
-        , objects = List.map .object nTriples
-        , bySubjectByPredicate =
-            nTriples
-                |> List.map annotateWithIriSubject
-                |> groupByTupleFirst
-                |> List.map
-                    (\( ( iriSubject, nTripleFirst ), rest ) ->
-                        ( iriSubject
-                        , (nTripleFirst :: List.map Tuple.second rest)
-                            |> List.map annotateWithIriPredicate
-                            |> groupByTupleFirst
-                            |> dictFromGroups
-                        )
-                    )
-                |> Dict.fromList
-        , byPredicateBySubject =
-            nTriples
-                |> List.map annotateWithIriPredicate
-                |> groupByTupleFirst
-                |> List.map
-                    (\( ( iriPredicate, nTripleFirst ), rest ) ->
-                        ( iriPredicate
-                        , (nTripleFirst :: List.map Tuple.second rest)
-                            |> List.map annotateWithIriSubject
-                            |> groupByTupleFirst
-                            |> dictFromGroups
-                        )
-                    )
-                |> Dict.fromList
-        }
-
-
-annotateWithIriSubject : NTriple -> ( String, NTriple )
-annotateWithIriSubject nTriple =
-    ( serializeNode nTriple.subject, nTriple )
-
-
-annotateWithIriPredicate : NTriple -> ( String, NTriple )
-annotateWithIriPredicate nTriple =
-    ( serializeNode nTriple.predicate, nTriple )
-
-
-groupByTupleFirst : List ( comparable, a ) -> List ( ( comparable, a ), List ( comparable, a ) )
-groupByTupleFirst =
-    List.sortBy Tuple.first
-        >> List.groupWhile (\( left, _ ) ( right, _ ) -> left == right)
-
-
-dictFromGroups : List ( ( comparable, a ), List ( comparable, a ) ) -> Dict comparable (List a)
-dictFromGroups =
-    List.map
-        (\( ( key, first ), rest ) ->
-            ( key
-            , first :: List.map Tuple.second rest
-            )
-        )
-        >> Dict.fromList
 
 
 
