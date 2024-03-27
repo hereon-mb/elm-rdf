@@ -3,6 +3,7 @@ module RDF.Namespaces exposing
     , a
     , owl, sh, dash
     , dcterms, qudt, prov
+    , schema
     )
 
 {-|
@@ -11,6 +12,7 @@ module RDF.Namespaces exposing
 @docs a
 @docs owl, sh, dash
 @docs dcterms, qudt, prov
+@docs schema
 
 -}
 
@@ -78,6 +80,13 @@ xsd name =
 prov : String -> Iri
 prov name =
     iriAbsolute ("http://www.w3.org/ns/prov#" ++ name)
+
+
+{-| TODO Add documentation
+-}
+schema : String -> Iri
+schema name =
+    iriAbsolute ("http://schema.org/" ++ name)
 
 
 {-| TODO Add documentation
