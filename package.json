@@ -1,0 +1,14 @@
+{
+  "name": "elm-rdf",
+  "description": "RDF for Elm",
+  "license": "UNLICENSED",
+  "repository": {},
+  "scripts": {
+    "test": "elm-test",
+    "test:watch": "elm-test --watch"
+  },
+  "devDependencies": {
+    "elm": "^0.19.1-6",
+    "elm-test": "^0.19.1-revision12"
+  }
+}
