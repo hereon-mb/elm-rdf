@@ -8,6 +8,8 @@ module Internal.Turtle exposing
     , Subject(..)
     , Object(..)
     , Literal(..)
+    , NumericLiteral(..)
+    , BooleanLiteral(..)
     , Iri(..)
     , BlankNode(..)
     )
@@ -24,6 +26,8 @@ module Internal.Turtle exposing
 @docs Subject
 @docs Object
 @docs Literal
+@docs NumericLiteral
+@docs BooleanLiteral
 @docs Iri
 @docs BlankNode
 
@@ -51,7 +55,7 @@ type Directive
 
 type Triples
     = TriplesSubject Subject PredicateObjectList
-    | TriplesBlankNodePropertyList PredicateObjectList (Maybe PredicateObjectList)
+    | TriplesBlankNodePropertyList PredicateObjectList PredicateObjectList
 
 
 type alias PredicateObjectList =
@@ -92,9 +96,9 @@ type Literal
 
 
 type NumericLiteral
-    = Integer String
+    = Integer Int
     | Decimal String
-    | Double String
+    | Double Float
 
 
 type alias LangTag =
@@ -110,7 +114,7 @@ type BooleanLiteral
 
 type Iri
     = IriRef String
-    | PrefixedName String
+    | PrefixedName String String
 
 
 type BlankNode
@@ -125,7 +129,10 @@ parse =
 
 turtleDoc : Parser TurtleDoc
 turtleDoc =
-    Parser.loop [] turtleDocHelp
+    Parser.succeed identity
+        |= Parser.loop [] turtleDocHelp
+        |. whitespace
+        |. Parser.end
 
 
 turtleDocHelp : List Statement -> Parser (Parser.Step (List Statement) (List Statement))
@@ -162,16 +169,26 @@ prefixId =
     Parser.succeed PrefixId
         |. Parser.keyword "@prefix"
         |. whitespace
-        |= Parser.variable
-            { start = \char -> char /= ':' && isPnCharsBase char
-            , inner = \char -> char /= ':' && isPnChars char
-            , reserved = Set.empty
-            }
-        |. Parser.symbol ":"
+        |= pnameNs
         |. whitespace
         |= iriRef
         |. whitespace
         |. Parser.symbol "."
+
+
+pnameNs : Parser String
+pnameNs =
+    Parser.oneOf
+        [ Parser.succeed ""
+            |. Parser.symbol ":"
+        , Parser.succeed identity
+            |= Parser.variable
+                { start = \char -> char /= ':' && isPnCharsBase char
+                , inner = \char -> char /= ':' && isPnChars char
+                , reserved = Set.empty
+                }
+            |. Parser.symbol ":"
+        ]
 
 
 base : Parser Directive
@@ -209,9 +226,13 @@ sparqlBase =
 
 triples : Parser Triples
 triples =
-    Parser.oneOf
-        [ triplesSubject
-        ]
+    Parser.succeed identity
+        |= Parser.oneOf
+            [ triplesSubject
+            , triplesBlankNodePropertyList
+            ]
+        |. whitespace
+        |. Parser.symbol "."
 
 
 triplesSubject : Parser Triples
@@ -225,9 +246,9 @@ triplesSubject =
 subject : Parser Subject
 subject =
     Parser.oneOf
-        [ subjectIri
-        , subjectBlankNode
+        [ subjectBlankNode
         , subjectCollection
+        , subjectIri
         ]
 
 
@@ -254,6 +275,21 @@ subjectCollection =
             , item = object
             , trailing = Parser.Forbidden
             }
+
+
+triplesBlankNodePropertyList : Parser Triples
+triplesBlankNodePropertyList =
+    Parser.succeed TriplesBlankNodePropertyList
+        |. Parser.symbol "["
+        |. whitespace
+        |= predicateObjectList
+        |. whitespace
+        |. Parser.symbol "]"
+        |. whitespace
+        |= Parser.oneOf
+            [ predicateObjectList
+            , Parser.succeed []
+            ]
 
 
 predicateObjectList : Parser PredicateObjectList
@@ -343,10 +379,10 @@ predicate =
 object : Parser Object
 object =
     Parser.oneOf
-        [ objectIri
-        , objectBlankNode
+        [ objectBlankNode
         , objectCollection
         , objectLiteral
+        , objectIri
         ]
 
 
@@ -384,6 +420,41 @@ iri : Parser Iri
 iri =
     Parser.oneOf
         [ Parser.map IriRef iriRef
+        , Parser.succeed PrefixedName
+            |= pnameNs
+            |= pnLocal
+        ]
+
+
+pnLocal : Parser String
+pnLocal =
+    Parser.oneOf
+        [ Parser.succeed ""
+            |. Parser.chompIf isWhitespace
+        , Parser.succeed ()
+            |. Parser.oneOf
+                [ Parser.chompIf
+                    (\char ->
+                        isPnCharsU char
+                            || (char == ':')
+                            || Char.isDigit char
+                    )
+                ]
+            |. Parser.chompWhile
+                (\char ->
+                    isPnChars char
+                        || (char == '.')
+                        || (char == ':')
+                )
+            |> Parser.getChompedString
+            |> Parser.andThen
+                (\chomped ->
+                    if String.endsWith "." chomped then
+                        Parser.problem "prefixed IRI must not end with '.'"
+
+                    else
+                        Parser.succeed chomped
+                )
         ]
 
 
@@ -406,6 +477,8 @@ blankNode : Parser BlankNode
 blankNode =
     Parser.oneOf
         [ Parser.map BlankNodeLabel blankNodeLabel
+        , Parser.succeed Anon
+            |. Parser.symbol "[]"
         ]
 
 
@@ -446,6 +519,8 @@ literal : Parser Literal
 literal =
     Parser.oneOf
         [ rdfLiteral
+        , numericLiteral
+        , booleanLiteral
         ]
 
 
@@ -464,6 +539,85 @@ rdfLiteral =
                     , Parser.succeed (RdfLiteralString str)
                     ]
             )
+
+
+numericLiteral : Parser Literal
+numericLiteral =
+    Parser.map NumericLiteral <|
+        Parser.oneOf
+            [ Parser.succeed negateNumericLiteral
+                |. Parser.symbol "-"
+                |= numeric
+            , Parser.succeed identity
+                |. Parser.symbol "+"
+                |= numeric
+            , numeric
+            ]
+
+
+numeric : Parser NumericLiteral
+numeric =
+    (Parser.succeed ()
+        |. Parser.chompIf
+            (\char ->
+                Char.isDigit char
+                    || (char == '.')
+            )
+        |. Parser.chompWhile
+            (\char ->
+                Char.isDigit char
+                    || (char == '.')
+                    || (char == 'e')
+                    || (char == 'E')
+                    || (char == '-')
+                    || (char == '+')
+            )
+    )
+        |> Parser.getChompedString
+        |> Parser.andThen
+            (\raw ->
+                case String.toInt raw of
+                    Nothing ->
+                        if String.contains "e" raw || String.contains "E" raw then
+                            String.toFloat raw
+                                |> Maybe.map (Double >> Parser.succeed)
+                                |> Maybe.withDefault (Parser.problem ("'" ++ raw ++ "' is not a valid double literal"))
+
+                        else
+                            raw
+                                |> Decimal
+                                |> Parser.succeed
+
+                    Just int ->
+                        int
+                            |> Integer
+                            |> Parser.succeed
+            )
+
+
+negateNumericLiteral : NumericLiteral -> NumericLiteral
+negateNumericLiteral num =
+    case num of
+        Integer value ->
+            Integer (-1 * value)
+
+        Decimal value ->
+            Decimal ("-" ++ value)
+
+        Double value ->
+            Double (-1 * value)
+
+
+booleanLiteral : Parser Literal
+booleanLiteral =
+    Parser.oneOf
+        [ Parser.succeed BooleanLiteralTrue
+            |. Parser.keyword "true"
+            |> Parser.map BooleanLiteral
+        , Parser.succeed BooleanLiteralFalse
+            |. Parser.keyword "false"
+            |> Parser.map BooleanLiteral
+        ]
 
 
 string : Parser String
@@ -573,8 +727,12 @@ langTag =
 
 whitespace : Parser ()
 whitespace =
-    Parser.chompWhile
-        (\char -> char == ' ' || char == '\t')
+    Parser.chompWhile isWhitespace
+
+
+isWhitespace : Char -> Bool
+isWhitespace char =
+    char == ' ' || char == '\t' || char == '\n'
 
 
 isPnCharsBase : Char -> Bool
