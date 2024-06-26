@@ -4,6 +4,8 @@ module Internal.Turtle exposing
     , Statement(..)
     , Directive(..)
     , Triples(..)
+    , PredicateObjectList
+    , PredicateObjectListData
     , Verb(..)
     , Subject(..)
     , Object(..)
@@ -22,6 +24,8 @@ module Internal.Turtle exposing
 @docs Statement
 @docs Directive
 @docs Triples
+@docs PredicateObjectList
+@docs PredicateObjectListData
 @docs Verb
 @docs Subject
 @docs Object
@@ -381,6 +385,7 @@ object =
     Parser.oneOf
         [ objectBlankNode
         , objectCollection
+        , objectBlankNodePropertyList
         , objectLiteral
         , objectIri
         ]
@@ -408,6 +413,16 @@ objectCollection =
             , item = Parser.lazy (\_ -> object)
             , trailing = Parser.Forbidden
             }
+
+
+objectBlankNodePropertyList : Parser Object
+objectBlankNodePropertyList =
+    Parser.succeed ObjectBlankNodePropertyList
+        |. Parser.symbol "["
+        |. whitespace
+        |= Parser.lazy (\_ -> predicateObjectList)
+        |. whitespace
+        |. Parser.symbol "]"
 
 
 objectLiteral : Parser Object

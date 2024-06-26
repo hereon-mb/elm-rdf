@@ -188,6 +188,22 @@ parse =
                 )
             ]
           )
+        , ( "example:alice example:knows [ example:knows example:bob ] ."
+          , [ Turtle.Triples
+                (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.PrefixedName "example" "alice"))
+                    [ { verb = Turtle.Predicate (Turtle.PrefixedName "example" "knows")
+                      , objectList =
+                            [ Turtle.ObjectBlankNodePropertyList
+                                [ { verb = Turtle.Predicate (Turtle.PrefixedName "example" "knows")
+                                  , objectList = [ Turtle.ObjectIri (Turtle.PrefixedName "example" "bob") ]
+                                  }
+                                ]
+                            ]
+                      }
+                    ]
+                )
+            ]
+          )
 
         -- OBJECT LIST
         , ( "[ example:knows example:bob , example:cindi ] ."
@@ -219,6 +235,18 @@ parse =
           )
 
         -- COLLECTION
+        , ( "() a () ."
+          , [ Turtle.Triples
+                (Turtle.TriplesSubject (Turtle.SubjectCollection [])
+                    [ { verb = Turtle.A
+                      , objectList =
+                            [ Turtle.ObjectCollection []
+                            ]
+                      }
+                    ]
+                )
+            ]
+          )
         , ( "(_:a _:b) a (_:c _:d) ."
           , [ Turtle.Triples
                 (Turtle.TriplesSubject
