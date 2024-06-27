@@ -88,6 +88,7 @@ parse =
 statements : Parser (List Statement)
 statements =
     Parser.succeed identity
+        |. whitespace
         |= Parser.loop [] statementsHelp
         |. whitespace
         |. Parser.end
