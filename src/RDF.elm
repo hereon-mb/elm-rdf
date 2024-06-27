@@ -533,7 +533,7 @@ toLangString (Node node) =
             Nothing
 
         Literal data ->
-            if data.datatype == xsd "langString" then
+            if data.datatype == rdf "langString" then
                 Maybe.map2 Tuple.pair data.languageTag (Just data.value)
 
             else
@@ -1172,7 +1172,7 @@ collectObjectList object state =
             addTriple (toBlankNodeOrIriOrAnyLiteral (string value)) state
 
         Turtle.ObjectLiteral (Turtle.RdfLiteralLangString value lang) ->
-            addTriple (toBlankNodeOrIriOrAnyLiteral (literal (xsd "langString") (Just lang) value)) state
+            addTriple (toBlankNodeOrIriOrAnyLiteral (literal (rdf "langString") (Just lang) value)) state
 
         Turtle.ObjectLiteral (Turtle.RdfLiteralTyped value datatype) ->
             resolveIri state datatype
