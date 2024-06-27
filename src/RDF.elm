@@ -6,9 +6,17 @@ module RDF exposing
     , Node(..), Yes, No, NodeInternal(..)
     , forgetCompatible
     , unwrap
-    , blankNode, iriAbsolute, literalWithDatatype, literal, bool, string, int
-    , toIri, toBlankNodeOrIri, toBlankNodeOrIriOrAnyLiteral, toAnyLiteral
+    , iri, blankNode
+    , literal
+    , string, langString
+    , int, float, decimal
+    , date, dateTime
+    , bool
+    , toIri, toBlankNode
+    , toAnyLiteral
+    , toBlankNodeOrIri, toBlankNodeOrIriOrAnyLiteral
     , toUrl
+    , toValue
     , toString, toLangString
     , toInt, toFloat, toDecimal
     , toDate, toDateTime
@@ -16,8 +24,10 @@ module RDF exposing
     , serializeNode, serializeNTriple, serializeNodeHelp
     , encodeNTriple
     , nTripleDecoder
-    , toValue
-    , StringOrLangString(..), localize, nonLocalized, stringOrLangStringFrom, stringOrLangStringFromList, mergeStringOrLangStrings
+    , StringOrLangString(..)
+    , localize, nonLocalized
+    , stringOrLangStringFrom, stringOrLangStringFromList
+    , mergeStringOrLangStrings
     )
 
 {-|
@@ -36,13 +46,22 @@ module RDF exposing
 
 ## Create
 
-@docs blankNode, iriAbsolute, literalWithDatatype, literal, bool, string, int
+@docs iri, blankNode
+@docs literal
+@docs string, langString
+@docs int, float, decimal
+@docs date, dateTime
+@docs bool
 
 
 ## Transform
 
-@docs toIri, toBlankNodeOrIri, toBlankNodeOrIriOrAnyLiteral, toAnyLiteral
+@docs toIri, toBlankNode
+@docs toAnyLiteral
+@docs toBlankNodeOrIri, toBlankNodeOrIriOrAnyLiteral
+
 @docs toUrl
+@docs toValue
 @docs toString, toLangString
 @docs toInt, toFloat, toDecimal
 @docs toDate, toDateTime
@@ -52,18 +71,20 @@ module RDF exposing
 ## Serialize
 
 @docs serializeNode, serializeNTriple, serializeNodeHelp
+
+
+## Json
+
 @docs encodeNTriple
 @docs nTripleDecoder
 
 
-## Retrieve
+## StringOrLangString
 
-
-## Filter
-
-@docs toValue
-
-@docs StringOrLangString, localize, nonLocalized, stringOrLangStringFrom, stringOrLangStringFromList, mergeStringOrLangStrings
+@docs StringOrLangString
+@docs localize, nonLocalized
+@docs stringOrLangStringFrom, stringOrLangStringFromList
+@docs mergeStringOrLangStrings
 
 -}
 
@@ -75,18 +96,6 @@ import Json.Decode.Pipeline as Decode
 import Json.Encode as Encode exposing (Value)
 import Maybe.Extra as Maybe
 import Time exposing (Posix)
-
-
-{-| TODO Add documentation
--}
-type Yes
-    = Yes Never
-
-
-{-| TODO Add documentation
--}
-type No
-    = No Never
 
 
 {-| FIXME internals exposed for benchmarks
@@ -193,15 +202,6 @@ type alias BlankNodeOrIriOrAnyLiteral =
 
 {-| TODO Add documentation
 -}
-type alias NTriple =
-    { subject : BlankNodeOrIri
-    , predicate : Iri
-    , object : BlankNodeOrIriOrAnyLiteral
-    }
-
-
-{-| TODO Add documentation
--}
 type alias IsBlankNodeOrIri compatible =
     Node { compatible | isBlankNodeOrIri : Yes }
 
@@ -214,328 +214,14 @@ type alias IsIri compatible =
 
 {-| TODO Add documentation
 -}
-blankNode : String -> BlankNode
-blankNode value =
-    Node (BlankNode value)
+type Yes
+    = Yes Never
 
 
 {-| TODO Add documentation
 -}
-iriAbsolute : String -> Iri
-iriAbsolute value =
-    Node (Iri value)
-
-
-{-| TODO Add documentation
--}
-literalWithDatatype : Iri -> String -> Literal a
-literalWithDatatype datatype value =
-    Node
-        (Literal
-            { value = value
-            , datatype = datatype
-            , languageTag = Nothing
-            }
-        )
-
-
-{-| TODO Add documentation
--}
-literal : Iri -> Maybe String -> String -> Literal a
-literal datatype languageTag value =
-    -- FIXME check datatype iri when languageTag is present
-    Node
-        (Literal
-            { value = value
-            , datatype = datatype
-            , languageTag = languageTag
-            }
-        )
-
-
-{-| TODO Add documentation
--}
-bool : Bool -> Literal Bool
-bool value =
-    Node
-        (Literal
-            { value =
-                if value then
-                    "true"
-
-                else
-                    "false"
-            , datatype = xsd "boolean"
-            , languageTag = Nothing
-            }
-        )
-
-
-{-| TODO Add documentation
--}
-string : String -> Literal String
-string value =
-    Node
-        (Literal
-            { value = value
-            , datatype = xsd "string"
-            , languageTag = Nothing
-            }
-        )
-
-
-{-| TODO Add documentation
--}
-int : Int -> Literal Int
-int value =
-    Node
-        (Literal
-            { value = String.fromInt value
-            , datatype = xsd "integer"
-            , languageTag = Nothing
-            }
-        )
-
-
-{-| TODO Add documentation
--}
-toBlankNodeOrIri : IsBlankNodeOrIri compatible -> BlankNodeOrIri
-toBlankNodeOrIri (Node node) =
-    Node node
-
-
-{-| TODO Add documentation
--}
-toBlankNodeOrIriOrAnyLiteral : Node compatible -> BlankNodeOrIriOrAnyLiteral
-toBlankNodeOrIriOrAnyLiteral (Node node) =
-    Node node
-
-
-{-| TODO Add documentation
--}
-toIri : Node compatible -> Maybe Iri
-toIri (Node node) =
-    case node of
-        BlankNode _ ->
-            Nothing
-
-        Iri _ ->
-            Just (Node node)
-
-        Literal _ ->
-            Nothing
-
-
-{-| TODO Add documentation
--}
-toUrl : Iri -> String
-toUrl (Node node) =
-    case node of
-        BlankNode _ ->
-            ""
-
-        Iri url ->
-            url
-
-        Literal _ ->
-            ""
-
-
-{-| TODO Add documentation
--}
-toAnyLiteral : Node compatible -> Maybe AnyLiteral
-toAnyLiteral (Node node) =
-    case node of
-        BlankNode _ ->
-            Nothing
-
-        Iri _ ->
-            Nothing
-
-        Literal _ ->
-            Just (Node node)
-
-
-{-| TODO Add documentation
--}
-toValue : AnyLiteral -> String
-toValue (Node node) =
-    case node of
-        BlankNode _ ->
-            ""
-
-        Iri _ ->
-            ""
-
-        Literal { value } ->
-            value
-
-
-{-| TODO Add documentation
--}
-toBool : Node compatible -> Maybe Bool
-toBool (Node node) =
-    case node of
-        BlankNode _ ->
-            Nothing
-
-        Iri _ ->
-            Nothing
-
-        Literal data ->
-            if data.datatype == xsd "boolean" then
-                case data.value of
-                    "true" ->
-                        Just True
-
-                    "false" ->
-                        Just False
-
-                    _ ->
-                        Nothing
-
-            else
-                Nothing
-
-
-{-| TODO Add documentation
--}
-toString : Node compatible -> Maybe String
-toString (Node node) =
-    case node of
-        BlankNode _ ->
-            Nothing
-
-        Iri _ ->
-            Nothing
-
-        Literal data ->
-            if data.datatype == xsd "string" then
-                Just data.value
-
-            else
-                Nothing
-
-
-{-| TODO Add documentation
--}
-toInt : Node compatible -> Maybe Int
-toInt (Node node) =
-    case node of
-        BlankNode _ ->
-            Nothing
-
-        Iri _ ->
-            Nothing
-
-        Literal data ->
-            if data.datatype == xsd "int" then
-                String.toInt data.value
-
-            else if data.datatype == xsd "integer" then
-                String.toInt data.value
-
-            else
-                Nothing
-
-
-{-| TODO Add documentation
--}
-toFloat : Node compatible -> Maybe Float
-toFloat (Node node) =
-    case node of
-        BlankNode _ ->
-            Nothing
-
-        Iri _ ->
-            Nothing
-
-        Literal data ->
-            if data.datatype == xsd "float" then
-                String.toFloat data.value
-
-            else
-                Nothing
-
-
-{-| TODO Add documentation
--}
-toDecimal : Node compatible -> Maybe Decimal
-toDecimal (Node node) =
-    case node of
-        BlankNode _ ->
-            Nothing
-
-        Iri _ ->
-            Nothing
-
-        Literal data ->
-            if data.datatype == xsd "decimal" then
-                Decimal.fromString data.value
-
-            else
-                Nothing
-
-
-{-| TODO Add documentation
--}
-toDate : Node compatible -> Maybe Posix
-toDate (Node node) =
-    case node of
-        BlankNode _ ->
-            Nothing
-
-        Iri _ ->
-            Nothing
-
-        Literal data ->
-            if data.datatype == xsd "date" then
-                (data.value ++ "T00:00:00.000Z")
-                    |> Iso8601.toTime
-                    |> Result.toMaybe
-
-            else
-                Nothing
-
-
-{-| TODO Add documentation
--}
-toDateTime : Node compatible -> Maybe Posix
-toDateTime (Node node) =
-    case node of
-        BlankNode _ ->
-            Nothing
-
-        Iri _ ->
-            Nothing
-
-        Literal data ->
-            if data.datatype == xsd "dateTime" then
-                data.value
-                    |> Iso8601.toTime
-                    |> Result.toMaybe
-
-            else
-                Nothing
-
-
-{-| TODO Add documentation
--}
-toLangString : Node compatible -> Maybe ( String, String )
-toLangString (Node node) =
-    case node of
-        BlankNode _ ->
-            Nothing
-
-        Iri _ ->
-            Nothing
-
-        Literal data ->
-            if data.datatype == rdf "langString" then
-                Maybe.map2 Tuple.pair data.languageTag (Just data.value)
-
-            else
-                Nothing
+type No
+    = No Never
 
 
 {-| TODO Add documentation
@@ -554,14 +240,389 @@ unwrap (Node node) =
 
 {-| TODO Add documentation
 -}
-serializeNTriple : NTriple -> String
-serializeNTriple { subject, predicate, object } =
-    [ serializeNode subject
-    , serializeNode predicate
-    , serializeNode object
-    , "."
-    ]
-        |> String.join " "
+type alias NTriple =
+    { subject : BlankNodeOrIri
+    , predicate : Iri
+    , object : BlankNodeOrIriOrAnyLiteral
+    }
+
+
+
+-- CREATE
+
+
+{-| -}
+iri : String -> Iri
+iri value =
+    Node (Iri value)
+
+
+{-| -}
+blankNode : String -> BlankNode
+blankNode value =
+    Node (BlankNode value)
+
+
+{-| -}
+literal : Iri -> String -> Literal a
+literal datatype value =
+    Node
+        (Literal
+            { value = value
+            , datatype = datatype
+            , languageTag = Nothing
+            }
+        )
+
+
+{-| -}
+string : String -> Literal String
+string value =
+    Node
+        (Literal
+            { value = value
+            , datatype = xsdString
+            , languageTag = Nothing
+            }
+        )
+
+
+{-| -}
+langString : String -> String -> Literal a
+langString languageTag value =
+    Node
+        (Literal
+            { value = value
+            , datatype = rdfLangString
+            , languageTag = Just languageTag
+            }
+        )
+
+
+{-| -}
+int : Int -> Literal Int
+int value =
+    Node
+        (Literal
+            { value = String.fromInt value
+            , datatype = xsdInteger
+            , languageTag = Nothing
+            }
+        )
+
+
+{-| -}
+float : Float -> Literal Float
+float value =
+    Node
+        (Literal
+            { value = String.fromFloat value
+            , datatype = xsdDouble
+            , languageTag = Nothing
+            }
+        )
+
+
+{-| -}
+decimal : Decimal -> Literal Decimal
+decimal value =
+    Node
+        (Literal
+            { value = Decimal.toString value
+            , datatype = xsdDecimal
+            , languageTag = Nothing
+            }
+        )
+
+
+{-| -}
+date : Posix -> Literal Posix
+date value =
+    Node
+        (Literal
+            { value = String.left (4 + 1 + 2 + 1 + 2) (Iso8601.fromTime value)
+            , datatype = xsdDate
+            , languageTag = Nothing
+            }
+        )
+
+
+{-| -}
+dateTime : Posix -> Literal Posix
+dateTime value =
+    Node
+        (Literal
+            { value = Iso8601.fromTime value
+            , datatype = xsdDateTime
+            , languageTag = Nothing
+            }
+        )
+
+
+{-| -}
+bool : Bool -> Literal Bool
+bool value =
+    Node
+        (Literal
+            { value =
+                if value then
+                    "true"
+
+                else
+                    "false"
+            , datatype = xsdBoolean
+            , languageTag = Nothing
+            }
+        )
+
+
+
+-- TRANSFORM
+
+
+{-| -}
+toIri : Node compatible -> Maybe Iri
+toIri (Node node) =
+    case node of
+        BlankNode _ ->
+            Nothing
+
+        Iri _ ->
+            Just (Node node)
+
+        Literal _ ->
+            Nothing
+
+
+{-| -}
+toBlankNode : Node compatible -> Maybe BlankNode
+toBlankNode (Node node) =
+    case node of
+        BlankNode _ ->
+            Just (Node node)
+
+        Iri _ ->
+            Nothing
+
+        Literal _ ->
+            Nothing
+
+
+{-| -}
+toAnyLiteral : Node compatible -> Maybe AnyLiteral
+toAnyLiteral (Node node) =
+    case node of
+        BlankNode _ ->
+            Nothing
+
+        Iri _ ->
+            Nothing
+
+        Literal _ ->
+            Just (Node node)
+
+
+{-| -}
+toBlankNodeOrIri : IsBlankNodeOrIri compatible -> BlankNodeOrIri
+toBlankNodeOrIri (Node node) =
+    Node node
+
+
+{-| -}
+toBlankNodeOrIriOrAnyLiteral : Node compatible -> BlankNodeOrIriOrAnyLiteral
+toBlankNodeOrIriOrAnyLiteral (Node node) =
+    Node node
+
+
+{-| -}
+toUrl : Iri -> String
+toUrl (Node node) =
+    case node of
+        BlankNode _ ->
+            ""
+
+        Iri url ->
+            url
+
+        Literal _ ->
+            ""
+
+
+{-| -}
+toValue : AnyLiteral -> String
+toValue (Node node) =
+    case node of
+        BlankNode _ ->
+            ""
+
+        Iri _ ->
+            ""
+
+        Literal { value } ->
+            value
+
+
+{-| -}
+toString : Node compatible -> Maybe String
+toString (Node node) =
+    case node of
+        BlankNode _ ->
+            Nothing
+
+        Iri _ ->
+            Nothing
+
+        Literal data ->
+            if data.datatype == xsdString then
+                Just data.value
+
+            else
+                Nothing
+
+
+{-| -}
+toLangString : Node compatible -> Maybe ( String, String )
+toLangString (Node node) =
+    case node of
+        BlankNode _ ->
+            Nothing
+
+        Iri _ ->
+            Nothing
+
+        Literal data ->
+            if data.datatype == rdfLangString then
+                Maybe.map2 Tuple.pair data.languageTag (Just data.value)
+
+            else
+                Nothing
+
+
+{-| -}
+toInt : Node compatible -> Maybe Int
+toInt (Node node) =
+    case node of
+        BlankNode _ ->
+            Nothing
+
+        Iri _ ->
+            Nothing
+
+        Literal data ->
+            if data.datatype == xsdInt then
+                String.toInt data.value
+
+            else if data.datatype == xsdInteger then
+                String.toInt data.value
+
+            else
+                Nothing
+
+
+{-| -}
+toFloat : Node compatible -> Maybe Float
+toFloat (Node node) =
+    case node of
+        BlankNode _ ->
+            Nothing
+
+        Iri _ ->
+            Nothing
+
+        Literal data ->
+            if data.datatype == xsdDouble then
+                String.toFloat data.value
+
+            else
+                Nothing
+
+
+{-| -}
+toDecimal : Node compatible -> Maybe Decimal
+toDecimal (Node node) =
+    case node of
+        BlankNode _ ->
+            Nothing
+
+        Iri _ ->
+            Nothing
+
+        Literal data ->
+            if data.datatype == xsdDecimal then
+                Decimal.fromString data.value
+
+            else
+                Nothing
+
+
+{-| -}
+toDate : Node compatible -> Maybe Posix
+toDate (Node node) =
+    case node of
+        BlankNode _ ->
+            Nothing
+
+        Iri _ ->
+            Nothing
+
+        Literal data ->
+            if data.datatype == xsdDate then
+                (data.value ++ "T00:00:00.000Z")
+                    |> Iso8601.toTime
+                    |> Result.toMaybe
+
+            else
+                Nothing
+
+
+{-| -}
+toDateTime : Node compatible -> Maybe Posix
+toDateTime (Node node) =
+    case node of
+        BlankNode _ ->
+            Nothing
+
+        Iri _ ->
+            Nothing
+
+        Literal data ->
+            if data.datatype == xsdDateTime then
+                data.value
+                    |> Iso8601.toTime
+                    |> Result.toMaybe
+
+            else
+                Nothing
+
+
+{-| -}
+toBool : Node compatible -> Maybe Bool
+toBool (Node node) =
+    case node of
+        BlankNode _ ->
+            Nothing
+
+        Iri _ ->
+            Nothing
+
+        Literal data ->
+            if data.datatype == xsdBoolean then
+                case data.value of
+                    "true" ->
+                        Just True
+
+                    "false" ->
+                        Just False
+
+                    _ ->
+                        Nothing
+
+            else
+                Nothing
+
+
+
+-- SERIALIZE
 
 
 {-| TODO Add documentation
@@ -599,6 +660,22 @@ serializeNodeHelp node =
                     "@" ++ languageTag
             ]
                 |> String.concat
+
+
+{-| TODO Add documentation
+-}
+serializeNTriple : NTriple -> String
+serializeNTriple { subject, predicate, object } =
+    [ serializeNode subject
+    , serializeNode predicate
+    , serializeNode object
+    , "."
+    ]
+        |> String.join " "
+
+
+
+-- STRING OR LANG STRING
 
 
 {-| TODO Add documentation
@@ -667,6 +744,10 @@ mergeStringOrLangStrings stringOrLangStrings =
         }
             |> StringOrLangString
             |> Just
+
+
+
+-- JSON
 
 
 {-| TODO Add documentation
@@ -784,8 +865,8 @@ encodeSubject (Node node) =
         BlankNode name ->
             encodeBlankNode name
 
-        Iri iri ->
-            encodeIri iri
+        Iri url ->
+            encodeIri url
 
         Literal _ ->
             Encode.null
@@ -797,8 +878,8 @@ encodePredicate (Node node) =
         BlankNode _ ->
             Encode.null
 
-        Iri iri ->
-            encodeIri iri
+        Iri url ->
+            encodeIri url
 
         Literal _ ->
             Encode.null
@@ -810,8 +891,8 @@ encodeObject (Node node) =
         BlankNode name ->
             encodeBlankNode name
 
-        Iri iri ->
-            encodeIri iri
+        Iri url ->
+            encodeIri url
 
         Literal data ->
             encodeLiteral data
@@ -826,9 +907,9 @@ encodeBlankNode name =
 
 
 encodeIri : String -> Value
-encodeIri iri =
+encodeIri url =
     [ ( "termType", Encode.string "NamedNode" )
-    , ( "value", Encode.string iri )
+    , ( "value", Encode.string url )
     ]
         |> Encode.object
 
@@ -839,8 +920,8 @@ encodeLiteral data =
     , ( "value", Encode.string data.value )
     , ( "datatype"
       , case data.datatype of
-            Node (Iri iriDatatype) ->
-                encodeIri iriDatatype
+            Node (Iri url) ->
+                encodeIri url
 
             _ ->
                 Encode.null
@@ -855,6 +936,55 @@ encodeLiteral data =
       )
     ]
         |> Encode.object
+
+
+
+-- CONSTANTS
+
+
+xsdString : Iri
+xsdString =
+    xsd "string"
+
+
+rdfLangString : Iri
+rdfLangString =
+    rdf "langString"
+
+
+xsdInt : Iri
+xsdInt =
+    xsd "int"
+
+
+xsdInteger : Iri
+xsdInteger =
+    xsd "integer"
+
+
+xsdDouble : Iri
+xsdDouble =
+    xsd "double"
+
+
+xsdDecimal : Iri
+xsdDecimal =
+    xsd "decimal"
+
+
+xsdDate : Iri
+xsdDate =
+    xsd "date"
+
+
+xsdDateTime : Iri
+xsdDateTime =
+    xsd "dateTime"
+
+
+xsdBoolean : Iri
+xsdBoolean =
+    xsd "boolean"
 
 
 xsd : String -> Iri

@@ -423,7 +423,7 @@ collectTriplesSubject subject predicateObjectList state =
                 Ok url ->
                     predicateObjectList
                         |> List.foldl (\predicateObject -> Result.andThen (collectPredicateObjectList predicateObject))
-                            (Ok { state | subjects = RDF.toBlankNodeOrIri (RDF.iriAbsolute url) :: state.subjects })
+                            (Ok { state | subjects = RDF.toBlankNodeOrIri (RDF.iri url) :: state.subjects })
                         |> Result.map dropSubject
 
         Turtle.SubjectBlankNode (Turtle.BlankNodeLabel label) ->
@@ -515,7 +515,7 @@ collectPredicateObjectList { verb, objects } state =
         Ok url ->
             objects
                 |> List.foldl (Result.andThen << collectObject)
-                    (Ok { state | predicates = RDF.iriAbsolute url :: state.predicates })
+                    (Ok { state | predicates = RDF.iri url :: state.predicates })
                 |> Result.map dropPredicate
 
 
@@ -524,7 +524,7 @@ collectObject object state =
     case object of
         Turtle.ObjectIri iri ->
             resolveIri state iri
-                |> Result.andThen (\url -> addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iriAbsolute url)) state)
+                |> Result.andThen (\url -> addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iri url)) state)
 
         Turtle.ObjectBlankNode (Turtle.BlankNodeLabel label) ->
             case Dict.get label state.blankNodes of
@@ -582,20 +582,20 @@ collectObject object state =
             addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.string value)) state
 
         Turtle.ObjectLiteral (Turtle.LiteralLangString value lang) ->
-            addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.literal (rdf "langString") (Just lang) value)) state
+            addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.langString lang value)) state
 
         Turtle.ObjectLiteral (Turtle.LiteralTyped value datatype) ->
             resolveIri state datatype
-                |> Result.andThen (\url -> addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.literal (RDF.iriAbsolute url) Nothing value)) state)
+                |> Result.andThen (\url -> addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.literal (RDF.iri url) value)) state)
 
         Turtle.ObjectLiteral (Turtle.LiteralInteger value) ->
             addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.int value)) state
 
         Turtle.ObjectLiteral (Turtle.LiteralDecimal value) ->
-            addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.literal (xsd "decimal") Nothing value)) state
+            addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.literal (xsd "decimal") value)) state
 
         Turtle.ObjectLiteral (Turtle.LiteralDouble value) ->
-            addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.literal (xsd "double") Nothing (String.fromFloat value))) state
+            addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.literal (xsd "double") (String.fromFloat value))) state
 
         Turtle.ObjectLiteral Turtle.LiteralTrue ->
             addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.bool True)) state
