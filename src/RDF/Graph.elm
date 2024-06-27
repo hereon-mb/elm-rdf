@@ -36,7 +36,7 @@ module RDF.Graph exposing
 -}
 
 import Dict exposing (Dict)
-import Internal.Turtle as Turtle exposing (TurtleDoc)
+import Internal.Turtle as Turtle
 import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode exposing (Value)
 import List.Extra as List
@@ -371,7 +371,7 @@ stateInitial =
     }
 
 
-collectNTriples : TurtleDoc -> Result Error (List NTriple)
+collectNTriples : List Turtle.Statement -> Result Error (List NTriple)
 collectNTriples statements =
     statements
         |> List.foldl (\statement -> Result.andThen (collectNTriplesStep statement)) (Ok stateInitial)

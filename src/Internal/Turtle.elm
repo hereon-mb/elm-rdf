@@ -1,40 +1,24 @@
 module Internal.Turtle exposing
     ( parse
-    , TurtleDoc
     , Statement(..)
-    , Triples(..)
-    , PredicateObjectList
-    , Verb(..)
-    , Subject(..)
-    , Object(..)
-    , Literal(..)
-    , Iri(..)
-    , BlankNode(..)
+    , Triples(..), PredicateObjectList
+    , Subject(..), Verb(..), Object(..)
+    , Iri(..), BlankNode(..), Literal(..)
     )
 
 {-|
 
 @docs parse
 
-@docs TurtleDoc
 @docs Statement
-@docs Triples
-@docs PredicateObjectList
-@docs Verb
-@docs Subject
-@docs Object
-@docs Literal
-@docs Iri
-@docs BlankNode
+@docs Triples, PredicateObjectList
+@docs Subject, Verb, Object
+@docs Iri, BlankNode, Literal
 
 -}
 
 import Parser exposing ((|.), (|=), Parser)
 import Set
-
-
-type alias TurtleDoc =
-    List Statement
 
 
 type Statement
@@ -96,21 +80,21 @@ type Literal
     | LiteralFalse
 
 
-parse : String -> Result (List Parser.DeadEnd) TurtleDoc
+parse : String -> Result (List Parser.DeadEnd) (List Statement)
 parse =
-    Parser.run turtleDoc
+    Parser.run statements
 
 
-turtleDoc : Parser TurtleDoc
-turtleDoc =
+statements : Parser (List Statement)
+statements =
     Parser.succeed identity
-        |= Parser.loop [] turtleDocHelp
+        |= Parser.loop [] statementsHelp
         |. whitespace
         |. Parser.end
 
 
-turtleDocHelp : List Statement -> Parser (Parser.Step (List Statement) (List Statement))
-turtleDocHelp statementsReversed =
+statementsHelp : List Statement -> Parser (Parser.Step (List Statement) (List Statement))
+statementsHelp statementsReversed =
     Parser.oneOf
         [ Parser.succeed (\statementNext -> Parser.Loop (statementNext :: statementsReversed))
             |= statement
