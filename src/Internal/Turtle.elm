@@ -2,7 +2,6 @@ module Internal.Turtle exposing
     ( parse
     , TurtleDoc
     , Statement(..)
-    , Directive(..)
     , Triples(..)
     , PredicateObjectList
     , Verb(..)
@@ -19,7 +18,6 @@ module Internal.Turtle exposing
 
 @docs TurtleDoc
 @docs Statement
-@docs Directive
 @docs Triples
 @docs PredicateObjectList
 @docs Verb
@@ -40,15 +38,11 @@ type alias TurtleDoc =
 
 
 type Statement
-    = Directive Directive
+    = DirectivePrefixId String String
+    | DirectiveBase String
+    | DirectiveSparqlPrefix String String
+    | DirectiveSparqlBase String
     | Triples Triples
-
-
-type Directive
-    = PrefixId String String
-    | Base String
-    | SparqlPrefix String String
-    | SparqlBase String
 
 
 type Triples
@@ -129,12 +123,12 @@ turtleDocHelp statementsReversed =
 statement : Parser Statement
 statement =
     Parser.oneOf
-        [ Parser.map Directive directive
+        [ directive
         , Parser.map Triples triples
         ]
 
 
-directive : Parser Directive
+directive : Parser Statement
 directive =
     Parser.oneOf
         [ prefixId
@@ -144,9 +138,9 @@ directive =
         ]
 
 
-prefixId : Parser Directive
+prefixId : Parser Statement
 prefixId =
-    Parser.succeed PrefixId
+    Parser.succeed DirectivePrefixId
         |. Parser.keyword "@prefix"
         |. whitespace
         |= pnameNs
@@ -171,9 +165,9 @@ pnameNs =
         ]
 
 
-base : Parser Directive
+base : Parser Statement
 base =
-    Parser.succeed Base
+    Parser.succeed DirectiveBase
         |. Parser.keyword "@base"
         |. whitespace
         |= iriRef
@@ -181,9 +175,9 @@ base =
         |. Parser.symbol "."
 
 
-sparqlPrefix : Parser Directive
+sparqlPrefix : Parser Statement
 sparqlPrefix =
-    Parser.succeed SparqlPrefix
+    Parser.succeed DirectiveSparqlPrefix
         |. Parser.keyword "PREFIX"
         |. whitespace
         |= Parser.variable
@@ -196,9 +190,9 @@ sparqlPrefix =
         |= iriRef
 
 
-sparqlBase : Parser Directive
+sparqlBase : Parser Statement
 sparqlBase =
-    Parser.succeed SparqlBase
+    Parser.succeed DirectiveSparqlBase
         |. Parser.keyword "BASE"
         |. whitespace
         |= iriRef

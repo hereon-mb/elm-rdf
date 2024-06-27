@@ -381,16 +381,16 @@ collectNTriples statements =
 collectNTriplesStep : Turtle.Statement -> State -> Result Error State
 collectNTriplesStep statement state =
     case statement of
-        Turtle.Directive (Turtle.PrefixId prefix value) ->
+        Turtle.DirectivePrefixId prefix value ->
             Ok { state | prefixes = Dict.insert prefix value state.prefixes }
 
-        Turtle.Directive (Turtle.Base base) ->
+        Turtle.DirectiveBase base ->
             Ok { state | base = Just base }
 
-        Turtle.Directive (Turtle.SparqlPrefix prefix value) ->
+        Turtle.DirectiveSparqlPrefix prefix value ->
             Ok { state | prefixes = Dict.insert prefix value state.prefixes }
 
-        Turtle.Directive (Turtle.SparqlBase base) ->
+        Turtle.DirectiveSparqlBase base ->
             Ok { state | base = Just base }
 
         Turtle.Triples (Turtle.TriplesSubject subject predicateObjectList) ->
