@@ -3,7 +3,9 @@ module RDF.Graph exposing
     , union
     , isEmpty
     , emptyGraph, singleton
-    , decoder, encode, parse, serialize
+    , decoder, encode
+    , parse, Error
+    , serialize
     , fromNTriples
     , Seed, initialSeed
     , insert, insertAt, generateBlankNode
@@ -20,7 +22,9 @@ module RDF.Graph exposing
 ## Create
 
 @docs emptyGraph, singleton
-@docs decoder, encode, parse, serialize
+@docs decoder, encode
+@docs parse, Error
+@docs serialize
 @docs fromNTriples
 
 
@@ -32,15 +36,16 @@ module RDF.Graph exposing
 -}
 
 import Dict exposing (Dict)
+import Internal.Turtle as Turtle exposing (TurtleDoc)
 import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode exposing (Value)
 import List.Extra as List
+import Parser exposing ((|.), (|=), Parser)
 import RDF
     exposing
         ( BlankNode
         , BlankNodeOrIri
         , BlankNodeOrIriOrAnyLiteral
-        , Error
         , Iri
         , IsBlankNodeOrIri
         , IsIri
@@ -50,12 +55,12 @@ import RDF
         , encodeNTriple
         , forgetCompatible
         , nTripleDecoder
-        , parseNTriples
         , serializeNTriple
         , serializeNode
         , serializeNodeHelp
         , unwrap
         )
+import RDF.Namespaces exposing (rdf, xsd)
 import RDF.PropertyPath exposing (PropertyPath(..))
 import Random
 import Tuple.Extra as Tuple
@@ -317,13 +322,383 @@ encode (Graph data) =
         |> Encode.list encodeNTriple
 
 
-{-| Get all N-Triples from a n-triple text file.
+{-| Get all RDF Triples from a turtle text file.
 -}
-parse : String -> Result (List Error) Graph
+parse : String -> Result Error Graph
 parse raw =
     raw
-        |> parseNTriples
+        |> Turtle.parse
+        |> Result.mapError ErrorParser
+        |> Result.andThen collectNTriples
         |> Result.map fromNTriples
+
+
+type Error
+    = ErrorParser (List Parser.DeadEnd)
+    | MissingSubject
+    | MissingPredicate
+    | MissingBase
+    | CouldNotResolvePrefixedName String String
+
+
+type alias State =
+    { base : Maybe String
+    , prefixes : Dict String String
+    , nTriples : List NTriple
+    , subjects : List BlankNodeOrIri
+    , predicates : List Iri
+    , seed : Seed
+    , blankNodes : Dict String BlankNode
+    }
+
+
+stateInitial : State
+stateInitial =
+    { base = Nothing
+    , prefixes = Dict.empty
+    , nTriples = []
+    , subjects = []
+    , predicates = []
+    , seed = initialSeed
+    , blankNodes = Dict.empty
+    }
+
+
+collectNTriples : TurtleDoc -> Result Error (List NTriple)
+collectNTriples statements =
+    statements
+        |> List.foldl (\statement -> Result.andThen (collectNTriplesStep statement)) (Ok stateInitial)
+        |> Result.map .nTriples
+
+
+collectNTriplesStep : Turtle.Statement -> State -> Result Error State
+collectNTriplesStep statement state =
+    case statement of
+        Turtle.Directive (Turtle.PrefixId prefix value) ->
+            Ok { state | prefixes = Dict.insert prefix value state.prefixes }
+
+        Turtle.Directive (Turtle.Base base) ->
+            Ok { state | base = Just base }
+
+        Turtle.Directive (Turtle.SparqlPrefix prefix value) ->
+            Ok { state | prefixes = Dict.insert prefix value state.prefixes }
+
+        Turtle.Directive (Turtle.SparqlBase base) ->
+            Ok { state | base = Just base }
+
+        Turtle.Triples (Turtle.TriplesSubject subject predicateObjectList) ->
+            collectTriplesSubject subject predicateObjectList state
+
+        Turtle.Triples (Turtle.TriplesBlankNodePropertyList predicateObjectListSubject predicateObjectList) ->
+            let
+                ( node, seed ) =
+                    mintBlankNode state.seed
+            in
+            (predicateObjectListSubject ++ predicateObjectList)
+                |> List.foldl (\predicateObject -> Result.andThen (collectPredicateObjectList predicateObject))
+                    (Ok
+                        { state
+                            | subjects = RDF.toBlankNodeOrIri node :: state.subjects
+                            , seed = seed
+                        }
+                    )
+                |> Result.map dropSubject
+
+
+collectTriplesSubject : Turtle.Subject -> Turtle.PredicateObjectList -> State -> Result Error State
+collectTriplesSubject subject predicateObjectList state =
+    case subject of
+        Turtle.SubjectIri iri ->
+            case resolveIri state iri of
+                Err error ->
+                    Err error
+
+                Ok url ->
+                    predicateObjectList
+                        |> List.foldl (\predicateObject -> Result.andThen (collectPredicateObjectList predicateObject))
+                            (Ok { state | subjects = RDF.toBlankNodeOrIri (RDF.iriAbsolute url) :: state.subjects })
+                        |> Result.map dropSubject
+
+        Turtle.SubjectBlankNode (Turtle.BlankNodeLabel label) ->
+            case Dict.get label state.blankNodes of
+                Nothing ->
+                    let
+                        ( node, seed ) =
+                            mintBlankNode state.seed
+                    in
+                    predicateObjectList
+                        |> List.foldl (\predicateObject -> Result.andThen (collectPredicateObjectList predicateObject))
+                            (Ok
+                                { state
+                                    | subjects = RDF.toBlankNodeOrIri node :: state.subjects
+                                    , seed = seed
+                                    , blankNodes = Dict.insert label node state.blankNodes
+                                }
+                            )
+                        |> Result.map dropSubject
+
+                Just node ->
+                    predicateObjectList
+                        |> List.foldl (\predicateObject -> Result.andThen (collectPredicateObjectList predicateObject))
+                            (Ok { state | subjects = RDF.toBlankNodeOrIri node :: state.subjects })
+                        |> Result.map dropSubject
+
+        Turtle.SubjectBlankNode Turtle.Anon ->
+            let
+                ( node, seed ) =
+                    mintBlankNode state.seed
+            in
+            predicateObjectList
+                |> List.foldl (\predicateObject -> Result.andThen (collectPredicateObjectList predicateObject))
+                    (Ok
+                        { state
+                            | subjects = RDF.toBlankNodeOrIri node :: state.subjects
+                            , seed = seed
+                        }
+                    )
+                |> Result.map dropSubject
+
+        Turtle.SubjectCollection objects ->
+            if List.isEmpty objects then
+                predicateObjectList
+                    |> List.foldl (\predicateObject -> Result.andThen (collectPredicateObjectList predicateObject))
+                        (Ok { state | subjects = RDF.toBlankNodeOrIri (rdf "nil") :: state.subjects })
+                    |> Result.map dropSubject
+
+            else
+                let
+                    ( node, seed ) =
+                        mintBlankNode state.seed
+                in
+                predicateObjectList
+                    |> List.foldl (\predicateObject -> Result.andThen (collectPredicateObjectList predicateObject))
+                        (Ok
+                            { state
+                                | subjects = RDF.toBlankNodeOrIri node :: state.subjects
+                                , seed = seed
+                            }
+                        )
+                    |> Result.andThen (addCollection node objects)
+                    |> Result.map dropSubject
+
+
+mintBlankNode : Seed -> ( BlankNode, Seed )
+mintBlankNode (Seed seed) =
+    UUID.step seed
+        |> Tuple.mapFirst (UUID.toString >> RDF.blankNode)
+        |> Tuple.mapSecond Seed
+
+
+collectPredicateObjectList : Turtle.PredicateObjectListData -> State -> Result Error State
+collectPredicateObjectList data state =
+    let
+        predicate =
+            case data.verb of
+                Turtle.Predicate iri ->
+                    resolveIri state iri
+
+                Turtle.A ->
+                    Ok "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
+    in
+    case predicate of
+        Err error ->
+            Err error
+
+        Ok url ->
+            data.objectList
+                |> List.foldl (Result.andThen << collectObjectList)
+                    (Ok { state | predicates = RDF.iriAbsolute url :: state.predicates })
+                |> Result.map dropPredicate
+
+
+collectObjectList : Turtle.Object -> State -> Result Error State
+collectObjectList object state =
+    case object of
+        Turtle.ObjectIri iri ->
+            resolveIri state iri
+                |> Result.andThen (\url -> addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iriAbsolute url)) state)
+
+        Turtle.ObjectBlankNode (Turtle.BlankNodeLabel label) ->
+            case Dict.get label state.blankNodes of
+                Nothing ->
+                    let
+                        ( node, seed ) =
+                            mintBlankNode state.seed
+                    in
+                    addTriple (RDF.toBlankNodeOrIriOrAnyLiteral node)
+                        { state
+                            | seed = seed
+                            , blankNodes = Dict.insert label node state.blankNodes
+                        }
+
+                Just node ->
+                    addTriple (RDF.toBlankNodeOrIriOrAnyLiteral node) state
+
+        Turtle.ObjectBlankNode Turtle.Anon ->
+            let
+                ( node, seed ) =
+                    mintBlankNode state.seed
+            in
+            addTriple (RDF.toBlankNodeOrIriOrAnyLiteral node) { state | seed = seed }
+
+        Turtle.ObjectCollection objects ->
+            if List.isEmpty objects then
+                addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (rdf "nil")) state
+
+            else
+                let
+                    ( nodeFirst, seedFirst ) =
+                        mintBlankNode state.seed
+                in
+                { state | seed = seedFirst }
+                    |> addTriple (RDF.toBlankNodeOrIriOrAnyLiteral nodeFirst)
+                    |> Result.andThen (addCollection nodeFirst objects)
+
+        Turtle.ObjectBlankNodePropertyList predicateObjectList ->
+            let
+                ( node, seed ) =
+                    mintBlankNode state.seed
+            in
+            predicateObjectList
+                |> List.foldl (Result.andThen << collectPredicateObjectList)
+                    (Ok
+                        { state
+                            | subjects = RDF.toBlankNodeOrIri node :: state.subjects
+                            , seed = seed
+                        }
+                    )
+                |> Result.map dropSubject
+                |> Result.andThen (addTriple (RDF.toBlankNodeOrIriOrAnyLiteral node))
+
+        Turtle.ObjectLiteral (Turtle.RdfLiteralString value) ->
+            addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.string value)) state
+
+        Turtle.ObjectLiteral (Turtle.RdfLiteralLangString value lang) ->
+            addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.literal (rdf "langString") (Just lang) value)) state
+
+        Turtle.ObjectLiteral (Turtle.RdfLiteralTyped value datatype) ->
+            resolveIri state datatype
+                |> Result.andThen (\url -> addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.literal (RDF.iriAbsolute url) Nothing value)) state)
+
+        Turtle.ObjectLiteral (Turtle.NumericLiteral (Turtle.Integer value)) ->
+            addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.int value)) state
+
+        Turtle.ObjectLiteral (Turtle.NumericLiteral (Turtle.Decimal value)) ->
+            addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.literal (xsd "decimal") Nothing value)) state
+
+        Turtle.ObjectLiteral (Turtle.NumericLiteral (Turtle.Double value)) ->
+            addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.literal (xsd "double") Nothing (String.fromFloat value))) state
+
+        Turtle.ObjectLiteral (Turtle.BooleanLiteral Turtle.BooleanLiteralTrue) ->
+            addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.bool True)) state
+
+        Turtle.ObjectLiteral (Turtle.BooleanLiteral Turtle.BooleanLiteralFalse) ->
+            addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.bool False)) state
+
+
+addTriple : BlankNodeOrIriOrAnyLiteral -> State -> Result Error State
+addTriple object state =
+    Result.map3 NTriple
+        (Result.fromMaybe MissingSubject (List.head state.subjects))
+        (Result.fromMaybe MissingPredicate (List.head state.predicates))
+        (Ok object)
+        |> Result.map (\nTriple -> { state | nTriples = nTriple :: state.nTriples })
+
+
+addCollection : BlankNode -> List Turtle.Object -> State -> Result Error State
+addCollection nodeFirst objects state =
+    case List.reverse objects of
+        [] ->
+            addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (rdf "nil")) state
+
+        last :: rest ->
+            rest
+                |> List.reverse
+                |> List.foldl
+                    (\obj result ->
+                        result
+                            |> Result.andThen
+                                (\( nodePrevious, stateNext ) ->
+                                    let
+                                        ( nodeNext, seedNext ) =
+                                            mintBlankNode stateNext.seed
+                                    in
+                                    { stateNext
+                                        | subjects = RDF.toBlankNodeOrIri nodePrevious :: stateNext.subjects
+                                        , predicates = rdf "first" :: stateNext.predicates
+                                        , seed = seedNext
+                                    }
+                                        |> collectObjectList obj
+                                        |> Result.map dropPredicate
+                                        |> Result.map
+                                            (\stateNextNext ->
+                                                { stateNextNext | predicates = rdf "rest" :: stateNextNext.predicates }
+                                            )
+                                        |> Result.andThen (addTriple (RDF.toBlankNodeOrIriOrAnyLiteral nodeNext))
+                                        |> Result.map dropPredicate
+                                        |> Result.map dropSubject
+                                        |> Result.map (Tuple.pair nodeNext)
+                                )
+                    )
+                    (Ok ( nodeFirst, state ))
+                |> Result.andThen
+                    (\( nodePrevious, stateNext ) ->
+                        { stateNext
+                            | subjects = RDF.toBlankNodeOrIri nodePrevious :: stateNext.subjects
+                            , predicates = rdf "first" :: stateNext.predicates
+                        }
+                            |> collectObjectList last
+                            |> Result.map dropPredicate
+                            |> Result.map
+                                (\stateNextNext ->
+                                    { stateNextNext | predicates = rdf "rest" :: stateNextNext.predicates }
+                                )
+                            |> Result.andThen (addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (rdf "nil")))
+                            |> Result.map dropPredicate
+                            |> Result.map dropSubject
+                    )
+
+
+resolveIri : State -> Turtle.Iri -> Result Error String
+resolveIri state iri =
+    case iri of
+        Turtle.IriRef url ->
+            -- FIXME Check correctly if the url is relative
+            if String.startsWith "http" url then
+                Ok url
+
+            else
+                case state.base of
+                    Nothing ->
+                        Err MissingBase
+
+                    Just base ->
+                        Ok (base ++ url)
+
+        Turtle.PrefixedName prefix name ->
+            Dict.get prefix state.prefixes
+                |> Maybe.map (\url -> url ++ name)
+                |> Result.fromMaybe (CouldNotResolvePrefixedName prefix name)
+
+
+dropSubject : State -> State
+dropSubject state =
+    { state
+        | subjects =
+            state.subjects
+                |> List.tail
+                |> Maybe.withDefault []
+    }
+
+
+dropPredicate : State -> State
+dropPredicate state =
+    { state
+        | predicates =
+            state.predicates
+                |> List.tail
+                |> Maybe.withDefault []
+    }
 
 
 {-| TODO Add documentation
