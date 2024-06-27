@@ -37,7 +37,7 @@ module Internal.Turtle exposing
 
 -}
 
-import Parser exposing ((|.), (|=), Parser, oneOf)
+import Parser exposing ((|.), (|=), Parser)
 import Set
 
 
@@ -103,12 +103,6 @@ type NumericLiteral
     = Integer Int
     | Decimal String
     | Double Float
-
-
-type alias LangTag =
-    { tag : String
-    , iri : Iri
-    }
 
 
 type BooleanLiteral
@@ -305,6 +299,7 @@ predicateObjectList =
 predicateObjectListHelp : List PredicateObjectListData -> Parser (Parser.Step (List PredicateObjectListData) (List PredicateObjectListData))
 predicateObjectListHelp itemsReversed =
     let
+        end : Parser (Parser.Step (List PredicateObjectListData) (List PredicateObjectListData))
         end =
             Parser.succeed ()
                 |> Parser.map (\_ -> Parser.Done (List.reverse itemsReversed))
@@ -341,6 +336,7 @@ objectList =
 objectListHelp : List Object -> Parser (Parser.Step (List Object) (List Object))
 objectListHelp objectsReversed =
     let
+        end : Parser (Parser.Step (List Object) (List Object))
         end =
             Parser.succeed ()
                 |> Parser.map (\_ -> Parser.Done (List.reverse objectsReversed))
@@ -447,14 +443,12 @@ pnLocal =
         [ Parser.succeed ""
             |. Parser.chompIf isWhitespace
         , Parser.succeed ()
-            |. Parser.oneOf
-                [ Parser.chompIf
-                    (\char ->
-                        isPnCharsU char
-                            || (char == ':')
-                            || Char.isDigit char
-                    )
-                ]
+            |. Parser.chompIf
+                (\char ->
+                    isPnCharsU char
+                        || (char == ':')
+                        || Char.isDigit char
+                )
             |. Parser.chompWhile
                 (\char ->
                     isPnChars char
@@ -659,7 +653,7 @@ stringHelp revChunks =
                     |. Parser.token "}"
                 ]
         , Parser.token "\""
-            |> Parser.map (\_ -> Parser.Done (String.join "" (List.reverse revChunks)))
+            |> Parser.map (\_ -> Parser.Done (String.concat (List.reverse revChunks)))
         , Parser.chompWhile isUninteresting
             |> Parser.getChompedString
             |> Parser.map (\chunk -> Parser.Loop (chunk :: revChunks))
@@ -675,25 +669,30 @@ unicode =
 codeToChar : String -> Parser Char
 codeToChar str =
     let
+        length : Int
         length =
             String.length str
-
-        code =
-            String.foldl addHex 0 str
     in
     if 4 <= length && length <= 6 then
         Parser.problem "code point must have between 4 and 6 digits"
 
-    else if 0 <= code && code <= 0x0010FFFF then
-        Parser.succeed (Char.fromCode code)
-
     else
-        Parser.problem "code point must be between 0 and 0x10FFFF"
+        let
+            code : Int
+            code =
+                String.foldl addHex 0 str
+        in
+        if 0 <= code && code <= 0x0010FFFF then
+            Parser.succeed (Char.fromCode code)
+
+        else
+            Parser.problem "code point must be between 0 and 0x10FFFF"
 
 
 addHex : Char -> Int -> Int
 addHex char total =
     let
+        code : Int
         code =
             Char.toCode char
     in
@@ -753,6 +752,7 @@ isWhitespace char =
 isPnCharsBase : Char -> Bool
 isPnCharsBase char =
     let
+        code : Int
         code =
             Char.toCode char
     in
@@ -779,6 +779,7 @@ isPnCharsU char =
 isPnChars : Char -> Bool
 isPnChars char =
     let
+        code : Int
         code =
             Char.toCode char
     in

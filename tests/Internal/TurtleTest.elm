@@ -1,7 +1,6 @@
 module Internal.TurtleTest exposing (suite)
 
-import Expect exposing (Expectation)
-import Fuzz exposing (Fuzzer, int, list, string)
+import Expect
 import Internal.Turtle as Turtle
 import Test exposing (Test, describe, test)
 
@@ -382,6 +381,7 @@ testParse tests =
 testParseCase : String -> Turtle.TurtleDoc -> Test
 testParseCase raw parsed =
     let
+        description : String
         description =
             if raw == "" then
                 "<empty document>"

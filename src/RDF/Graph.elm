@@ -4,7 +4,7 @@ module RDF.Graph exposing
     , isEmpty
     , emptyGraph, singleton
     , decoder, encode
-    , parse, Error
+    , parse, Error(..)
     , serialize
     , fromNTriples
     , Seed, initialSeed
@@ -40,7 +40,7 @@ import Internal.Turtle as Turtle exposing (TurtleDoc)
 import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode exposing (Value)
 import List.Extra as List
-import Parser exposing ((|.), (|=), Parser)
+import Parser
 import RDF
     exposing
         ( BlankNode
@@ -89,6 +89,7 @@ type alias GraphData =
 union : Graph -> Graph -> Graph
 union (Graph g) (Graph h) =
     let
+        merge : Dict String (Dict String (List NTriple)) -> Dict String (Dict String (List NTriple)) -> Dict String (Dict String (List NTriple))
         merge dictLeft dictRight =
             Dict.merge
                 Dict.insert
@@ -175,12 +176,15 @@ initialSeed =
 insert : IsBlankNodeOrIri compatible1 -> IsIri compatible2 -> Node compatible3 -> Graph -> Graph
 insert subject predicate object (Graph graph) =
     let
+        keySubject : String
         keySubject =
             serializeNode subject
 
+        keyPredicate : String
         keyPredicate =
             serializeNode predicate
 
+        triple : NTriple
         triple =
             { subject = forgetCompatible subject
             , predicate = forgetCompatible predicate
@@ -231,6 +235,7 @@ insertAt subject path object graph seed =
 
         SequencePath (PredicatePath predicate) propertyPaths ->
             let
+                insertAtNext : IsBlankNodeOrIri compatible1 -> Graph -> Seed -> ( Graph, Seed )
                 insertAtNext idFocusNodeNext graphNext seedNext =
                     case propertyPaths of
                         [] ->
@@ -333,6 +338,8 @@ parse raw =
         |> Result.map fromNTriples
 
 
+{-| TODO
+-}
 type Error
     = ErrorParser (List Parser.DeadEnd)
     | MissingSubject
@@ -492,6 +499,7 @@ mintBlankNode (Seed seed) =
 collectPredicateObjectList : Turtle.PredicateObjectListData -> State -> Result Error State
 collectPredicateObjectList data state =
     let
+        predicate : Result Error String
         predicate =
             case data.verb of
                 Turtle.Predicate iri ->

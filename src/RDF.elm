@@ -7,13 +7,17 @@ module RDF exposing
     , forgetCompatible
     , unwrap
     , blankNode, iriAbsolute, literalWithDatatype, literal, bool, string, int
-    , toIri, toUrl, toBlankNodeOrIri, toString, toLangString, toInt, toFloat, toDecimal, toDate, toDateTime, toAnyLiteral, toBool
+    , toIri, toBlankNodeOrIri, toBlankNodeOrIriOrAnyLiteral, toAnyLiteral
+    , toUrl
+    , toString, toLangString
+    , toInt, toFloat, toDecimal
+    , toDate, toDateTime
+    , toBool
     , serializeNode, serializeNTriple, serializeNodeHelp
     , encodeNTriple
     , nTripleDecoder
     , toValue
     , StringOrLangString(..), localize, nonLocalized, stringOrLangStringFrom, stringOrLangStringFromList, mergeStringOrLangStrings
-    , toBlankNodeOrIriOrAnyLiteral
     )
 
 {-|
@@ -37,7 +41,12 @@ module RDF exposing
 
 ## Transform
 
-@docs toIri, toUrl, toBlankNodeOrIri, toString, toLangString, toInt, toFloat, toDecimal, toDate, toDateTime, toAnyLiteral, toBool
+@docs toIri, toBlankNodeOrIri, toBlankNodeOrIriOrAnyLiteral, toAnyLiteral
+@docs toUrl
+@docs toString, toLangString
+@docs toInt, toFloat, toDecimal
+@docs toDate, toDateTime
+@docs toBool
 
 
 ## Serialize
@@ -60,16 +69,12 @@ module RDF exposing
 
 import Decimal exposing (Decimal)
 import Dict exposing (Dict)
-import Internal.Turtle as Turtle exposing (TurtleDoc)
 import Iso8601
 import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline as Decode
 import Json.Encode as Encode exposing (Value)
 import Maybe.Extra as Maybe
-import Random
-import Set
 import Time exposing (Posix)
-import UUID
 
 
 {-| TODO Add documentation
@@ -255,12 +260,11 @@ bool value =
     Node
         (Literal
             { value =
-                case value of
-                    True ->
-                        "true"
+                if value then
+                    "true"
 
-                    False ->
-                        "false"
+                else
+                    "false"
             , datatype = xsd "boolean"
             , languageTag = Nothing
             }
@@ -580,6 +584,7 @@ serializeNodeHelp node =
 
         Literal data ->
             let
+                replaceLineBreaks : String -> String
                 replaceLineBreaks =
                     String.replace "\n" "\\n"
             in

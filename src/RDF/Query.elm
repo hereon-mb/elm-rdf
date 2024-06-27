@@ -26,7 +26,7 @@ module RDF.Query exposing
 
 -}
 
-import Dict
+import Dict exposing (Dict)
 import List.Extra as List
 import Maybe.Extra as Maybe
 import RDF
@@ -115,6 +115,7 @@ withObject node (Query query) =
 exists : Graph -> Query -> Bool
 exists (Graph graph) (Query query) =
     let
+        subjectMatches : RDF.NTriple -> Bool
         subjectMatches triple =
             case query.subject of
                 Nothing ->
@@ -123,6 +124,7 @@ exists (Graph graph) (Query query) =
                 Just subject ->
                     triple.subject == subject
 
+        predicateMatches : RDF.NTriple -> Bool
         predicateMatches triple =
             case query.propertyPath of
                 Just (PredicatePath predicate) ->
@@ -134,6 +136,7 @@ exists (Graph graph) (Query query) =
                 Nothing ->
                     True
 
+        objectMatches : RDF.NTriple -> Bool
         objectMatches triple =
             case query.object of
                 Nothing ->
@@ -156,6 +159,7 @@ getSubjects : Graph -> Query -> List BlankNodeOrIri
 getSubjects (Graph graph) (Query query) =
     List.unique
         (let
+            filterByObject : List RDF.NTriple -> List RDF.NTriple
             filterByObject result =
                 case query.object of
                     Nothing ->
@@ -212,6 +216,7 @@ getSubject graph query =
 getBlankNodeOrIriSubject : Graph -> Query -> Maybe BlankNodeOrIri
 getBlankNodeOrIriSubject graph query =
     let
+        toBlankNodeOrIriSafe : Node compatible -> Maybe BlankNodeOrIri
         toBlankNodeOrIriSafe (Node node) =
             case node of
                 BlankNode _ ->
@@ -296,6 +301,7 @@ followPropertyPath data propertyPath subject =
 getBlankNodeOrIriObjects : Graph -> Query -> List BlankNodeOrIri
 getBlankNodeOrIriObjects graph query =
     let
+        onlyBlankNodeOrIri : Node compatbiel -> Maybe BlankNodeOrIri
         onlyBlankNodeOrIri (Node node) =
             case node of
                 BlankNode _ ->
@@ -339,6 +345,7 @@ getObject graph query =
 getBlankNodeOrIriObject : Graph -> Query -> Maybe BlankNodeOrIri
 getBlankNodeOrIriObject graph query =
     let
+        toBlankNodeOrIriSafe : Node compatible -> Maybe BlankNodeOrIri
         toBlankNodeOrIriSafe (Node node) =
             case node of
                 BlankNode _ ->
@@ -555,6 +562,7 @@ getDateTime graph query =
 getInts : Graph -> Query -> List Int
 getInts graph query =
     let
+        onlyInt : Node compatible -> Maybe Int
         onlyInt (Node node) =
             case node of
                 BlankNode _ ->
@@ -590,6 +598,7 @@ getInt graph query =
 getFloats : Graph -> Query -> List Float
 getFloats graph query =
     let
+        onlyFloat : Node compatible -> Maybe Float
         onlyFloat (Node node) =
             case node of
                 BlankNode _ ->
@@ -741,13 +750,16 @@ rdfsCommentFor graph blankNodeOrIri =
 getStringOrLangString : Graph -> Query -> Maybe StringOrLangString
 getStringOrLangString graph query =
     let
+        getStringOrLangStringHelp : List (Node compatible) -> Maybe StringOrLangString
         getStringOrLangStringHelp objects =
             let
+                maybeString : Maybe String
                 maybeString =
                     objects
                         |> List.filterMap toString
                         |> List.head
 
+                langStrings : Dict String String
                 langStrings =
                     objects
                         |> List.filterMap toLangString

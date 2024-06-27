@@ -1,8 +1,6 @@
 module RDFTest exposing (suite)
 
-import Expect exposing (Expectation)
-import Fuzz exposing (Fuzzer, int, list, string)
-import Internal.Turtle as Turtle
+import Expect
 import RDF
 import RDF.Namespaces exposing (rdf, xsd)
 import Test exposing (Test, describe, test)
@@ -327,6 +325,7 @@ testParseTurtle tests =
 testParseTurtleCase : String -> List RDF.NTriple -> Test
 testParseTurtleCase raw expected =
     let
+        description : String
         description =
             if raw == "" then
                 "<empty document>"
