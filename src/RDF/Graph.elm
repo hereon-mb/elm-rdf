@@ -578,29 +578,29 @@ collectObjectList object state =
                 |> Result.map dropSubject
                 |> Result.andThen (addTriple (RDF.toBlankNodeOrIriOrAnyLiteral node))
 
-        Turtle.ObjectLiteral (Turtle.RdfLiteralString value) ->
+        Turtle.ObjectLiteral (Turtle.LiteralString value) ->
             addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.string value)) state
 
-        Turtle.ObjectLiteral (Turtle.RdfLiteralLangString value lang) ->
+        Turtle.ObjectLiteral (Turtle.LiteralLangString value lang) ->
             addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.literal (rdf "langString") (Just lang) value)) state
 
-        Turtle.ObjectLiteral (Turtle.RdfLiteralTyped value datatype) ->
+        Turtle.ObjectLiteral (Turtle.LiteralTyped value datatype) ->
             resolveIri state datatype
                 |> Result.andThen (\url -> addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.literal (RDF.iriAbsolute url) Nothing value)) state)
 
-        Turtle.ObjectLiteral (Turtle.NumericLiteral (Turtle.Integer value)) ->
+        Turtle.ObjectLiteral (Turtle.LiteralInteger value) ->
             addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.int value)) state
 
-        Turtle.ObjectLiteral (Turtle.NumericLiteral (Turtle.Decimal value)) ->
+        Turtle.ObjectLiteral (Turtle.LiteralDecimal value) ->
             addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.literal (xsd "decimal") Nothing value)) state
 
-        Turtle.ObjectLiteral (Turtle.NumericLiteral (Turtle.Double value)) ->
+        Turtle.ObjectLiteral (Turtle.LiteralDouble value) ->
             addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.literal (xsd "double") Nothing (String.fromFloat value))) state
 
-        Turtle.ObjectLiteral (Turtle.BooleanLiteral Turtle.BooleanLiteralTrue) ->
+        Turtle.ObjectLiteral Turtle.LiteralTrue ->
             addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.bool True)) state
 
-        Turtle.ObjectLiteral (Turtle.BooleanLiteral Turtle.BooleanLiteralFalse) ->
+        Turtle.ObjectLiteral Turtle.LiteralFalse ->
             addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.bool False)) state
 
 

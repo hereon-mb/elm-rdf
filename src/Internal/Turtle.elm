@@ -10,8 +10,6 @@ module Internal.Turtle exposing
     , Subject(..)
     , Object(..)
     , Literal(..)
-    , NumericLiteral(..)
-    , BooleanLiteral(..)
     , Iri(..)
     , BlankNode(..)
     )
@@ -30,8 +28,6 @@ module Internal.Turtle exposing
 @docs Subject
 @docs Object
 @docs Literal
-@docs NumericLiteral
-@docs BooleanLiteral
 @docs Iri
 @docs BlankNode
 
@@ -92,22 +88,14 @@ type Object
 
 
 type Literal
-    = RdfLiteralString String
-    | RdfLiteralLangString String String
-    | RdfLiteralTyped String Iri
-    | NumericLiteral NumericLiteral
-    | BooleanLiteral BooleanLiteral
-
-
-type NumericLiteral
-    = Integer Int
-    | Decimal String
-    | Double Float
-
-
-type BooleanLiteral
-    = BooleanLiteralTrue
-    | BooleanLiteralFalse
+    = LiteralString String
+    | LiteralLangString String String
+    | LiteralTyped String Iri
+    | LiteralInteger Int
+    | LiteralDecimal String
+    | LiteralDouble Float
+    | LiteralTrue
+    | LiteralFalse
 
 
 type Iri
@@ -539,32 +527,31 @@ rdfLiteral =
         |> Parser.andThen
             (\str ->
                 Parser.oneOf
-                    [ Parser.succeed (RdfLiteralLangString str)
+                    [ Parser.succeed (LiteralLangString str)
                         |. Parser.symbol "@"
                         |= langTag
-                    , Parser.succeed (RdfLiteralTyped str)
+                    , Parser.succeed (LiteralTyped str)
                         |. Parser.symbol "^^"
                         |= iri
-                    , Parser.succeed (RdfLiteralString str)
+                    , Parser.succeed (LiteralString str)
                     ]
             )
 
 
 numericLiteral : Parser Literal
 numericLiteral =
-    Parser.map NumericLiteral <|
-        Parser.oneOf
-            [ Parser.succeed negateNumericLiteral
-                |. Parser.symbol "-"
-                |= numeric
-            , Parser.succeed identity
-                |. Parser.symbol "+"
-                |= numeric
-            , numeric
-            ]
+    Parser.oneOf
+        [ Parser.succeed negateNumericLiteral
+            |. Parser.symbol "-"
+            |= numeric
+        , Parser.succeed identity
+            |. Parser.symbol "+"
+            |= numeric
+        , numeric
+        ]
 
 
-numeric : Parser NumericLiteral
+numeric : Parser Literal
 numeric =
     (Parser.succeed ()
         |. Parser.chompIf
@@ -589,43 +576,44 @@ numeric =
                     Nothing ->
                         if String.contains "e" raw || String.contains "E" raw then
                             String.toFloat raw
-                                |> Maybe.map (Double >> Parser.succeed)
+                                |> Maybe.map (LiteralDouble >> Parser.succeed)
                                 |> Maybe.withDefault (Parser.problem ("'" ++ raw ++ "' is not a valid double literal"))
 
                         else
                             raw
-                                |> Decimal
+                                |> LiteralDecimal
                                 |> Parser.succeed
 
                     Just int ->
                         int
-                            |> Integer
+                            |> LiteralInteger
                             |> Parser.succeed
             )
 
 
-negateNumericLiteral : NumericLiteral -> NumericLiteral
-negateNumericLiteral num =
-    case num of
-        Integer value ->
-            Integer (-1 * value)
+negateNumericLiteral : Literal -> Literal
+negateNumericLiteral l =
+    case l of
+        LiteralInteger value ->
+            LiteralInteger (-1 * value)
 
-        Decimal value ->
-            Decimal ("-" ++ value)
+        LiteralDecimal value ->
+            LiteralDecimal ("-" ++ value)
 
-        Double value ->
-            Double (-1 * value)
+        LiteralDouble value ->
+            LiteralDouble (-1 * value)
+
+        _ ->
+            l
 
 
 booleanLiteral : Parser Literal
 booleanLiteral =
     Parser.oneOf
-        [ Parser.succeed BooleanLiteralTrue
+        [ Parser.succeed LiteralTrue
             |. Parser.keyword "true"
-            |> Parser.map BooleanLiteral
-        , Parser.succeed BooleanLiteralFalse
+        , Parser.succeed LiteralFalse
             |. Parser.keyword "false"
-            |> Parser.map BooleanLiteral
         ]
 
 
