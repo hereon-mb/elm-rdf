@@ -412,7 +412,7 @@ collectNTriplesStep statement state =
                 |> Result.map dropSubject
 
 
-collectTriplesSubject : Turtle.Subject -> Turtle.PredicateObjectList -> State -> Result Error State
+collectTriplesSubject : Turtle.Subject -> List Turtle.PredicateObjectList -> State -> Result Error State
 collectTriplesSubject subject predicateObjectList state =
     case subject of
         Turtle.SubjectIri iri ->
@@ -496,12 +496,12 @@ mintBlankNode (Seed seed) =
         |> Tuple.mapSecond Seed
 
 
-collectPredicateObjectList : Turtle.PredicateObjectListData -> State -> Result Error State
-collectPredicateObjectList data state =
+collectPredicateObjectList : Turtle.PredicateObjectList -> State -> Result Error State
+collectPredicateObjectList { verb, objects } state =
     let
         predicate : Result Error String
         predicate =
-            case data.verb of
+            case verb of
                 Turtle.Predicate iri ->
                     resolveIri state iri
 
@@ -513,14 +513,14 @@ collectPredicateObjectList data state =
             Err error
 
         Ok url ->
-            data.objectList
-                |> List.foldl (Result.andThen << collectObjectList)
+            objects
+                |> List.foldl (Result.andThen << collectObject)
                     (Ok { state | predicates = RDF.iriAbsolute url :: state.predicates })
                 |> Result.map dropPredicate
 
 
-collectObjectList : Turtle.Object -> State -> Result Error State
-collectObjectList object state =
+collectObject : Turtle.Object -> State -> Result Error State
+collectObject object state =
     case object of
         Turtle.ObjectIri iri ->
             resolveIri state iri
@@ -562,12 +562,12 @@ collectObjectList object state =
                     |> addTriple (RDF.toBlankNodeOrIriOrAnyLiteral nodeFirst)
                     |> Result.andThen (addCollection nodeFirst objects)
 
-        Turtle.ObjectBlankNodePropertyList predicateObjectList ->
+        Turtle.ObjectBlankNodePropertyList predicateObjects ->
             let
                 ( node, seed ) =
                     mintBlankNode state.seed
             in
-            predicateObjectList
+            predicateObjects
                 |> List.foldl (Result.andThen << collectPredicateObjectList)
                     (Ok
                         { state
@@ -636,7 +636,7 @@ addCollection nodeFirst objects state =
                                         , predicates = rdf "first" :: stateNext.predicates
                                         , seed = seedNext
                                     }
-                                        |> collectObjectList obj
+                                        |> collectObject obj
                                         |> Result.map dropPredicate
                                         |> Result.map
                                             (\stateNextNext ->
@@ -655,7 +655,7 @@ addCollection nodeFirst objects state =
                             | subjects = RDF.toBlankNodeOrIri nodePrevious :: stateNext.subjects
                             , predicates = rdf "first" :: stateNext.predicates
                         }
-                            |> collectObjectList last
+                            |> collectObject last
                             |> Result.map dropPredicate
                             |> Result.map
                                 (\stateNextNext ->

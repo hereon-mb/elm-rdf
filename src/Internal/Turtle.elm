@@ -5,7 +5,6 @@ module Internal.Turtle exposing
     , Directive(..)
     , Triples(..)
     , PredicateObjectList
-    , PredicateObjectListData
     , Verb(..)
     , Subject(..)
     , Object(..)
@@ -23,7 +22,6 @@ module Internal.Turtle exposing
 @docs Directive
 @docs Triples
 @docs PredicateObjectList
-@docs PredicateObjectListData
 @docs Verb
 @docs Subject
 @docs Object
@@ -54,23 +52,14 @@ type Directive
 
 
 type Triples
-    = TriplesSubject Subject PredicateObjectList
-    | TriplesBlankNodePropertyList PredicateObjectList PredicateObjectList
+    = TriplesSubject Subject (List PredicateObjectList)
+    | TriplesBlankNodePropertyList (List PredicateObjectList) (List PredicateObjectList)
 
 
 type alias PredicateObjectList =
-    List PredicateObjectListData
-
-
-type alias PredicateObjectListData =
     { verb : Verb
-    , objectList : List Object
+    , objects : List Object
     }
-
-
-type Verb
-    = Predicate Iri
-    | A
 
 
 type Subject
@@ -79,12 +68,27 @@ type Subject
     | SubjectCollection (List Object)
 
 
+type Verb
+    = Predicate Iri
+    | A
+
+
 type Object
     = ObjectIri Iri
     | ObjectBlankNode BlankNode
     | ObjectCollection (List Object)
-    | ObjectBlankNodePropertyList PredicateObjectList
+    | ObjectBlankNodePropertyList (List PredicateObjectList)
     | ObjectLiteral Literal
+
+
+type Iri
+    = IriRef String
+    | PrefixedName String String
+
+
+type BlankNode
+    = BlankNodeLabel String
+    | Anon
 
 
 type Literal
@@ -96,16 +100,6 @@ type Literal
     | LiteralDouble Float
     | LiteralTrue
     | LiteralFalse
-
-
-type Iri
-    = IriRef String
-    | PrefixedName String String
-
-
-type BlankNode
-    = BlankNodeLabel String
-    | Anon
 
 
 parse : String -> Result (List Parser.DeadEnd) TurtleDoc
@@ -226,7 +220,7 @@ triplesSubject =
     Parser.succeed TriplesSubject
         |= subject
         |. whitespace
-        |= predicateObjectList
+        |= predicateObjectLists
 
 
 subject : Parser Subject
@@ -268,26 +262,26 @@ triplesBlankNodePropertyList =
     Parser.succeed TriplesBlankNodePropertyList
         |. Parser.symbol "["
         |. whitespace
-        |= predicateObjectList
+        |= predicateObjectLists
         |. whitespace
         |. Parser.symbol "]"
         |. whitespace
         |= Parser.oneOf
-            [ predicateObjectList
+            [ predicateObjectLists
             , Parser.succeed []
             ]
 
 
-predicateObjectList : Parser PredicateObjectList
-predicateObjectList =
+predicateObjectLists : Parser (List PredicateObjectList)
+predicateObjectLists =
     predicateObjectListData
         |> Parser.andThen (\itemFirst -> Parser.loop [ itemFirst ] predicateObjectListHelp)
 
 
-predicateObjectListHelp : List PredicateObjectListData -> Parser (Parser.Step (List PredicateObjectListData) (List PredicateObjectListData))
+predicateObjectListHelp : List PredicateObjectList -> Parser (Parser.Step (List PredicateObjectList) (List PredicateObjectList))
 predicateObjectListHelp itemsReversed =
     let
-        end : Parser (Parser.Step (List PredicateObjectListData) (List PredicateObjectListData))
+        end : Parser (Parser.Step (List PredicateObjectList) (List PredicateObjectList))
         end =
             Parser.succeed ()
                 |> Parser.map (\_ -> Parser.Done (List.reverse itemsReversed))
@@ -307,16 +301,16 @@ predicateObjectListHelp itemsReversed =
             ]
 
 
-predicateObjectListData : Parser PredicateObjectListData
+predicateObjectListData : Parser PredicateObjectList
 predicateObjectListData =
-    Parser.succeed PredicateObjectListData
+    Parser.succeed PredicateObjectList
         |= verb
         |. whitespace
-        |= objectList
+        |= objects
 
 
-objectList : Parser (List Object)
-objectList =
+objects : Parser (List Object)
+objects =
     object
         |> Parser.andThen (\objectFirst -> Parser.loop [ objectFirst ] objectListHelp)
 
@@ -404,7 +398,7 @@ objectBlankNodePropertyList =
     Parser.succeed ObjectBlankNodePropertyList
         |. Parser.symbol "["
         |. whitespace
-        |= Parser.lazy (\_ -> predicateObjectList)
+        |= Parser.lazy (\_ -> predicateObjectLists)
         |. whitespace
         |. Parser.symbol "]"
 
