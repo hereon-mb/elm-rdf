@@ -2,6 +2,7 @@ module RDFTest exposing (suite)
 
 import Expect
 import RDF
+import RDF.Graph
 import RDF.Namespaces exposing (rdf, xsd)
 import Test exposing (Test, describe, test)
 
@@ -9,20 +10,20 @@ import Test exposing (Test, describe, test)
 suite : Test
 suite =
     describe "RDF"
-        [ parseTurtle
+        [ parse
         ]
 
 
-parseTurtle : Test
-parseTurtle =
-    testParseTurtle
+parse : Test
+parse =
+    testParse
         [ ( ""
           , []
           )
         , ( "<http://example.org/alice> <http://example.org/knows> <http://example.org/bob> ."
-          , [ { subject = RDF.toBlankNodeOrIri (RDF.iriAbsolute "http://example.org/alice")
-              , predicate = RDF.iriAbsolute "http://example.org/knows"
-              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iriAbsolute "http://example.org/bob")
+          , [ { subject = RDF.toBlankNodeOrIri (RDF.iri "http://example.org/alice")
+              , predicate = RDF.iri "http://example.org/knows"
+              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iri "http://example.org/bob")
               }
             ]
           )
@@ -30,16 +31,16 @@ parseTurtle =
             , "example:alice example:knows example:bob ."
             ]
                 |> String.join "\n"
-          , [ { subject = RDF.toBlankNodeOrIri (RDF.iriAbsolute "http://example.org/alice")
-              , predicate = RDF.iriAbsolute "http://example.org/knows"
-              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iriAbsolute "http://example.org/bob")
+          , [ { subject = RDF.toBlankNodeOrIri (RDF.iri "http://example.org/alice")
+              , predicate = RDF.iri "http://example.org/knows"
+              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iri "http://example.org/bob")
               }
             ]
           )
         , ( "[] <http://example.org/knows> <http://example.org/bob> ."
           , [ { subject = RDF.toBlankNodeOrIri (RDF.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
-              , predicate = RDF.iriAbsolute "http://example.org/knows"
-              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iriAbsolute "http://example.org/bob")
+              , predicate = RDF.iri "http://example.org/knows"
+              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iri "http://example.org/bob")
               }
             ]
           )
@@ -48,19 +49,19 @@ parseTurtle =
             ]
                 |> String.join "\n"
           , [ { subject = RDF.toBlankNodeOrIri (RDF.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
-              , predicate = RDF.iriAbsolute "http://example.org/knows"
-              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iriAbsolute "http://example.org/cindi")
+              , predicate = RDF.iri "http://example.org/knows"
+              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iri "http://example.org/cindi")
               }
             , { subject = RDF.toBlankNodeOrIri (RDF.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
-              , predicate = RDF.iriAbsolute "http://example.org/knows"
-              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iriAbsolute "http://example.org/bob")
+              , predicate = RDF.iri "http://example.org/knows"
+              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iri "http://example.org/bob")
               }
             ]
           )
         , ( "_:alice <http://example.org/knows> <http://example.org/bob> ."
           , [ { subject = RDF.toBlankNodeOrIri (RDF.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
-              , predicate = RDF.iriAbsolute "http://example.org/knows"
-              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iriAbsolute "http://example.org/bob")
+              , predicate = RDF.iri "http://example.org/knows"
+              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iri "http://example.org/bob")
               }
             ]
           )
@@ -69,18 +70,18 @@ parseTurtle =
             ]
                 |> String.join "\n"
           , [ { subject = RDF.toBlankNodeOrIri (RDF.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
-              , predicate = RDF.iriAbsolute "http://example.org/knows"
-              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iriAbsolute "http://example.org/cindi")
+              , predicate = RDF.iri "http://example.org/knows"
+              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iri "http://example.org/cindi")
               }
             , { subject = RDF.toBlankNodeOrIri (RDF.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
-              , predicate = RDF.iriAbsolute "http://example.org/knows"
-              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iriAbsolute "http://example.org/bob")
+              , predicate = RDF.iri "http://example.org/knows"
+              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iri "http://example.org/bob")
               }
             ]
           )
         , ( "<http://example.org/alice> <http://example.org/knows> [] ."
-          , [ { subject = RDF.toBlankNodeOrIri (RDF.iriAbsolute "http://example.org/alice")
-              , predicate = RDF.iriAbsolute "http://example.org/knows"
+          , [ { subject = RDF.toBlankNodeOrIri (RDF.iri "http://example.org/alice")
+              , predicate = RDF.iri "http://example.org/knows"
               , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
               }
             ]
@@ -90,19 +91,19 @@ parseTurtle =
             , "] ."
             ]
                 |> String.join "\n"
-          , [ { subject = RDF.toBlankNodeOrIri (RDF.iriAbsolute "http://example.org/alice")
-              , predicate = RDF.iriAbsolute "http://example.org/knows"
+          , [ { subject = RDF.toBlankNodeOrIri (RDF.iri "http://example.org/alice")
+              , predicate = RDF.iri "http://example.org/knows"
               , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
               }
             , { subject = RDF.toBlankNodeOrIri (RDF.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
-              , predicate = RDF.iriAbsolute "http://example.org/knows"
-              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iriAbsolute "http://example.org/bob")
+              , predicate = RDF.iri "http://example.org/knows"
+              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iri "http://example.org/bob")
               }
             ]
           )
         , ( "<http://example.org/alice> <http://example.org/knows> _:bob ."
-          , [ { subject = RDF.toBlankNodeOrIri (RDF.iriAbsolute "http://example.org/alice")
-              , predicate = RDF.iriAbsolute "http://example.org/knows"
+          , [ { subject = RDF.toBlankNodeOrIri (RDF.iri "http://example.org/alice")
+              , predicate = RDF.iri "http://example.org/knows"
               , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
               }
             ]
@@ -111,9 +112,9 @@ parseTurtle =
             , "<alice> <knows> <bob> ."
             ]
                 |> String.join "\n"
-          , [ { subject = RDF.toBlankNodeOrIri (RDF.iriAbsolute "http://example.org/alice")
-              , predicate = RDF.iriAbsolute "http://example.org/knows"
-              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iriAbsolute "http://example.org/bob")
+          , [ { subject = RDF.toBlankNodeOrIri (RDF.iri "http://example.org/alice")
+              , predicate = RDF.iri "http://example.org/knows"
+              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iri "http://example.org/bob")
               }
             ]
           )
@@ -121,8 +122,8 @@ parseTurtle =
             , "<alice> <value> \"Alice\" ."
             ]
                 |> String.join "\n"
-          , [ { subject = RDF.toBlankNodeOrIri (RDF.iriAbsolute "http://example.org/alice")
-              , predicate = RDF.iriAbsolute "http://example.org/value"
+          , [ { subject = RDF.toBlankNodeOrIri (RDF.iri "http://example.org/alice")
+              , predicate = RDF.iri "http://example.org/value"
               , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.string "Alice")
               }
             ]
@@ -131,9 +132,9 @@ parseTurtle =
             , "<alice> <value> \"Alice\"@en ."
             ]
                 |> String.join "\n"
-          , [ { subject = RDF.toBlankNodeOrIri (RDF.iriAbsolute "http://example.org/alice")
-              , predicate = RDF.iriAbsolute "http://example.org/value"
-              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.literal (xsd "langString") (Just "en") "Alice")
+          , [ { subject = RDF.toBlankNodeOrIri (RDF.iri "http://example.org/alice")
+              , predicate = RDF.iri "http://example.org/value"
+              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.langString "en" "Alice")
               }
             ]
           )
@@ -142,9 +143,9 @@ parseTurtle =
             , "<alice> <value> \"42\"^^xsd:integer ."
             ]
                 |> String.join "\n"
-          , [ { subject = RDF.toBlankNodeOrIri (RDF.iriAbsolute "http://example.org/alice")
-              , predicate = RDF.iriAbsolute "http://example.org/value"
-              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.literal (xsd "integer") Nothing "42")
+          , [ { subject = RDF.toBlankNodeOrIri (RDF.iri "http://example.org/alice")
+              , predicate = RDF.iri "http://example.org/value"
+              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.literal (xsd "integer") "42")
               }
             ]
           )
@@ -152,9 +153,9 @@ parseTurtle =
             , "<alice> <value> 42 ."
             ]
                 |> String.join "\n"
-          , [ { subject = RDF.toBlankNodeOrIri (RDF.iriAbsolute "http://example.org/alice")
-              , predicate = RDF.iriAbsolute "http://example.org/value"
-              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.literal (xsd "integer") Nothing "42")
+          , [ { subject = RDF.toBlankNodeOrIri (RDF.iri "http://example.org/alice")
+              , predicate = RDF.iri "http://example.org/value"
+              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.literal (xsd "integer") "42")
               }
             ]
           )
@@ -162,9 +163,9 @@ parseTurtle =
             , "<alice> <value> 3.14 ."
             ]
                 |> String.join "\n"
-          , [ { subject = RDF.toBlankNodeOrIri (RDF.iriAbsolute "http://example.org/alice")
-              , predicate = RDF.iriAbsolute "http://example.org/value"
-              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.literal (xsd "decimal") Nothing "3.14")
+          , [ { subject = RDF.toBlankNodeOrIri (RDF.iri "http://example.org/alice")
+              , predicate = RDF.iri "http://example.org/value"
+              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.literal (xsd "decimal") "3.14")
               }
             ]
           )
@@ -172,9 +173,9 @@ parseTurtle =
             , "<alice> <value> 0.314e1 ."
             ]
                 |> String.join "\n"
-          , [ { subject = RDF.toBlankNodeOrIri (RDF.iriAbsolute "http://example.org/alice")
-              , predicate = RDF.iriAbsolute "http://example.org/value"
-              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.literal (xsd "double") Nothing "3.14")
+          , [ { subject = RDF.toBlankNodeOrIri (RDF.iri "http://example.org/alice")
+              , predicate = RDF.iri "http://example.org/value"
+              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.literal (xsd "double") "3.14")
               }
             ]
           )
@@ -182,9 +183,9 @@ parseTurtle =
             , "<alice> <value> true ."
             ]
                 |> String.join "\n"
-          , [ { subject = RDF.toBlankNodeOrIri (RDF.iriAbsolute "http://example.org/alice")
-              , predicate = RDF.iriAbsolute "http://example.org/value"
-              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.literal (xsd "boolean") Nothing "true")
+          , [ { subject = RDF.toBlankNodeOrIri (RDF.iri "http://example.org/alice")
+              , predicate = RDF.iri "http://example.org/value"
+              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.literal (xsd "boolean") "true")
               }
             ]
           )
@@ -192,9 +193,9 @@ parseTurtle =
             , "<alice> <value> false ."
             ]
                 |> String.join "\n"
-          , [ { subject = RDF.toBlankNodeOrIri (RDF.iriAbsolute "http://example.org/alice")
-              , predicate = RDF.iriAbsolute "http://example.org/value"
-              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.literal (xsd "boolean") Nothing "false")
+          , [ { subject = RDF.toBlankNodeOrIri (RDF.iri "http://example.org/alice")
+              , predicate = RDF.iri "http://example.org/value"
+              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.literal (xsd "boolean") "false")
               }
             ]
           )
@@ -202,13 +203,13 @@ parseTurtle =
             , "<http://example.org/alice> <http://example.org/knows> <http://example.org/cindi> ."
             ]
                 |> String.join "\n"
-          , [ { subject = RDF.toBlankNodeOrIri (RDF.iriAbsolute "http://example.org/alice")
-              , predicate = RDF.iriAbsolute "http://example.org/knows"
-              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iriAbsolute "http://example.org/cindi")
+          , [ { subject = RDF.toBlankNodeOrIri (RDF.iri "http://example.org/alice")
+              , predicate = RDF.iri "http://example.org/knows"
+              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iri "http://example.org/cindi")
               }
-            , { subject = RDF.toBlankNodeOrIri (RDF.iriAbsolute "http://example.org/alice")
-              , predicate = RDF.iriAbsolute "http://example.org/knows"
-              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iriAbsolute "http://example.org/bob")
+            , { subject = RDF.toBlankNodeOrIri (RDF.iri "http://example.org/alice")
+              , predicate = RDF.iri "http://example.org/knows"
+              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iri "http://example.org/bob")
               }
             ]
           )
@@ -216,13 +217,13 @@ parseTurtle =
             , "                           <http://example.org/knows> <http://example.org/cindi> ."
             ]
                 |> String.join "\n"
-          , [ { subject = RDF.toBlankNodeOrIri (RDF.iriAbsolute "http://example.org/alice")
-              , predicate = RDF.iriAbsolute "http://example.org/knows"
-              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iriAbsolute "http://example.org/cindi")
+          , [ { subject = RDF.toBlankNodeOrIri (RDF.iri "http://example.org/alice")
+              , predicate = RDF.iri "http://example.org/knows"
+              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iri "http://example.org/cindi")
               }
-            , { subject = RDF.toBlankNodeOrIri (RDF.iriAbsolute "http://example.org/alice")
-              , predicate = RDF.iriAbsolute "http://example.org/knows"
-              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iriAbsolute "http://example.org/bob")
+            , { subject = RDF.toBlankNodeOrIri (RDF.iri "http://example.org/alice")
+              , predicate = RDF.iri "http://example.org/knows"
+              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iri "http://example.org/bob")
               }
             ]
           )
@@ -230,13 +231,13 @@ parseTurtle =
             , "                                                       <http://example.org/cindi> ."
             ]
                 |> String.join "\n"
-          , [ { subject = RDF.toBlankNodeOrIri (RDF.iriAbsolute "http://example.org/alice")
-              , predicate = RDF.iriAbsolute "http://example.org/knows"
-              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iriAbsolute "http://example.org/cindi")
+          , [ { subject = RDF.toBlankNodeOrIri (RDF.iri "http://example.org/alice")
+              , predicate = RDF.iri "http://example.org/knows"
+              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iri "http://example.org/cindi")
               }
-            , { subject = RDF.toBlankNodeOrIri (RDF.iriAbsolute "http://example.org/alice")
-              , predicate = RDF.iriAbsolute "http://example.org/knows"
-              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iriAbsolute "http://example.org/bob")
+            , { subject = RDF.toBlankNodeOrIri (RDF.iri "http://example.org/alice")
+              , predicate = RDF.iri "http://example.org/knows"
+              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iri "http://example.org/bob")
               }
             ]
           )
@@ -244,8 +245,8 @@ parseTurtle =
             , "<alice> <knows> () ."
             ]
                 |> String.join "\n"
-          , [ { subject = RDF.toBlankNodeOrIri (RDF.iriAbsolute "http://example.org/alice")
-              , predicate = RDF.iriAbsolute "http://example.org/knows"
+          , [ { subject = RDF.toBlankNodeOrIri (RDF.iri "http://example.org/alice")
+              , predicate = RDF.iri "http://example.org/knows"
               , object = RDF.toBlankNodeOrIriOrAnyLiteral (rdf "nil")
               }
             ]
@@ -270,8 +271,8 @@ parseTurtle =
               , predicate = rdf "first"
               , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.int 1)
               }
-            , { subject = RDF.toBlankNodeOrIri (RDF.iriAbsolute "http://example.org/alice")
-              , predicate = RDF.iriAbsolute "http://example.org/knows"
+            , { subject = RDF.toBlankNodeOrIri (RDF.iri "http://example.org/alice")
+              , predicate = RDF.iri "http://example.org/knows"
               , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
               }
             ]
@@ -281,8 +282,8 @@ parseTurtle =
             ]
                 |> String.join "\n"
           , [ { subject = RDF.toBlankNodeOrIri (rdf "nil")
-              , predicate = RDF.iriAbsolute "http://example.org/knows"
-              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iriAbsolute "http://example.org/alice")
+              , predicate = RDF.iri "http://example.org/knows"
+              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iri "http://example.org/alice")
               }
             ]
           )
@@ -307,23 +308,23 @@ parseTurtle =
               , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.int 1)
               }
             , { subject = RDF.toBlankNodeOrIri (RDF.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
-              , predicate = RDF.iriAbsolute "http://example.org/knows"
-              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iriAbsolute "http://example.org/alice")
+              , predicate = RDF.iri "http://example.org/knows"
+              , object = RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iri "http://example.org/alice")
               }
             ]
           )
         ]
 
 
-testParseTurtle : List ( String, List RDF.NTriple ) -> Test
-testParseTurtle tests =
+testParse : List ( String, List RDF.NTriple ) -> Test
+testParse tests =
     tests
-        |> List.map (\( raw, parsed ) -> testParseTurtleCase raw parsed)
+        |> List.map (\( raw, parsed ) -> testParseCase raw parsed)
         |> describe "parse"
 
 
-testParseTurtleCase : String -> List RDF.NTriple -> Test
-testParseTurtleCase raw expected =
+testParseCase : String -> List RDF.NTriple -> Test
+testParseCase raw expected =
     let
         description : String
         description =
@@ -336,5 +337,5 @@ testParseTurtleCase raw expected =
     test description <|
         \_ ->
             raw
-                |> RDF.parseTurtle
-                |> Expect.equal (Ok expected)
+                |> RDF.Graph.parse
+                |> Expect.equal (Ok (RDF.Graph.fromNTriples expected))

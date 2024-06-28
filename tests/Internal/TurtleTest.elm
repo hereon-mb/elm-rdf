@@ -19,23 +19,19 @@ parse =
           , []
           )
         , ( "@prefix example: <http://example.org/> ."
-          , [ Turtle.Directive
-                (Turtle.PrefixId "example" "http://example.org/")
+          , [ Turtle.DirectivePrefixId "example" "http://example.org/"
             ]
           )
         , ( "@base <http://example.org/> ."
-          , [ Turtle.Directive
-                (Turtle.Base "http://example.org/")
+          , [ Turtle.DirectiveBase "http://example.org/"
             ]
           )
         , ( "PREFIX example: <http://example.org/>"
-          , [ Turtle.Directive
-                (Turtle.SparqlPrefix "example" "http://example.org/")
+          , [ Turtle.DirectiveSparqlPrefix "example" "http://example.org/"
             ]
           )
         , ( "BASE <http://example.org/>"
-          , [ Turtle.Directive
-                (Turtle.SparqlBase "http://example.org/")
+          , [ Turtle.DirectiveSparqlBase "http://example.org/"
             ]
           )
 
@@ -44,7 +40,7 @@ parse =
           , [ Turtle.Triples
                 (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.IriRef "http://example.org/alice"))
                     [ { verb = Turtle.A
-                      , objectList = [ Turtle.ObjectIri (Turtle.IriRef "http://example.org/#Person") ]
+                      , objects = [ Turtle.ObjectIri (Turtle.IriRef "http://example.org/#Person") ]
                       }
                     ]
                 )
@@ -56,7 +52,7 @@ parse =
           , [ Turtle.Triples
                 (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.IriRef "http://example.org/alice"))
                     [ { verb = Turtle.Predicate (Turtle.IriRef "http://example.org/#knows")
-                      , objectList = [ Turtle.ObjectIri (Turtle.IriRef "http://example.org/#bob") ]
+                      , objects = [ Turtle.ObjectIri (Turtle.IriRef "http://example.org/#bob") ]
                       }
                     ]
                 )
@@ -66,7 +62,7 @@ parse =
           , [ Turtle.Triples
                 (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.PrefixedName "example" "alice"))
                     [ { verb = Turtle.Predicate (Turtle.PrefixedName "example" "knows")
-                      , objectList = [ Turtle.ObjectIri (Turtle.PrefixedName "example" "bob") ]
+                      , objects = [ Turtle.ObjectIri (Turtle.PrefixedName "example" "bob") ]
                       }
                     ]
                 )
@@ -76,7 +72,7 @@ parse =
           , [ Turtle.Triples
                 (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.PrefixedName "example" ""))
                     [ { verb = Turtle.Predicate (Turtle.PrefixedName "example" "")
-                      , objectList = [ Turtle.ObjectIri (Turtle.PrefixedName "example" "") ]
+                      , objects = [ Turtle.ObjectIri (Turtle.PrefixedName "example" "") ]
                       }
                     ]
                 )
@@ -86,7 +82,7 @@ parse =
           , [ Turtle.Triples
                 (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.PrefixedName "" ""))
                     [ { verb = Turtle.Predicate (Turtle.PrefixedName "" "")
-                      , objectList = [ Turtle.ObjectIri (Turtle.PrefixedName "" "") ]
+                      , objects = [ Turtle.ObjectIri (Turtle.PrefixedName "" "") ]
                       }
                     ]
                 )
@@ -98,7 +94,7 @@ parse =
           , [ Turtle.Triples
                 (Turtle.TriplesSubject (Turtle.SubjectBlankNode (Turtle.BlankNodeLabel "alice"))
                     [ { verb = Turtle.Predicate (Turtle.PrefixedName "example" "knows")
-                      , objectList = [ Turtle.ObjectBlankNode (Turtle.BlankNodeLabel "bob") ]
+                      , objects = [ Turtle.ObjectBlankNode (Turtle.BlankNodeLabel "bob") ]
                       }
                     ]
                 )
@@ -108,7 +104,7 @@ parse =
           , [ Turtle.Triples
                 (Turtle.TriplesSubject (Turtle.SubjectBlankNode Turtle.Anon)
                     [ { verb = Turtle.Predicate (Turtle.PrefixedName "example" "knows")
-                      , objectList = [ Turtle.ObjectBlankNode Turtle.Anon ]
+                      , objects = [ Turtle.ObjectBlankNode Turtle.Anon ]
                       }
                     ]
                 )
@@ -120,14 +116,14 @@ parse =
           , [ Turtle.Triples
                 (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.PrefixedName "example" "alice"))
                     [ { verb = Turtle.Predicate (Turtle.PrefixedName "example" "knows")
-                      , objectList = [ Turtle.ObjectIri (Turtle.PrefixedName "example" "bob") ]
+                      , objects = [ Turtle.ObjectIri (Turtle.PrefixedName "example" "bob") ]
                       }
                     ]
                 )
             , Turtle.Triples
                 (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.PrefixedName "example" "alice"))
                     [ { verb = Turtle.Predicate (Turtle.PrefixedName "example" "knows")
-                      , objectList = [ Turtle.ObjectIri (Turtle.PrefixedName "example" "cindi") ]
+                      , objects = [ Turtle.ObjectIri (Turtle.PrefixedName "example" "cindi") ]
                       }
                     ]
                 )
@@ -139,7 +135,7 @@ parse =
           , [ Turtle.Triples
                 (Turtle.TriplesBlankNodePropertyList
                     [ { verb = Turtle.Predicate (Turtle.PrefixedName "example" "knows")
-                      , objectList = [ Turtle.ObjectIri (Turtle.PrefixedName "example" "bob") ]
+                      , objects = [ Turtle.ObjectIri (Turtle.PrefixedName "example" "bob") ]
                       }
                     ]
                     []
@@ -150,10 +146,10 @@ parse =
           , [ Turtle.Triples
                 (Turtle.TriplesBlankNodePropertyList
                     [ { verb = Turtle.Predicate (Turtle.PrefixedName "example" "knows")
-                      , objectList = [ Turtle.ObjectIri (Turtle.PrefixedName "example" "bob") ]
+                      , objects = [ Turtle.ObjectIri (Turtle.PrefixedName "example" "bob") ]
                       }
                     , { verb = Turtle.Predicate (Turtle.PrefixedName "example" "knows")
-                      , objectList = [ Turtle.ObjectIri (Turtle.PrefixedName "example" "cindi") ]
+                      , objects = [ Turtle.ObjectIri (Turtle.PrefixedName "example" "cindi") ]
                       }
                     ]
                     []
@@ -164,10 +160,10 @@ parse =
           , [ Turtle.Triples
                 (Turtle.TriplesSubject (Turtle.SubjectBlankNode Turtle.Anon)
                     [ { verb = Turtle.Predicate (Turtle.PrefixedName "example" "knows")
-                      , objectList = [ Turtle.ObjectIri (Turtle.PrefixedName "example" "bob") ]
+                      , objects = [ Turtle.ObjectIri (Turtle.PrefixedName "example" "bob") ]
                       }
                     , { verb = Turtle.Predicate (Turtle.PrefixedName "example" "knows")
-                      , objectList = [ Turtle.ObjectIri (Turtle.PrefixedName "example" "cindi") ]
+                      , objects = [ Turtle.ObjectIri (Turtle.PrefixedName "example" "cindi") ]
                       }
                     ]
                 )
@@ -177,11 +173,11 @@ parse =
           , [ Turtle.Triples
                 (Turtle.TriplesBlankNodePropertyList
                     [ { verb = Turtle.Predicate (Turtle.PrefixedName "example" "knows")
-                      , objectList = [ Turtle.ObjectIri (Turtle.PrefixedName "example" "bob") ]
+                      , objects = [ Turtle.ObjectIri (Turtle.PrefixedName "example" "bob") ]
                       }
                     ]
                     [ { verb = Turtle.Predicate (Turtle.PrefixedName "example" "knows")
-                      , objectList = [ Turtle.ObjectIri (Turtle.PrefixedName "example" "cindi") ]
+                      , objects = [ Turtle.ObjectIri (Turtle.PrefixedName "example" "cindi") ]
                       }
                     ]
                 )
@@ -191,10 +187,10 @@ parse =
           , [ Turtle.Triples
                 (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.PrefixedName "example" "alice"))
                     [ { verb = Turtle.Predicate (Turtle.PrefixedName "example" "knows")
-                      , objectList =
+                      , objects =
                             [ Turtle.ObjectBlankNodePropertyList
                                 [ { verb = Turtle.Predicate (Turtle.PrefixedName "example" "knows")
-                                  , objectList = [ Turtle.ObjectIri (Turtle.PrefixedName "example" "bob") ]
+                                  , objects = [ Turtle.ObjectIri (Turtle.PrefixedName "example" "bob") ]
                                   }
                                 ]
                             ]
@@ -209,7 +205,7 @@ parse =
           , [ Turtle.Triples
                 (Turtle.TriplesBlankNodePropertyList
                     [ { verb = Turtle.Predicate (Turtle.PrefixedName "example" "knows")
-                      , objectList =
+                      , objects =
                             [ Turtle.ObjectIri (Turtle.PrefixedName "example" "bob")
                             , Turtle.ObjectIri (Turtle.PrefixedName "example" "cindi")
                             ]
@@ -223,7 +219,7 @@ parse =
           , [ Turtle.Triples
                 (Turtle.TriplesSubject (Turtle.SubjectBlankNode Turtle.Anon)
                     [ { verb = Turtle.Predicate (Turtle.PrefixedName "example" "knows")
-                      , objectList =
+                      , objects =
                             [ Turtle.ObjectIri (Turtle.PrefixedName "example" "bob")
                             , Turtle.ObjectIri (Turtle.PrefixedName "example" "cindi")
                             ]
@@ -238,7 +234,7 @@ parse =
           , [ Turtle.Triples
                 (Turtle.TriplesSubject (Turtle.SubjectCollection [])
                     [ { verb = Turtle.A
-                      , objectList =
+                      , objects =
                             [ Turtle.ObjectCollection []
                             ]
                       }
@@ -255,7 +251,7 @@ parse =
                         ]
                     )
                     [ { verb = Turtle.A
-                      , objectList =
+                      , objects =
                             [ Turtle.ObjectCollection
                                 [ Turtle.ObjectBlankNode (Turtle.BlankNodeLabel "c")
                                 , Turtle.ObjectBlankNode (Turtle.BlankNodeLabel "d")
@@ -272,7 +268,7 @@ parse =
           , [ Turtle.Triples
                 (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.PrefixedName "" "alice"))
                     [ { verb = Turtle.Predicate (Turtle.PrefixedName "" "value")
-                      , objectList = [ Turtle.ObjectLiteral (Turtle.RdfLiteralString "Alice") ]
+                      , objects = [ Turtle.ObjectLiteral (Turtle.LiteralString "Alice") ]
                       }
                     ]
                 )
@@ -282,7 +278,7 @@ parse =
           , [ Turtle.Triples
                 (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.PrefixedName "" "alice"))
                     [ { verb = Turtle.Predicate (Turtle.PrefixedName "" "value")
-                      , objectList = [ Turtle.ObjectLiteral (Turtle.RdfLiteralLangString "Alice" "en-US") ]
+                      , objects = [ Turtle.ObjectLiteral (Turtle.LiteralLangString "Alice" "en-US") ]
                       }
                     ]
                 )
@@ -292,7 +288,7 @@ parse =
           , [ Turtle.Triples
                 (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.PrefixedName "" "alice"))
                     [ { verb = Turtle.Predicate (Turtle.PrefixedName "" "value")
-                      , objectList = [ Turtle.ObjectLiteral (Turtle.RdfLiteralTyped "Alice" (Turtle.IriRef "http://example.org/#datatype")) ]
+                      , objects = [ Turtle.ObjectLiteral (Turtle.LiteralTyped "Alice" (Turtle.IriRef "http://example.org/#datatype")) ]
                       }
                     ]
                 )
@@ -302,7 +298,7 @@ parse =
           , [ Turtle.Triples
                 (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.PrefixedName "" "alice"))
                     [ { verb = Turtle.Predicate (Turtle.PrefixedName "" "value")
-                      , objectList = [ Turtle.ObjectLiteral (Turtle.NumericLiteral (Turtle.Integer 42)) ]
+                      , objects = [ Turtle.ObjectLiteral (Turtle.LiteralInteger 42) ]
                       }
                     ]
                 )
@@ -312,7 +308,7 @@ parse =
           , [ Turtle.Triples
                 (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.PrefixedName "" "alice"))
                     [ { verb = Turtle.Predicate (Turtle.PrefixedName "" "value")
-                      , objectList = [ Turtle.ObjectLiteral (Turtle.NumericLiteral (Turtle.Integer -42)) ]
+                      , objects = [ Turtle.ObjectLiteral (Turtle.LiteralInteger -42) ]
                       }
                     ]
                 )
@@ -322,7 +318,7 @@ parse =
           , [ Turtle.Triples
                 (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.PrefixedName "" "alice"))
                     [ { verb = Turtle.Predicate (Turtle.PrefixedName "" "value")
-                      , objectList = [ Turtle.ObjectLiteral (Turtle.NumericLiteral (Turtle.Integer 42)) ]
+                      , objects = [ Turtle.ObjectLiteral (Turtle.LiteralInteger 42) ]
                       }
                     ]
                 )
@@ -332,7 +328,7 @@ parse =
           , [ Turtle.Triples
                 (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.PrefixedName "" "alice"))
                     [ { verb = Turtle.Predicate (Turtle.PrefixedName "" "value")
-                      , objectList = [ Turtle.ObjectLiteral (Turtle.NumericLiteral (Turtle.Double 3.14)) ]
+                      , objects = [ Turtle.ObjectLiteral (Turtle.LiteralDouble 3.14) ]
                       }
                     ]
                 )
@@ -342,7 +338,7 @@ parse =
           , [ Turtle.Triples
                 (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.PrefixedName "" "alice"))
                     [ { verb = Turtle.Predicate (Turtle.PrefixedName "" "value")
-                      , objectList = [ Turtle.ObjectLiteral (Turtle.NumericLiteral (Turtle.Decimal "3.14")) ]
+                      , objects = [ Turtle.ObjectLiteral (Turtle.LiteralDecimal "3.14") ]
                       }
                     ]
                 )
@@ -352,7 +348,7 @@ parse =
           , [ Turtle.Triples
                 (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.PrefixedName "" "alice"))
                     [ { verb = Turtle.Predicate (Turtle.PrefixedName "" "value")
-                      , objectList = [ Turtle.ObjectLiteral (Turtle.BooleanLiteral Turtle.BooleanLiteralTrue) ]
+                      , objects = [ Turtle.ObjectLiteral Turtle.LiteralTrue ]
                       }
                     ]
                 )
@@ -362,7 +358,7 @@ parse =
           , [ Turtle.Triples
                 (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.PrefixedName "" "alice"))
                     [ { verb = Turtle.Predicate (Turtle.PrefixedName "" "value")
-                      , objectList = [ Turtle.ObjectLiteral (Turtle.BooleanLiteral Turtle.BooleanLiteralFalse) ]
+                      , objects = [ Turtle.ObjectLiteral Turtle.LiteralFalse ]
                       }
                     ]
                 )
@@ -371,14 +367,14 @@ parse =
         ]
 
 
-testParse : List ( String, Turtle.TurtleDoc ) -> Test
+testParse : List ( String, List Turtle.Statement ) -> Test
 testParse tests =
     tests
         |> List.map (\( raw, parsed ) -> testParseCase raw parsed)
         |> describe "parse"
 
 
-testParseCase : String -> Turtle.TurtleDoc -> Test
+testParseCase : String -> List Turtle.Statement -> Test
 testParseCase raw parsed =
     let
         description : String
