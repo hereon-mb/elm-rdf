@@ -4,7 +4,7 @@ module RDF.Graph exposing
     , isEmpty
     , emptyGraph, singleton
     , decoder, encode
-    , parse, Error(..)
+    , parse, Error(..), errorToString
     , serialize
     , fromNTriples
     , Seed, initialSeed
@@ -23,7 +23,7 @@ module RDF.Graph exposing
 
 @docs emptyGraph, singleton
 @docs decoder, encode
-@docs parse, Error
+@docs parse, Error, errorToString
 @docs serialize
 @docs fromNTriples
 
@@ -346,6 +346,91 @@ type Error
     | MissingPredicate
     | MissingBase
     | CouldNotResolvePrefixedName String String
+
+
+errorToString : Error -> String
+errorToString error =
+    case error of
+        ErrorParser deadEnds ->
+            "I ran into a syntax error: I " ++ deadEndsToString deadEnds
+
+        MissingSubject ->
+            "I tried to create a triple, but no subject was set.  This is likely a bug in the turtle parser."
+
+        MissingPredicate ->
+            "I tried to create a triple, but no predicate was set.  This is likely a bug in the turtle parser."
+
+        MissingBase ->
+            "I tried to resolve an IRI of the form <name>, but no base was set for the document."
+
+        CouldNotResolvePrefixedName prefix name ->
+            "I tried to resolve " ++ prefix ++ ":" ++ name ++ ", but the prefix " ++ prefix ++ ": was not set."
+
+
+deadEndsToString : List Parser.DeadEnd -> String
+deadEndsToString deadEnds =
+    [ deadEnds
+        |> List.map deadEndToString
+        |> String.join ", "
+    , "."
+    ]
+        |> String.concat
+
+
+deadEndToString : Parser.DeadEnd -> String
+deadEndToString { row, col, problem } =
+    let
+        position : String
+        position =
+            [ "row "
+            , String.fromInt row
+            , " column "
+            , String.fromInt col
+            ]
+                |> String.concat
+    in
+    case problem of
+        Parser.Expecting expect ->
+            "expected '" ++ expect ++ "' at " ++ position
+
+        Parser.ExpectingInt ->
+            "expected an integer at " ++ position
+
+        Parser.ExpectingHex ->
+            "expected a hex at " ++ position
+
+        Parser.ExpectingOctal ->
+            "expected an octal at " ++ position
+
+        Parser.ExpectingBinary ->
+            "expected a binary at " ++ position
+
+        Parser.ExpectingFloat ->
+            "expected a float at " ++ position
+
+        Parser.ExpectingNumber ->
+            "expected a number at " ++ position
+
+        Parser.ExpectingVariable ->
+            "expected a variable at " ++ position
+
+        Parser.ExpectingSymbol expect ->
+            "expected the symbol '" ++ expect ++ "' at " ++ position
+
+        Parser.ExpectingKeyword expect ->
+            "expected the keyword '" ++ expect ++ "' at " ++ position
+
+        Parser.ExpectingEnd ->
+            "expected the end of the document at " ++ position
+
+        Parser.UnexpectedChar ->
+            "ran into an unexpected character at " ++ position
+
+        Parser.Problem text ->
+            text ++ " at " ++ position
+
+        Parser.BadRepeat ->
+            "bad repetition at " ++ position
 
 
 type alias State =

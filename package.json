@@ -6,7 +6,7 @@
   "scripts": {
     "test": "elm-test",
     "test:watch": "elm-test --watch",
-    "review:fix": "elm-review --fix-all"
+    "review": "elm-review --fix-all"
   },
   "devDependencies": {
     "elm": "^0.19.1-6",
