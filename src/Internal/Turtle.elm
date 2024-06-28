@@ -88,9 +88,9 @@ parse =
 statements : Parser (List Statement)
 statements =
     Parser.succeed identity
-        |. whitespace
+        |. whitespaceOrComment
         |= Parser.loop [] statementsHelp
-        |. whitespace
+        |. whitespaceOrComment
         |. Parser.end
 
 
@@ -99,7 +99,7 @@ statementsHelp statementsReversed =
     Parser.oneOf
         [ Parser.succeed (\statementNext -> Parser.Loop (statementNext :: statementsReversed))
             |= statement
-            |. whitespace
+            |. whitespaceOrComment
         , Parser.succeed ()
             |> Parser.map (\_ -> Parser.Done (List.reverse statementsReversed))
         ]
@@ -127,11 +127,11 @@ prefixId : Parser Statement
 prefixId =
     Parser.succeed DirectivePrefixId
         |. Parser.keyword "@prefix"
-        |. whitespace
+        |. whitespaceOrComment
         |= pnameNs
-        |. whitespace
+        |. whitespaceOrComment
         |= iriRef
-        |. whitespace
+        |. whitespaceOrComment
         |. Parser.symbol "."
 
 
@@ -154,9 +154,9 @@ base : Parser Statement
 base =
     Parser.succeed DirectiveBase
         |. Parser.keyword "@base"
-        |. whitespace
+        |. whitespaceOrComment
         |= iriRef
-        |. whitespace
+        |. whitespaceOrComment
         |. Parser.symbol "."
 
 
@@ -164,14 +164,14 @@ sparqlPrefix : Parser Statement
 sparqlPrefix =
     Parser.succeed DirectiveSparqlPrefix
         |. Parser.keyword "PREFIX"
-        |. whitespace
+        |. whitespaceOrComment
         |= Parser.variable
             { start = \char -> char /= ':' && isPnCharsBase char
             , inner = \char -> char /= ':' && isPnChars char
             , reserved = Set.empty
             }
         |. Parser.symbol ":"
-        |. whitespace
+        |. whitespaceOrComment
         |= iriRef
 
 
@@ -179,7 +179,7 @@ sparqlBase : Parser Statement
 sparqlBase =
     Parser.succeed DirectiveSparqlBase
         |. Parser.keyword "BASE"
-        |. whitespace
+        |. whitespaceOrComment
         |= iriRef
 
 
@@ -190,7 +190,7 @@ triples =
             [ triplesSubject
             , triplesBlankNodePropertyList
             ]
-        |. whitespace
+        |. whitespaceOrComment
         |. Parser.symbol "."
 
 
@@ -198,7 +198,7 @@ triplesSubject : Parser Triples
 triplesSubject =
     Parser.succeed TriplesSubject
         |= subject
-        |. whitespace
+        |. whitespaceOrComment
         |= predicateObjectLists
 
 
@@ -230,7 +230,7 @@ subjectCollection =
             { start = "("
             , separator = ""
             , end = ")"
-            , spaces = whitespace
+            , spaces = whitespaceOrComment
             , item = object
             , trailing = Parser.Forbidden
             }
@@ -240,11 +240,11 @@ triplesBlankNodePropertyList : Parser Triples
 triplesBlankNodePropertyList =
     Parser.succeed TriplesBlankNodePropertyList
         |. Parser.symbol "["
-        |. whitespace
+        |. whitespaceOrComment
         |= predicateObjectLists
-        |. whitespace
+        |. whitespaceOrComment
         |. Parser.symbol "]"
-        |. whitespace
+        |. whitespaceOrComment
         |= Parser.oneOf
             [ predicateObjectLists
             , Parser.succeed []
@@ -266,11 +266,11 @@ predicateObjectListHelp itemsReversed =
                 |> Parser.map (\_ -> Parser.Done (List.reverse itemsReversed))
     in
     Parser.succeed identity
-        |. whitespace
+        |. whitespaceOrComment
         |= Parser.oneOf
             [ Parser.succeed identity
                 |. Parser.symbol ";"
-                |. whitespace
+                |. whitespaceOrComment
                 |= Parser.oneOf
                     [ Parser.succeed (\itemNext -> Parser.Loop (itemNext :: itemsReversed))
                         |= predicateObjectListData
@@ -284,7 +284,7 @@ predicateObjectListData : Parser PredicateObjectList
 predicateObjectListData =
     Parser.succeed PredicateObjectList
         |= verb
-        |. whitespace
+        |. whitespaceOrComment
         |= objects
 
 
@@ -303,11 +303,11 @@ objectListHelp objectsReversed =
                 |> Parser.map (\_ -> Parser.Done (List.reverse objectsReversed))
     in
     Parser.succeed identity
-        |. whitespace
+        |. whitespaceOrComment
         |= Parser.oneOf
             [ Parser.succeed identity
                 |. Parser.symbol ","
-                |. whitespace
+                |. whitespaceOrComment
                 |= Parser.oneOf
                     [ Parser.succeed (\objectNext -> Parser.Loop (objectNext :: objectsReversed))
                         |= object
@@ -366,7 +366,7 @@ objectCollection =
             { start = "("
             , separator = ""
             , end = ")"
-            , spaces = whitespace
+            , spaces = whitespaceOrComment
             , item = Parser.lazy (\_ -> object)
             , trailing = Parser.Forbidden
             }
@@ -376,9 +376,9 @@ objectBlankNodePropertyList : Parser Object
 objectBlankNodePropertyList =
     Parser.succeed ObjectBlankNodePropertyList
         |. Parser.symbol "["
-        |. whitespace
+        |. whitespaceOrComment
         |= Parser.lazy (\_ -> predicateObjectLists)
-        |. whitespace
+        |. whitespaceOrComment
         |. Parser.symbol "]"
 
 
@@ -697,6 +697,18 @@ langTag =
                     , reserved = Set.empty
                     }
             , Parser.succeed Nothing
+            ]
+
+
+whitespaceOrComment : Parser ()
+whitespaceOrComment =
+    Parser.succeed ()
+        |. whitespace
+        |. Parser.oneOf
+            [ Parser.succeed ()
+                |. Parser.lineComment "#"
+                |. whitespace
+            , whitespace
             ]
 
 

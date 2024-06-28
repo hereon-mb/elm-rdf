@@ -364,6 +364,45 @@ parse =
                 )
             ]
           )
+
+        -- COMMENTS
+        , ( "# comment"
+          , []
+          )
+        , ( [ "<http://example.org/alice>   # comment"
+            , "<http://example.org/#knows>  # comment"
+            , "<http://example.org/#bob> .  # comment"
+            ]
+                |> String.join "\n"
+          , [ Turtle.Triples
+                (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.IriRef "http://example.org/alice"))
+                    [ { verb = Turtle.Predicate (Turtle.IriRef "http://example.org/#knows")
+                      , objects = [ Turtle.ObjectIri (Turtle.IriRef "http://example.org/#bob") ]
+                      }
+                    ]
+                )
+            ]
+          )
+        , ( [ "[ example:knows    # comment"
+            , "    example:bob ;  # comment"
+            , "  example:knows    # comment"
+            , "    example:cindi  # comment"
+            , "] ."
+            ]
+                |> String.join "\n"
+          , [ Turtle.Triples
+                (Turtle.TriplesBlankNodePropertyList
+                    [ { verb = Turtle.Predicate (Turtle.PrefixedName "example" "knows")
+                      , objects = [ Turtle.ObjectIri (Turtle.PrefixedName "example" "bob") ]
+                      }
+                    , { verb = Turtle.Predicate (Turtle.PrefixedName "example" "knows")
+                      , objects = [ Turtle.ObjectIri (Turtle.PrefixedName "example" "cindi") ]
+                      }
+                    ]
+                    []
+                )
+            ]
+          )
         ]
 
 
