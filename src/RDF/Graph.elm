@@ -348,11 +348,11 @@ type Error
     | CouldNotResolvePrefixedName String String
 
 
-errorToString : Error -> String
-errorToString error =
+errorToString : String -> Error -> String
+errorToString raw error =
     case error of
         ErrorParser deadEnds ->
-            "I ran into a syntax error: I " ++ deadEndsToString deadEnds
+            "I ran into a syntax error: I " ++ deadEndsToString raw deadEnds
 
         MissingSubject ->
             "I tried to create a triple, but no subject was set.  This is likely a bug in the turtle parser."
@@ -367,12 +367,19 @@ errorToString error =
             "I tried to resolve " ++ prefix ++ ":" ++ name ++ ", but the prefix " ++ prefix ++ ": was not set."
 
 
-deadEndsToString : List Parser.DeadEnd -> String
-deadEndsToString deadEnds =
+deadEndsToString : String -> List Parser.DeadEnd -> String
+deadEndsToString raw deadEnds =
+    let
+        lines =
+            String.lines raw
+    in
     [ deadEnds
         |> List.map deadEndToString
         |> String.join ", "
-    , "."
+    , ":\n\n"
+    , deadEnds
+        |> List.filterMap (deadEndToCode lines)
+        |> String.join "\n"
     ]
         |> String.concat
 
@@ -431,6 +438,12 @@ deadEndToString { row, col, problem } =
 
         Parser.BadRepeat ->
             "bad repetition at " ++ position
+
+
+deadEndToCode : List String -> Parser.DeadEnd -> Maybe String
+deadEndToCode lines { row } =
+    List.getAt (row - 1) lines
+        |> Maybe.map (\line -> "> " ++ line)
 
 
 type alias State =
