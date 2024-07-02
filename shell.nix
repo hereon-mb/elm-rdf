@@ -1,4 +1,5 @@
-{ pkgs ? (import <nixpkgs> {}) }:
+{ pkgs ? (import (import ./nix/sources.nix).nixpkgs { })
+}:
 with pkgs;
 mkShell {
   packages = [
