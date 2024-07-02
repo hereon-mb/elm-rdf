@@ -1,5 +1,10 @@
 module RDF.Encode exposing
-    ( encode
+    ( Encoder
+    , encode
+    , IsGraphEncoder, IsPropertyEncoder, IsLiteralEncoder, IsGraphOrLiteralEncoder
+    , GraphEncoder, PropertyEncoder, LiteralEncoder
+    , Yes, No
+    , Subject, Predicate, Object
     , blankNode
     , node
     , property
@@ -7,7 +12,7 @@ module RDF.Encode exposing
     , literal
     )
 
-{-| A domain-soecific language for encoding `Graph`s.
+{-| A domain-specific language for encoding `Graph`s.
 
 
 # Introduction
@@ -56,6 +61,12 @@ Implementation-wise, the only challenge is the fact that blank nodes can be subj
 @docs Encoder
 @docs encode
 
+@docs IsGraphEncoder, IsPropertyEncoder, IsLiteralEncoder, IsGraphOrLiteralEncoder
+@docs GraphEncoder, PropertyEncoder, LiteralEncoder
+@docs Yes, No
+
+@docs Subject, Predicate, Object
+
 @docs blankNode
 @docs node
 @docs property
@@ -71,6 +82,8 @@ import RDF.Graph as RDF exposing (Graph, Seed)
 import RDF.PropertyPath as RDF exposing (PropertyPath)
 
 
+{-| TODO
+-}
 type Encoder compatible
     = Encoder EncoderInternal
 
@@ -81,18 +94,26 @@ type EncoderInternal
     | LiteralEncoder (Seed -> Subject -> Predicate -> ( Graph, Seed ))
 
 
+{-| TODO
+-}
 type alias Predicate =
     RDF.Iri
 
 
+{-| TODO
+-}
 type alias Subject =
     RDF.BlankNodeOrIri
 
 
+{-| TODO
+-}
 type alias Object =
     RDF.BlankNodeOrIriOrAnyLiteral
 
 
+{-| TODO
+-}
 encode : Seed -> IsGraphEncoder graph -> ( Graph, Seed )
 encode seed (Encoder encoder) =
     case encoder of
@@ -106,6 +127,8 @@ encode seed (Encoder encoder) =
             ( RDF.emptyGraph, seed )
 
 
+{-| TODO
+-}
 blankNode : List PropertyEncoder -> GraphEncoder
 blankNode propertyEs =
     Encoder
@@ -120,6 +143,8 @@ blankNode propertyEs =
         )
 
 
+{-| TODO
+-}
 node : Subject -> List PropertyEncoder -> GraphEncoder
 node subject propertyEs =
     Encoder (GraphEncoder (\seed -> nodeHelp propertyEs subject seed))
@@ -127,16 +152,17 @@ node subject propertyEs =
 
 nodeHelp : List PropertyEncoder -> Subject -> Seed -> ( Subject, ( Graph, Seed ) )
 nodeHelp propertyEs subject seed =
-    Tuple.pair subject
-        << Tuple.mapFirst (List.foldl RDF.union RDF.emptyGraph)
-    <|
+    ( subject
+    , Tuple.mapFirst (List.foldl RDF.union RDF.emptyGraph) <|
         List.foldl
             (\(Encoder propertyE) ( graphs, seedNext ) ->
                 case propertyE of
                     PropertyEncoder f ->
-                        case f seedNext (RDF.forgetCompatible subject) of
-                            ( graph, seedNextNext ) ->
-                                ( graph :: graphs, seedNextNext )
+                        let
+                            ( graph, seedNextNext ) =
+                                f seedNext (RDF.forgetCompatible subject)
+                        in
+                        ( graph :: graphs, seedNextNext )
 
                     GraphEncoder _ ->
                         ( graphs, seedNext )
@@ -146,8 +172,11 @@ nodeHelp propertyEs subject seed =
             )
             ( [], seed )
             propertyEs
+    )
 
 
+{-| TODO
+-}
 property :
     PropertyPath
     -> IsGraphOrLiteralEncoder object
@@ -171,7 +200,7 @@ property propertyPath objectE =
         Nothing ->
             Encoder
                 (PropertyEncoder
-                    (\seed subject ->
+                    (\seed _ ->
                         -- XXX `propertyPath` contains non-`Iri` components, we just give up..
                         ( RDF.emptyGraph, seed )
                     )
@@ -214,23 +243,24 @@ property1 predicate (Encoder objectE) =
             (\seed subject ->
                 case objectE of
                     GraphEncoder f ->
-                        case f seed of
-                            ( object, ( graphObject, seedUpdated ) ) ->
-                                let
-                                    ( graphProperty, seedUpdatedUpdated ) =
-                                        case property1 predicate (forgetCompatible (iri (RDF.forgetCompatible object))) of
-                                            Encoder propertyE ->
-                                                case propertyE of
-                                                    PropertyEncoder g ->
-                                                        g seedUpdated subject
+                        let
+                            ( object, ( graphObject, seedUpdated ) ) =
+                                f seed
 
-                                                    GraphEncoder _ ->
-                                                        ( RDF.emptyGraph, seedUpdated )
+                            ( graphProperty, seedUpdatedUpdated ) =
+                                case property1 predicate (forgetCompatible (iri (RDF.forgetCompatible object))) of
+                                    Encoder propertyE ->
+                                        case propertyE of
+                                            PropertyEncoder g ->
+                                                g seedUpdated subject
 
-                                                    LiteralEncoder _ ->
-                                                        ( RDF.emptyGraph, seedUpdated )
-                                in
-                                ( RDF.union graphObject graphProperty, seedUpdatedUpdated )
+                                            GraphEncoder _ ->
+                                                ( RDF.emptyGraph, seedUpdated )
+
+                                            LiteralEncoder _ ->
+                                                ( RDF.emptyGraph, seedUpdated )
+                        in
+                        ( RDF.union graphObject graphProperty, seedUpdatedUpdated )
 
                     LiteralEncoder f ->
                         f seed subject predicate
@@ -241,6 +271,8 @@ property1 predicate (Encoder objectE) =
         )
 
 
+{-| TODO
+-}
 literal : RDF.Literal a -> LiteralEncoder
 literal object =
     Encoder
@@ -251,6 +283,8 @@ literal object =
         )
 
 
+{-| TODO
+-}
 iri : RDF.Iri -> LiteralEncoder
 iri object =
     Encoder
@@ -261,10 +295,14 @@ iri object =
         )
 
 
+{-| TODO
+-}
 type alias IsGraphEncoder compatible =
     Encoder { compatible | isGraph : Yes }
 
 
+{-| TODO
+-}
 type alias GraphEncoder =
     Encoder
         { isGraph : Yes
@@ -274,10 +312,14 @@ type alias GraphEncoder =
         }
 
 
+{-| TODO
+-}
 type alias IsPropertyEncoder compatible =
     Encoder { compatible | isProperty : Yes }
 
 
+{-| TODO
+-}
 type alias PropertyEncoder =
     Encoder
         { isGraph : No
@@ -287,10 +329,14 @@ type alias PropertyEncoder =
         }
 
 
+{-| TODO
+-}
 type alias IsLiteralEncoder compatible =
     Encoder { compatible | isLiteral : Yes }
 
 
+{-| TODO
+-}
 type alias LiteralEncoder =
     Encoder
         { isGraph : No
@@ -300,6 +346,8 @@ type alias LiteralEncoder =
         }
 
 
+{-| TODO
+-}
 type alias IsGraphOrLiteralEncoder compatible =
     Encoder { compatible | isGraphOrLiteral : Yes }
 

@@ -7,8 +7,8 @@ module RDF.Query exposing
     , getSubject, getBlankNodeOrIriSubject, getIriSubject
     , getObjects, getBlankNodeOrIriObjects, getIriObjects, getInts, getFloats, getBools, getDates, getDateTimes, getListObjects, getListIriObjects, getListBlankNodeOrIriObjects
     , getObject, getBlankNodeOrIriObject, getIriObject, getAnyLiteralObject, getInt, getBool, getString, getDate, getDateTime, getPropertyPathObject, getStringOrLangString
-    , rdfsLabelFor, rdfsCommentFor
     , objectToList
+    , rdfsLabelFor, rdfsCommentFor
     )
 
 {-| TODO Add documentation
@@ -22,6 +22,8 @@ module RDF.Query exposing
 @docs getSubject, getBlankNodeOrIriSubject, getIriSubject
 @docs getObjects, getBlankNodeOrIriObjects, getIriObjects, getInts, getFloats, getBools, getDates, getDateTimes, getListObjects, getListIriObjects, getListBlankNodeOrIriObjects
 @docs getObject, getBlankNodeOrIriObject, getIriObject, getAnyLiteralObject, getInt, getBool, getString, getDate, getDateTime, getPropertyPathObject, getStringOrLangString
+
+@docs objectToList
 
 @docs rdfsLabelFor, rdfsCommentFor
 

@@ -1,7 +1,7 @@
 module RDF.Decode exposing
     ( Decoder
     , decode
-    , Error(..), NodeType(..)
+    , Error(..), NodeType(..), errorToString
     , bool
     , date
     , dateTime
@@ -27,14 +27,11 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 
 @docs Decoder
 @docs decode
-@docs Error, NodeType
+@docs Error, NodeType, errorToString
 
 @docs bool
 @docs date
 @docs dateTime
-@docs decimal
-@docs float
-@docs integer
 @docs iri
 @docs list
 @docs literal
@@ -51,10 +48,9 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 -}
 
 import List.NonEmpty exposing (NonEmpty)
-import Maybe.Extra as Maybe
 import RDF exposing (BlankNodeOrIri, BlankNodeOrIriOrAnyLiteral, Iri)
 import RDF.Graph exposing (Graph)
-import RDF.Namespaces as RDF exposing (xsd)
+import RDF.Namespaces exposing (xsd)
 import RDF.PropertyPath exposing (PropertyPath)
 import RDF.Query as RDF
 import Result.Extra as Result
@@ -82,6 +78,11 @@ type Error
     | UnexpectedBool String
     | UnknownProperty BlankNodeOrIri PropertyPath
     | UnexpectedUnit (NonEmpty Iri) Iri
+
+
+errorToString : Error -> String
+errorToString _ =
+    "Could not decode RDF: TODO"
 
 
 type NodeType

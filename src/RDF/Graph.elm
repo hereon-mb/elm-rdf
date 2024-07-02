@@ -370,6 +370,7 @@ errorToString raw error =
 deadEndsToString : String -> List Parser.DeadEnd -> String
 deadEndsToString raw deadEnds =
     let
+        lines : List String
         lines =
             String.lines raw
     in
