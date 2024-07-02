@@ -50,6 +50,7 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 
 -}
 
+import List.NonEmpty exposing (NonEmpty)
 import Maybe.Extra as Maybe
 import RDF exposing (BlankNodeOrIri, BlankNodeOrIriOrAnyLiteral, Iri)
 import RDF.Graph exposing (Graph)
@@ -80,7 +81,7 @@ type Error
     | UnexpectedNode NodeType RDF.BlankNodeOrIriOrAnyLiteral
     | UnexpectedBool String
     | UnknownProperty BlankNodeOrIri PropertyPath
-    | UnexpectedUnit (List Iri) Iri
+    | UnexpectedUnit (NonEmpty Iri) Iri
 
 
 type NodeType
