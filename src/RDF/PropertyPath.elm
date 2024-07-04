@@ -1,15 +1,19 @@
 module RDF.PropertyPath exposing
     ( PropertyPath(..)
     , serializePropertyPath
+    , normalizePropertyPath
     )
 
 {-|
 
 @docs PropertyPath
 @docs serializePropertyPath
+@docs normalizePropertyPath
 
 -}
 
+import List.NonEmpty as NonEmpty exposing (NonEmpty)
+import Maybe.Extra as Maybe
 import RDF
     exposing
         ( Iri
@@ -56,3 +60,34 @@ serializePropertyPath propertyPath =
 
         ZeroOrOnePath nested ->
             serializePropertyPath nested ++ "?"
+
+
+{-| XXX Normalizes a `PropertyPath` into a `NonEmpty Iri`. Ideally, we distinguish between `PropertyPath` and `NonEmpty Iri` in our code-base. But since we use the super-class `PropertyPath` everywhere, we have to special case the impossible variants, cf. `property` which is a no-op if it encounters a such special property path.
+-}
+normalizePropertyPath : PropertyPath -> Maybe (NonEmpty Iri)
+normalizePropertyPath propertyPath =
+    case propertyPath of
+        PredicatePath x ->
+            Just (NonEmpty.singleton x)
+
+        SequencePath firstPropertyPath otherPropertyPaths ->
+            Maybe.map NonEmpty.concat
+                (Maybe.map2 Tuple.pair
+                    (normalizePropertyPath firstPropertyPath)
+                    (Maybe.combine (List.map normalizePropertyPath otherPropertyPaths))
+                )
+
+        AlternativePath _ _ ->
+            Nothing
+
+        InversePath _ ->
+            Nothing
+
+        ZeroOrMorePath _ ->
+            Nothing
+
+        OneOrMorePath _ ->
+            Nothing
+
+        ZeroOrOnePath _ ->
+            Nothing

@@ -76,8 +76,7 @@ Implementation-wise, the only challenge is the fact that blank nodes can be subj
 
 -}
 
-import List.NonEmpty as NonEmpty exposing (NonEmpty)
-import RDF exposing (Iri)
+import RDF
 import RDF.Graph as RDF exposing (Graph, Seed)
 import RDF.PropertyPath as RDF exposing (PropertyPath)
 
@@ -182,7 +181,7 @@ property :
     -> IsGraphOrLiteralEncoder object
     -> PropertyEncoder
 property propertyPath objectE =
-    case normalizePropertyPath propertyPath of
+    case RDF.normalizePropertyPath propertyPath of
         Just ( predicate, predicates ) ->
             property1 predicate
                 (List.foldr
@@ -205,35 +204,6 @@ property propertyPath objectE =
                         ( RDF.emptyGraph, seed )
                     )
                 )
-
-
-{-| XXX Normalizes a `PropertyPath` into a `NonEmpty Iri`. Ideally, we distinguish between `PropertyPath` and `NonEmpty Iri` in our code-base. But since we use the super-class `PropertyPath` everywhere, we have to special case the impossible variants, cf. `property` which is a no-op if it encounters a such special property path.
--}
-normalizePropertyPath : PropertyPath -> Maybe (NonEmpty Iri)
-normalizePropertyPath propertyPath =
-    case propertyPath of
-        RDF.PredicatePath x ->
-            Just (NonEmpty.singleton x)
-
-        RDF.SequencePath firstPropertyPath otherPropertyPaths ->
-            List.foldl (Maybe.map2 NonEmpty.append)
-                (normalizePropertyPath firstPropertyPath)
-                (List.map normalizePropertyPath otherPropertyPaths)
-
-        RDF.AlternativePath _ _ ->
-            Nothing
-
-        RDF.InversePath _ ->
-            Nothing
-
-        RDF.ZeroOrMorePath _ ->
-            Nothing
-
-        RDF.OneOrMorePath _ ->
-            Nothing
-
-        RDF.ZeroOrOnePath _ ->
-            Nothing
 
 
 property1 : Predicate -> IsGraphOrLiteralEncoder object -> PropertyEncoder
