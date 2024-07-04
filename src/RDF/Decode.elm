@@ -19,6 +19,7 @@ module RDF.Decode exposing
     , map2
     , andThen
     , oneOf
+    , many
     , hardcoded
     , optional
     , required
@@ -56,6 +57,7 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 @docs map2
 @docs andThen
 @docs oneOf
+@docs many
 
 
 # Pipeline
@@ -83,14 +85,40 @@ import Result.Extra as Result
 import Time
 
 
+{-| Decode a list of focus nodes by the given decoder.
+
+Note that the position of `many` within a decode expression matters. Say, a focus node has multiple classes.
+
+The following decoder works as expected:
+
+    property a (many class)
+
+Hoever, the following (type-valid) decoder does NOT work:
+
+    many (property a class)
+
+Note that `property a class` alone fails (since there are many classes), and so `many (property a class)` fails as a whole!
+
+-}
+many : Decoder a -> Decoder (List a)
+many (Decoder f) =
+    Decoder
+        (\graph ->
+            Result.andThen
+                (\nodes ->
+                    Result.combine (List.map (f graph << Ok << List.singleton) nodes)
+                )
+        )
+
+
 type Decoder a
-    = Decoder (Graph -> Result Error BlankNodeOrIriOrAnyLiteral -> Result Error a)
+    = Decoder (Graph -> Result Error (List BlankNodeOrIriOrAnyLiteral) -> Result Error a)
 
 
 decode :
     Decoder a
     -> Graph
-    -> BlankNodeOrIriOrAnyLiteral
+    -> List BlankNodeOrIriOrAnyLiteral
     -> Result Error a
 decode (Decoder f) graph =
     f graph << Ok
@@ -106,6 +134,7 @@ type Error
     | UnexpectedEmptyList
     | CustomError String
     | Batch (List Error)
+    | TooManyNodes
 
 
 errorToString : Error -> String
@@ -124,14 +153,19 @@ blankNode (Decoder f) =
     Decoder
         (\graph ->
             Result.andThen
-                (\node ->
-                    case RDF.toBlankNode node of
-                        Just nodeNext ->
-                            Ok (RDF.forgetCompatible nodeNext)
-                                |> f graph
+                (\nodes ->
+                    case nodes of
+                        [ node ] ->
+                            case RDF.toBlankNode node of
+                                Just nodeNext ->
+                                    Ok [ RDF.forgetCompatible nodeNext ]
+                                        |> f graph
 
-                        Nothing ->
-                            Err (UnexpectedNode BlankNode node)
+                                Nothing ->
+                                    Err (UnexpectedNode BlankNode node)
+
+                        _ ->
+                            Err TooManyNodes
                 )
         )
 
@@ -141,9 +175,14 @@ subject =
     Decoder
         (\_ ->
             Result.andThen
-                (\node ->
-                    Maybe.unwrap (Err (UnexpectedNode BlankNode node)) Ok <|
-                        RDF.toBlankNode node
+                (\nodes ->
+                    case nodes of
+                        [ node ] ->
+                            Maybe.unwrap (Err (UnexpectedNode BlankNode node)) Ok <|
+                                RDF.toBlankNode node
+
+                        _ ->
+                            Err TooManyNodes
                 )
         )
 
@@ -178,9 +217,14 @@ date =
     Decoder
         (\_ ->
             Result.andThen
-                (\node ->
-                    RDF.toDate node
-                        |> Result.fromMaybe (InvalidDate node)
+                (\nodes ->
+                    case nodes of
+                        [ node ] ->
+                            RDF.toDate node
+                                |> Result.fromMaybe (InvalidDate node)
+
+                        _ ->
+                            Err TooManyNodes
                 )
         )
 
@@ -190,9 +234,14 @@ dateTime =
     Decoder
         (\_ ->
             Result.andThen
-                (\node ->
-                    RDF.toDateTime node
-                        |> Result.fromMaybe (InvalidDateTime node)
+                (\nodes ->
+                    case nodes of
+                        [ node ] ->
+                            RDF.toDateTime node
+                                |> Result.fromMaybe (InvalidDateTime node)
+
+                        _ ->
+                            Err TooManyNodes
                 )
         )
 
@@ -202,10 +251,15 @@ iri =
     Decoder
         (\_ ->
             Result.andThen
-                (\node ->
-                    node
-                        |> RDF.toIri
-                        |> Result.fromMaybe (UnexpectedNode IriNode node)
+                (\nodes ->
+                    case nodes of
+                        [ node ] ->
+                            node
+                                |> RDF.toIri
+                                |> Result.fromMaybe (UnexpectedNode IriNode node)
+
+                        _ ->
+                            Err TooManyNodes
                 )
         )
 
@@ -215,17 +269,26 @@ list (Decoder f) =
     Decoder
         (\graph ->
             Result.andThen
-                (\node ->
-                    case node of
-                        RDF.Node (RDF.BlankNode _) ->
-                            Ok (RDF.forgetCompatible node)
+                (\nodes ->
+                    case nodes of
+                        [ node ] ->
+                            Ok node
 
-                        RDF.Node (RDF.Iri _) ->
-                            Err (UnexpectedNode BlankNode node)
-
-                        RDF.Node (RDF.Literal _) ->
-                            Err (UnexpectedNode BlankNode node)
+                        _ ->
+                            Err TooManyNodes
                 )
+                >> Result.andThen
+                    (\node ->
+                        case node of
+                            RDF.Node (RDF.BlankNode _) ->
+                                Ok (RDF.forgetCompatible node)
+
+                            RDF.Node (RDF.Iri _) ->
+                                Err (UnexpectedNode BlankNode node)
+
+                            RDF.Node (RDF.Literal _) ->
+                                Err (UnexpectedNode BlankNode node)
+                    )
                 >> Result.andThen
                     (\focusNode ->
                         focusNode
@@ -233,7 +296,7 @@ list (Decoder f) =
                             |> Maybe.withDefault []
                             |> List.map
                                 (\nodeChild ->
-                                    Ok nodeChild
+                                    Ok [ nodeChild ]
                                         |> f graph
                                 )
                             |> Result.combine
@@ -260,20 +323,25 @@ literal datatype =
     Decoder
         (\_ ->
             Result.andThen
-                (\node ->
-                    case node of
-                        RDF.Node (RDF.BlankNode _) ->
-                            Err (UnexpectedNode LiteralNode node)
+                (\nodes ->
+                    case nodes of
+                        [ node ] ->
+                            case node of
+                                RDF.Node (RDF.BlankNode _) ->
+                                    Err (UnexpectedNode LiteralNode node)
 
-                        RDF.Node (RDF.Iri _) ->
-                            Err (UnexpectedNode LiteralNode node)
+                                RDF.Node (RDF.Iri _) ->
+                                    Err (UnexpectedNode LiteralNode node)
 
-                        RDF.Node (RDF.Literal literalData) ->
-                            if literalData.datatype /= datatype then
-                                Err (UnexpectedLiteralDatatype datatype literalData.datatype)
+                                RDF.Node (RDF.Literal literalData) ->
+                                    if literalData.datatype /= datatype then
+                                        Err (UnexpectedLiteralDatatype datatype literalData.datatype)
 
-                            else
-                                Ok literalData.value
+                                    else
+                                        Ok literalData.value
+
+                        _ ->
+                            Err TooManyNodes
                 )
         )
 
@@ -283,31 +351,49 @@ property path (Decoder f) =
     Decoder
         (\graph ->
             Result.andThen
-                (\node ->
-                    case node of
-                        RDF.Node (RDF.BlankNode _) ->
-                            Ok (RDF.forgetCompatible node)
+                (\nodes ->
+                    Result.combine
+                        (List.map
+                            (\node ->
+                                case node of
+                                    RDF.Node (RDF.BlankNode _) ->
+                                        Ok (RDF.forgetCompatible node)
 
-                        RDF.Node (RDF.Iri _) ->
-                            Ok (RDF.forgetCompatible node)
+                                    RDF.Node (RDF.Iri _) ->
+                                        Ok (RDF.forgetCompatible node)
 
-                        RDF.Node (RDF.Literal _) ->
-                            Err (UnexpectedNode BlankNode node)
+                                    RDF.Node (RDF.Literal _) ->
+                                        Err (UnexpectedNode BlankNode node)
+                            )
+                            nodes
+                        )
                 )
                 >> Result.andThen
-                    (\focusNode ->
-                        case
-                            RDF.emptyQuery
-                                |> RDF.withSubject focusNode
-                                |> RDF.withPropertyPath path
-                                |> RDF.getObject graph
-                        of
-                            Nothing ->
-                                Err (UnknownProperty focusNode path)
+                    (\focusNodes ->
+                        let
+                            nodeChilds : Result Error (List RDF.BlankNodeOrIriOrAnyLiteral)
+                            nodeChilds =
+                                Result.map List.concat <|
+                                    Result.combine
+                                        (List.map
+                                            (\focusNode ->
+                                                case
+                                                    RDF.emptyQuery
+                                                        |> RDF.withSubject focusNode
+                                                        |> RDF.withPropertyPath path
+                                                        |> RDF.getObjects graph
+                                                of
+                                                    [] ->
+                                                        Err (UnknownProperty focusNode path)
 
-                            Just nodeChild ->
-                                Ok nodeChild
-                                    |> f graph
+                                                    nodeChilds_ ->
+                                                        Ok nodeChilds_
+                                            )
+                                            focusNodes
+                                        )
+                        in
+                        nodeChilds
+                            |> f graph
                     )
         )
 
