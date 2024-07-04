@@ -47,7 +47,6 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 
 -}
 
-import List.NonEmpty exposing (NonEmpty)
 import RDF exposing (BlankNodeOrIri, BlankNodeOrIriOrAnyLiteral, Iri)
 import RDF.Graph exposing (Graph)
 import RDF.Namespaces exposing (xsd)
@@ -77,7 +76,7 @@ type Error
     | UnexpectedNode NodeType RDF.BlankNodeOrIriOrAnyLiteral
     | UnexpectedBool String
     | UnknownProperty BlankNodeOrIri PropertyPath
-    | UnexpectedUnit (NonEmpty Iri) Iri
+    | CustomError String
 
 
 errorToString : Error -> String
