@@ -4,6 +4,7 @@ import Expect
 import RDF
 import RDF.Decode as Decode exposing (Decoder, decode)
 import RDF.Graph as Graph
+import RDF.Namespaces as RDF
 import RDF.PropertyPath as RDF
 import Test exposing (Test, describe, test)
 
@@ -14,6 +15,7 @@ suite =
         [ bool
         , many
         , manyMany
+        , stringOrLangString
         ]
 
 
@@ -66,6 +68,37 @@ manyMany =
                             |> Result.map List.sort
                     )
                 |> Expect.equal (Ok (Ok [ "a", "b" ]))
+
+
+stringOrLangString : Test
+stringOrLangString =
+    test "string or lang string" <|
+        \_ ->
+            """
+            @base <http://example.org/> .
+            @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+            <x> rdfs:label "de", "en"@en, "fr"@fr .
+            """
+                |> Graph.parse
+                |> Result.map
+                    (\graph ->
+                        Decode.decode
+                            (Decode.property (RDF.PredicatePath (RDF.rdfs "label"))
+                                Decode.stringOrLangString
+                            )
+                            graph
+                            [ RDF.toBlankNodeOrIriOrAnyLiteral (example "x") ]
+                    )
+                |> Expect.equal
+                    (Ok
+                        (Ok
+                            (RDF.stringOrLangStringFrom (Just "de")
+                                [ ( "en", "en" )
+                                , ( "fr", "fr" )
+                                ]
+                            )
+                        )
+                    )
 
 
 example : String -> RDF.Iri

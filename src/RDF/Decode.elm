@@ -12,7 +12,7 @@ module RDF.Decode exposing
     , literal
     , property
     , propertyPath
-    , string
+    , string, stringOrLangString
     , succeed
     , fail
     , map
@@ -48,7 +48,7 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 @docs literal
 @docs property
 @docs propertyPath
-@docs string
+@docs string, stringOrLangString
 
 @docs succeed
 @docs fail
@@ -128,6 +128,7 @@ type Error
     = InvalidDate BlankNodeOrIriOrAnyLiteral
     | InvalidDateTime BlankNodeOrIriOrAnyLiteral
     | UnexpectedLiteralDatatype Iri Iri
+    | UnexpectedLiteralLanguageTag String (Maybe String)
     | UnexpectedNode NodeType RDF.BlankNodeOrIriOrAnyLiteral
     | UnexpectedBool String
     | UnknownProperty BlankNodeOrIri PropertyPath
@@ -135,6 +136,8 @@ type Error
     | CustomError String
     | Batch (List Error)
     | TooManyNodes
+    | MissingLangString RDF.AnyLiteral
+    | TooManyStrings
 
 
 errorToString : Error -> String
@@ -318,8 +321,46 @@ string =
     literal (RDF.xsd "string")
 
 
+langString : Decoder ( String, String )
+langString =
+    literalData (RDF.rdf "langString")
+        |> andThen
+            (\({ value, languageTag } as node) ->
+                Maybe.unwrap (error (MissingLangString (RDF.Node (RDF.Literal node))))
+                    (succeed << flip Tuple.pair value)
+                    languageTag
+            )
+
+
+stringOrLangString : Decoder RDF.StringOrLangString
+stringOrLangString =
+    many
+        (oneOf
+            [ map Err langString
+            , map Ok string
+            ]
+        )
+        |> andThen
+            (\stringsOrLangStrings ->
+                case Result.partition stringsOrLangStrings of
+                    ( [], langStrings ) ->
+                        succeed (RDF.stringOrLangStringFrom Nothing langStrings)
+
+                    ( [ string_ ], langStrings ) ->
+                        succeed (RDF.stringOrLangStringFrom (Just string_) langStrings)
+
+                    _ ->
+                        fail TooManyStrings
+            )
+
+
 literal : Iri -> Decoder String
 literal datatype =
+    map .value (literalData datatype)
+
+
+literalData : Iri -> Decoder RDF.LiteralData
+literalData datatype =
     Decoder
         (\_ ->
             Result.andThen
@@ -333,12 +374,12 @@ literal datatype =
                                 RDF.Node (RDF.Iri _) ->
                                     Err (UnexpectedNode LiteralNode node)
 
-                                RDF.Node (RDF.Literal literalData) ->
-                                    if literalData.datatype /= datatype then
-                                        Err (UnexpectedLiteralDatatype datatype literalData.datatype)
+                                RDF.Node (RDF.Literal literalData_) ->
+                                    if literalData_.datatype /= datatype then
+                                        Err (UnexpectedLiteralDatatype datatype literalData_.datatype)
 
                                     else
-                                        Ok literalData.value
+                                        Ok literalData_
 
                         _ ->
                             Err TooManyNodes
