@@ -128,21 +128,63 @@ type Error
     = InvalidDate BlankNodeOrIriOrAnyLiteral
     | InvalidDateTime BlankNodeOrIriOrAnyLiteral
     | UnexpectedLiteralDatatype Iri Iri
-    | UnexpectedLiteralLanguageTag String (Maybe String)
     | UnexpectedNode NodeType RDF.BlankNodeOrIriOrAnyLiteral
     | UnexpectedBool String
     | UnknownProperty BlankNodeOrIri PropertyPath
     | UnexpectedEmptyList
     | CustomError String
     | Batch (List Error)
-    | TooManyNodes
+    | TooManyNodes (List RDF.BlankNodeOrIriOrAnyLiteral)
     | MissingLangString RDF.AnyLiteral
-    | TooManyStrings
+    | TooManyStrings (List String)
 
 
 errorToString : Error -> String
-errorToString _ =
-    "Could not decode RDF: TODO"
+errorToString error_ =
+    case error_ of
+        InvalidDate _ ->
+            "Not a date"
+
+        InvalidDateTime _ ->
+            "Not a date time"
+
+        UnexpectedLiteralDatatype datatypeExpected datatypeFound ->
+            "Expected a literal of type " ++ RDF.toUrl datatypeExpected ++ ", but found a literal of type " ++ RDF.toUrl datatypeFound ++ "."
+
+        UnexpectedNode BlankNode nodeFound ->
+            "Expected a blank node, but found " ++ RDF.serializeNode nodeFound ++ "."
+
+        UnexpectedNode IriNode nodeFound ->
+            "Expected an IRI, but found " ++ RDF.serializeNode nodeFound ++ "."
+
+        UnexpectedNode LiteralNode nodeFound ->
+            "Expected a literal, but found " ++ RDF.serializeNode nodeFound ++ "."
+
+        UnexpectedBool found ->
+            "Expected a boolean, but found " ++ found ++ "."
+
+        UnknownProperty nodeFocus pathExpected ->
+            "No such property " ++ RDF.serializePropertyPath pathExpected ++ " found at " ++ RDF.serializeNode nodeFocus ++ "."
+
+        UnexpectedEmptyList ->
+            "Expected a non-empty list, but found an empty list."
+
+        CustomError s ->
+            s
+
+        Batch errors ->
+            "Decoding failed in one of the following ways:"
+                ++ (String.join "\n" << List.map (\item -> "  - " ++ item))
+                    (List.map errorToString errors)
+
+        TooManyNodes nodesFound ->
+            "I expected a single node, but I found multiple nodes" ++ String.join ", " (List.map RDF.serializeNode nodesFound) ++ "."
+
+        MissingLangString nodeFound ->
+            "I expected a lang string, but I found " ++ RDF.serializeNode nodeFound ++ "."
+
+        TooManyStrings stringsFound ->
+            "I expected a single string, but I found multiple strings " ++ String.join ", " stringsFound ++ "."
 
 
 type NodeType
@@ -168,7 +210,7 @@ blankNode (Decoder f) =
                                     Err (UnexpectedNode BlankNode node)
 
                         _ ->
-                            Err TooManyNodes
+                            Err (TooManyNodes nodes)
                 )
         )
 
@@ -185,7 +227,7 @@ subject =
                                 RDF.toBlankNode node
 
                         _ ->
-                            Err TooManyNodes
+                            Err (TooManyNodes nodes)
                 )
         )
 
@@ -211,7 +253,7 @@ bool =
                         succeed False
 
                     _ ->
-                        fail (UnexpectedBool stringLiteral)
+                        error (UnexpectedBool stringLiteral)
             )
 
 
@@ -227,7 +269,7 @@ date =
                                 |> Result.fromMaybe (InvalidDate node)
 
                         _ ->
-                            Err TooManyNodes
+                            Err (TooManyNodes nodes)
                 )
         )
 
@@ -244,7 +286,7 @@ dateTime =
                                 |> Result.fromMaybe (InvalidDateTime node)
 
                         _ ->
-                            Err TooManyNodes
+                            Err (TooManyNodes nodes)
                 )
         )
 
@@ -262,7 +304,7 @@ iri =
                                 |> Result.fromMaybe (UnexpectedNode IriNode node)
 
                         _ ->
-                            Err TooManyNodes
+                            Err (TooManyNodes nodes)
                 )
         )
 
@@ -278,7 +320,7 @@ list (Decoder f) =
                             Ok node
 
                         _ ->
-                            Err TooManyNodes
+                            Err (TooManyNodes nodes)
                 )
                 >> Result.andThen
                     (\node ->
@@ -312,7 +354,7 @@ nonEmpty =
     list
         >> andThen
             (NonEmpty.fromList
-                >> Maybe.unwrap (fail UnexpectedEmptyList) succeed
+                >> Maybe.unwrap (error UnexpectedEmptyList) succeed
             )
 
 
@@ -349,8 +391,8 @@ stringOrLangString =
                     ( [ string_ ], langStrings ) ->
                         succeed (RDF.stringOrLangStringFrom (Just string_) langStrings)
 
-                    _ ->
-                        fail TooManyStrings
+                    ( strings, _ ) ->
+                        error (TooManyStrings strings)
             )
 
 
@@ -382,7 +424,7 @@ literalData datatype =
                                         Ok literalData_
 
                         _ ->
-                            Err TooManyNodes
+                            Err (TooManyNodes nodes)
                 )
         )
 
@@ -446,7 +488,7 @@ propertyPath =
             (\irisOrNull ->
                 case irisOrNull of
                     [] ->
-                        fail (CustomError "expected property path, but got []")
+                        error (CustomError "expected property path, but got []")
 
                     iriFirst :: irisOther ->
                         succeed
@@ -494,9 +536,14 @@ apply (Decoder f) (Decoder g) =
     Decoder (\graph x -> Result.map2 (<|) (f graph x) (g graph x))
 
 
-fail : Error -> Decoder a
-fail e =
+error : Error -> Decoder a
+error e =
     Decoder (\_ _ -> Err e)
+
+
+fail : String -> Decoder a
+fail =
+    error << CustomError
 
 
 oneOf : List (Decoder a) -> Decoder a
