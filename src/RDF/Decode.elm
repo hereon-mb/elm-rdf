@@ -2,19 +2,27 @@ module RDF.Decode exposing
     ( Decoder
     , decode
     , Error(..), NodeType(..), errorToString
+    , blankNode
+    , blankNodeOrIri
     , bool
     , date
     , dateTime
     , iri
-    , list
+    , list, nonEmpty
     , literal
     , property
+    , propertyPath
     , string
     , succeed
     , fail
     , map
     , map2
     , andThen
+    , oneOf
+    , hardcoded
+    , optional
+    , required
+    , lazy
     )
 
 {-| The `DefaultValue` API is a parser combinator for functions `Node -> a` that supports querying.
@@ -29,13 +37,16 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 @docs decode
 @docs Error, NodeType, errorToString
 
+@docs blankNode
+@docs blankNodeOrIri
 @docs bool
 @docs date
 @docs dateTime
 @docs iri
-@docs list
+@docs list, nonEmpty
 @docs literal
 @docs property
+@docs propertyPath
 @docs string
 
 @docs succeed
@@ -44,13 +55,29 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 @docs map
 @docs map2
 @docs andThen
+@docs oneOf
+
+
+# Pipeline
+
+@docs hardcoded
+@docs optional
+@docs required
+
+
+# Recursion
+
+@docs lazy
 
 -}
 
+import Basics.Extra exposing (flip)
+import List.NonEmpty as NonEmpty exposing (NonEmpty)
+import Maybe.Extra as Maybe
 import RDF exposing (BlankNodeOrIri, BlankNodeOrIriOrAnyLiteral, Iri)
 import RDF.Graph exposing (Graph)
-import RDF.Namespaces exposing (xsd)
-import RDF.PropertyPath exposing (PropertyPath)
+import RDF.Namespaces as RDF
+import RDF.PropertyPath as RDF exposing (PropertyPath)
 import RDF.Query as RDF
 import Result.Extra as Result
 import Time
@@ -76,7 +103,9 @@ type Error
     | UnexpectedNode NodeType RDF.BlankNodeOrIriOrAnyLiteral
     | UnexpectedBool String
     | UnknownProperty BlankNodeOrIri PropertyPath
+    | UnexpectedEmptyList
     | CustomError String
+    | Batch (List Error)
 
 
 errorToString : Error -> String
@@ -90,9 +119,46 @@ type NodeType
     | LiteralNode
 
 
+blankNode : Decoder a -> Decoder a
+blankNode (Decoder f) =
+    Decoder
+        (\graph ->
+            Result.andThen
+                (\node ->
+                    case RDF.toBlankNode node of
+                        Just nodeNext ->
+                            Ok (RDF.forgetCompatible nodeNext)
+                                |> f graph
+
+                        Nothing ->
+                            Err (UnexpectedNode BlankNode node)
+                )
+        )
+
+
+subject : Decoder RDF.BlankNode
+subject =
+    Decoder
+        (\_ ->
+            Result.andThen
+                (\node ->
+                    Maybe.unwrap (Err (UnexpectedNode BlankNode node)) Ok <|
+                        RDF.toBlankNode node
+                )
+        )
+
+
+blankNodeOrIri : Decoder BlankNodeOrIri
+blankNodeOrIri =
+    oneOf
+        [ map RDF.forgetCompatible iri
+        , map RDF.forgetCompatible (blankNode subject)
+        ]
+
+
 bool : Decoder Bool
 bool =
-    literal (xsd "boolean")
+    literal (RDF.xsd "boolean")
         |> andThen
             (\stringLiteral ->
                 case stringLiteral of
@@ -175,9 +241,18 @@ list (Decoder f) =
         )
 
 
+nonEmpty : Decoder a -> Decoder (NonEmpty a)
+nonEmpty =
+    list
+        >> andThen
+            (NonEmpty.fromList
+                >> Maybe.unwrap (fail UnexpectedEmptyList) succeed
+            )
+
+
 string : Decoder String
 string =
-    literal (xsd "string")
+    literal (RDF.xsd "string")
 
 
 literal : Iri -> Decoder String
@@ -214,7 +289,7 @@ property path (Decoder f) =
                             Ok (RDF.forgetCompatible node)
 
                         RDF.Node (RDF.Iri _) ->
-                            Err (UnexpectedNode BlankNode node)
+                            Ok (RDF.forgetCompatible node)
 
                         RDF.Node (RDF.Literal _) ->
                             Err (UnexpectedNode BlankNode node)
@@ -235,6 +310,24 @@ property path (Decoder f) =
                                     |> f graph
                     )
         )
+
+
+propertyPath : Decoder PropertyPath
+propertyPath =
+    list iri
+        |> andThen
+            (\irisOrNull ->
+                case irisOrNull of
+                    [] ->
+                        fail (CustomError "expected property path, but got []")
+
+                    iriFirst :: irisOther ->
+                        succeed
+                            (RDF.SequencePath
+                                (RDF.PredicatePath iriFirst)
+                                (List.map RDF.PredicatePath irisOther)
+                            )
+            )
 
 
 succeed : a -> Decoder a
@@ -277,3 +370,66 @@ apply (Decoder f) (Decoder g) =
 fail : Error -> Decoder a
 fail e =
     Decoder (\_ _ -> Err e)
+
+
+oneOf : List (Decoder a) -> Decoder a
+oneOf fs =
+    Decoder
+        (\graph node ->
+            case
+                List.foldl
+                    (\(Decoder f) a ->
+                        case a of
+                            Ok x ->
+                                Ok x
+
+                            Err es ->
+                                case f graph node of
+                                    Ok x ->
+                                        Ok x
+
+                                    Err e ->
+                                        Err (e :: es)
+                    )
+                    (Err [])
+                    fs
+            of
+                Ok x ->
+                    Ok x
+
+                Err es ->
+                    Err (Batch (List.reverse es))
+        )
+
+
+required : Decoder a -> Decoder (a -> b) -> Decoder b
+required =
+    flip apply
+
+
+optional : Decoder a -> Decoder (Maybe a -> b) -> Decoder b
+optional =
+    required << try
+
+
+hardcoded : a -> Decoder (a -> b) -> Decoder b
+hardcoded =
+    required << succeed
+
+
+try : Decoder a -> Decoder (Maybe a)
+try (Decoder f) =
+    Decoder
+        (\graph node ->
+            case f graph node of
+                Ok x ->
+                    Ok (Just x)
+
+                Err _ ->
+                    Ok Nothing
+        )
+
+
+lazy : (() -> Decoder a) -> Decoder a
+lazy f =
+    andThen f (succeed ())
