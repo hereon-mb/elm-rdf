@@ -10,6 +10,7 @@ module RDF.Encode exposing
     , property
     , iri
     , literal
+    , object
     )
 
 {-| A domain-specific language for encoding `Graph`s.
@@ -73,6 +74,7 @@ Implementation-wise, the only challenge is the fact that blank nodes can be subj
 
 @docs iri
 @docs literal
+@docs object
 
 -}
 
@@ -214,11 +216,11 @@ property1 predicate (Encoder objectE) =
                 case objectE of
                     GraphEncoder f ->
                         let
-                            ( object, ( graphObject, seedUpdated ) ) =
+                            ( object_, ( graphObject, seedUpdated ) ) =
                                 f seed
 
                             ( graphProperty, seedUpdatedUpdated ) =
-                                case property1 predicate (forgetCompatible (iri (RDF.forgetCompatible object))) of
+                                case property1 predicate (forgetCompatible (iri (RDF.forgetCompatible object_))) of
                                     Encoder propertyE ->
                                         case propertyE of
                                             PropertyEncoder g ->
@@ -243,26 +245,28 @@ property1 predicate (Encoder objectE) =
 
 {-| TODO
 -}
-literal : RDF.Literal a -> LiteralEncoder
-literal object =
+object : Object -> LiteralEncoder
+object object_ =
     Encoder
         (LiteralEncoder
             (\seed subject predicate ->
-                ( RDF.singleton subject predicate object, seed )
+                ( RDF.singleton subject predicate object_, seed )
             )
         )
 
 
 {-| TODO
 -}
+literal : RDF.Literal a -> LiteralEncoder
+literal =
+    object << RDF.forgetCompatible
+
+
+{-| TODO
+-}
 iri : RDF.Iri -> LiteralEncoder
-iri object =
-    Encoder
-        (LiteralEncoder
-            (\seed subject predicate ->
-                ( RDF.singleton subject predicate object, seed )
-            )
-        )
+iri =
+    object << RDF.forgetCompatible
 
 
 {-| TODO
