@@ -9,6 +9,7 @@ module RDF.Encode exposing
     , node
     , predicate
     , property
+    , bunch
     , iri
     , literal
     , object
@@ -73,6 +74,7 @@ Implementation-wise, the only challenge is the fact that blank nodes can be subj
 @docs node
 @docs predicate
 @docs property
+@docs bunch
 
 @docs iri
 @docs literal
@@ -80,7 +82,10 @@ Implementation-wise, the only challenge is the fact that blank nodes can be subj
 
 -}
 
+import Basics.Extra exposing (flip)
+import List.NonEmpty as NonEmpty
 import RDF
+import RDF.Encode.Bunch as Bunch
 import RDF.Graph as RDF exposing (Graph, Seed)
 import RDF.PropertyPath as RDF exposing (PropertyPath)
 
@@ -176,6 +181,32 @@ nodeHelp propertyEs subject seed =
             ( [], seed )
             propertyEs
     )
+
+
+{-| TODO
+-}
+bunch : List ( PropertyPath, IsGraphOrLiteralEncoder object ) -> List PropertyEncoder
+bunch =
+    List.map bunchHelp
+        << Bunch.reduce
+        << List.filterMap
+            (\( propertyPath, object_ ) ->
+                Maybe.map (flip Tuple.pair object_)
+                    (RDF.normalizePropertyPath propertyPath)
+            )
+
+
+bunchHelp :
+    Bunch.Tree RDF.Iri ( RDF.Iri, IsGraphOrLiteralEncoder object )
+    -> PropertyEncoder
+bunchHelp tree =
+    case tree of
+        Bunch.Leaf ( predicate_, object_ ) ->
+            predicate predicate_ object_
+
+        Bunch.Node predicate_ trees ->
+            predicate predicate_
+                (blankNode (List.map bunchHelp (NonEmpty.toList trees)))
 
 
 {-| TODO
