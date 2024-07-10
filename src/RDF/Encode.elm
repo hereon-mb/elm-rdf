@@ -7,6 +7,7 @@ module RDF.Encode exposing
     , Subject, Predicate, Object
     , blankNode
     , node
+    , predicate
     , property
     , iri
     , literal
@@ -70,6 +71,7 @@ Implementation-wise, the only challenge is the fact that blank nodes can be subj
 
 @docs blankNode
 @docs node
+@docs predicate
 @docs property
 
 @docs iri
@@ -184,13 +186,13 @@ property :
     -> PropertyEncoder
 property propertyPath objectE =
     case RDF.normalizePropertyPath propertyPath of
-        Just ( predicate, predicates ) ->
-            property1 predicate
+        Just ( predicate_, predicates ) ->
+            predicate predicate_
                 (List.foldr
                     (\predicateCurrent objectCurrentE ->
                         forgetCompatible
                             (blankNode
-                                [ property1 predicateCurrent objectCurrentE
+                                [ predicate predicateCurrent objectCurrentE
                                 ]
                             )
                     )
@@ -208,8 +210,8 @@ property propertyPath objectE =
                 )
 
 
-property1 : Predicate -> IsGraphOrLiteralEncoder object -> PropertyEncoder
-property1 predicate (Encoder objectE) =
+predicate : Predicate -> IsGraphOrLiteralEncoder object -> PropertyEncoder
+predicate predicate_ (Encoder objectE) =
     Encoder
         (PropertyEncoder
             (\seed subject ->
@@ -220,7 +222,7 @@ property1 predicate (Encoder objectE) =
                                 f seed
 
                             ( graphProperty, seedUpdatedUpdated ) =
-                                case property1 predicate (forgetCompatible (iri (RDF.forgetCompatible object_))) of
+                                case predicate predicate_ (forgetCompatible (iri (RDF.forgetCompatible object_))) of
                                     Encoder propertyE ->
                                         case propertyE of
                                             PropertyEncoder g ->
@@ -235,7 +237,7 @@ property1 predicate (Encoder objectE) =
                         ( RDF.union graphObject graphProperty, seedUpdatedUpdated )
 
                     LiteralEncoder f ->
-                        f seed subject predicate
+                        f seed subject predicate_
 
                     PropertyEncoder _ ->
                         ( RDF.emptyGraph, seed )
@@ -249,8 +251,8 @@ object : Object -> LiteralEncoder
 object object_ =
     Encoder
         (LiteralEncoder
-            (\seed subject predicate ->
-                ( RDF.singleton subject predicate object_, seed )
+            (\seed subject predicate_ ->
+                ( RDF.singleton subject predicate_ object_, seed )
             )
         )
 
