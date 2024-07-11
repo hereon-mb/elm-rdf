@@ -24,6 +24,7 @@ module RDF.Decode exposing
     , optional
     , required
     , lazy
+    , predicate
     )
 
 {-| The `DefaultValue` API is a parser combinator for functions `Node -> a` that supports querying.
@@ -479,6 +480,11 @@ property path (Decoder f) =
                             |> f graph
                     )
         )
+
+
+predicate : Iri -> Decoder a -> Decoder a
+predicate =
+    property << RDF.PredicatePath
 
 
 propertyPath : Decoder PropertyPath
