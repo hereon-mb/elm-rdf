@@ -28,6 +28,7 @@ module RDF exposing
     , localize, nonLocalized
     , stringOrLangStringFrom, stringOrLangStringFromList
     , mergeStringOrLangStrings
+    , stringOrLangStringInfo
     )
 
 {-|
@@ -85,6 +86,7 @@ module RDF exposing
 @docs localize, nonLocalized
 @docs stringOrLangStringFrom, stringOrLangStringFromList
 @docs mergeStringOrLangStrings
+@docs stringOrLangStringInfo
 
 -}
 
@@ -685,6 +687,11 @@ type StringOrLangString
         { string : Maybe String
         , langStrings : Dict String String
         }
+
+
+stringOrLangStringInfo : StringOrLangString -> { string : Maybe String, langStrings : Dict String String }
+stringOrLangStringInfo (StringOrLangString stringOrLangString) =
+    stringOrLangString
 
 
 {-| TODO Add documentation
