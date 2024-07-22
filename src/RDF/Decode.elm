@@ -3,6 +3,7 @@ module RDF.Decode exposing
     , iri
     , blankNodeOrIri
     , anyLiteral
+    , object
     , literal
     , string, stringOrLangString
     , bool
@@ -41,6 +42,7 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 @docs iri
 @docs blankNodeOrIri
 @docs anyLiteral
+@docs object
 
 @docs literal
 @docs string, stringOrLangString
@@ -129,6 +131,22 @@ many (Decoder f) =
 -}
 type Decoder a
     = Decoder (Graph -> Result Error (List BlankNodeOrIriOrAnyLiteral) -> Result Error a)
+
+
+object : Decoder BlankNodeOrIriOrAnyLiteral
+object =
+    Decoder
+        (\_ ->
+            Result.andThen
+                (\nodes ->
+                    case nodes of
+                        [ node ] ->
+                            Ok node
+
+                        _ ->
+                            Err (TooManyNodes nodes)
+                )
+        )
 
 
 {-| Run a [`Decoder`](#Decoder) on an actual `Graph` starting at the provided
