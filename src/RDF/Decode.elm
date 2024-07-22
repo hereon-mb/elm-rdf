@@ -13,6 +13,7 @@ module RDF.Decode exposing
     , blankNode
     , predicate, property
     , list, nonEmpty
+    , at
     , decode
     , Error(..), NodeType(..), errorToString
     , map
@@ -59,6 +60,7 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 @docs blankNode
 @docs predicate, property
 @docs list, nonEmpty
+@docs at
 
 
 # Running Decoders
@@ -131,6 +133,11 @@ many (Decoder f) =
 -}
 type Decoder a
     = Decoder (Graph -> Result Error (List BlankNodeOrIriOrAnyLiteral) -> Result Error a)
+
+
+at : List BlankNodeOrIriOrAnyLiteral -> Decoder a -> Decoder a
+at nodes (Decoder f) =
+    Decoder (\graph _ -> f graph (Ok nodes))
 
 
 object : Decoder BlankNodeOrIriOrAnyLiteral
