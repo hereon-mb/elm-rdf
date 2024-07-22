@@ -2,6 +2,7 @@ module RDF.Decode exposing
     ( Decoder
     , iri
     , blankNodeOrIri
+    , anyLiteral
     , literal
     , string, stringOrLangString
     , bool
@@ -39,6 +40,7 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 
 @docs iri
 @docs blankNodeOrIri
+@docs anyLiteral
 
 @docs literal
 @docs string, stringOrLangString
@@ -599,6 +601,32 @@ literalData datatype =
 
                                     else
                                         Ok literalData_
+
+                        _ ->
+                            Err (TooManyNodes nodes)
+                )
+        )
+
+
+{-| TODO
+-}
+anyLiteral : Decoder RDF.AnyLiteral
+anyLiteral =
+    Decoder
+        (\_ ->
+            Result.andThen
+                (\nodes ->
+                    case nodes of
+                        [ node ] ->
+                            case node of
+                                RDF.Node (RDF.BlankNode _) ->
+                                    Err (UnexpectedNode LiteralNode node)
+
+                                RDF.Node (RDF.Iri _) ->
+                                    Err (UnexpectedNode LiteralNode node)
+
+                                RDF.Node (RDF.Literal literalData_) ->
+                                    Ok (RDF.Node (RDF.Literal literalData_))
 
                         _ ->
                             Err (TooManyNodes nodes)
