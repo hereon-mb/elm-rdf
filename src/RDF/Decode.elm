@@ -78,7 +78,7 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 import Basics.Extra exposing (flip)
 import List.NonEmpty as NonEmpty exposing (NonEmpty)
 import Maybe.Extra as Maybe
-import RDF exposing (BlankNodeOrIri, BlankNodeOrIriOrAnyLiteral, Iri)
+import RDF exposing (BlankNodeOrIri, BlankNodeOrIriOrAnyLiteral, Iri, Node)
 import RDF.Graph exposing (Graph)
 import RDF.Namespaces as RDF
 import RDF.PropertyPath as RDF exposing (PropertyPath)
@@ -120,10 +120,10 @@ type Decoder a
 decode :
     Decoder a
     -> Graph
-    -> List BlankNodeOrIriOrAnyLiteral
+    -> List (Node compatible)
     -> Result Error a
 decode (Decoder f) graph =
-    f graph << Ok
+    f graph << Ok << List.map RDF.toBlankNodeOrIriOrAnyLiteral
 
 
 type Error
@@ -293,6 +293,25 @@ dateTime =
         )
 
 
+{-| Decode an [IRI](https://www.w3.org/TR/rdf11-concepts/#section-IRIsk).
+
+    import RDF
+    import RDF.Graph as RDF exposing (Graph)
+    import RDF.Namespaces exposing (a)
+
+    graph : Graph
+    graph =
+        """
+        @base <http://example.org/> .
+        <alice> a <#Person> .
+        """
+            |> RDF.parse
+            |> Result.withDefault RDF.emptyGraph
+
+    decode (predicate a iri) graph [ RDF.iri "http://example.org/alice" ]
+    --> Ok (RDF.iri "http://example.org/#Person")
+
+-}
 iri : Decoder Iri
 iri =
     Decoder
