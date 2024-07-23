@@ -656,20 +656,23 @@ predicate =
 -}
 propertyPath : Decoder PropertyPath
 propertyPath =
-    list iri
-        |> andThen
-            (\irisOrNull ->
-                case irisOrNull of
-                    [] ->
-                        error (CustomError "expected property path, but got []")
+    oneOf
+        [ map RDF.PredicatePath iri
+        , list iri
+            |> andThen
+                (\irisOrNull ->
+                    case irisOrNull of
+                        [] ->
+                            error (CustomError "expected property path, but got []")
 
-                    iriFirst :: irisOther ->
-                        succeed
-                            (RDF.SequencePath
-                                (RDF.PredicatePath iriFirst)
-                                (List.map RDF.PredicatePath irisOther)
-                            )
-            )
+                        iriFirst :: irisOther ->
+                            succeed
+                                (RDF.SequencePath
+                                    (RDF.PredicatePath iriFirst)
+                                    (List.map RDF.PredicatePath irisOther)
+                                )
+                )
+        ]
 
 
 {-| A decoder which always succeeds with the given value.
