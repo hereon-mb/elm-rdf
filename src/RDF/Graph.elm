@@ -348,6 +348,8 @@ type Error
     | CouldNotResolvePrefixedName String String
 
 
+{-| TODO
+-}
 errorToString : String -> Error -> String
 errorToString raw error =
     case error of

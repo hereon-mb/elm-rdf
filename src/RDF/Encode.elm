@@ -241,6 +241,8 @@ property propertyPath objectE =
                 )
 
 
+{-| TODO
+-}
 predicate : Predicate -> IsGraphOrLiteralEncoder object -> PropertyEncoder
 predicate predicate_ (Encoder objectE) =
     Encoder
@@ -359,10 +361,14 @@ type alias IsGraphOrLiteralEncoder compatible =
     Encoder { compatible | isGraphOrLiteral : Yes }
 
 
+{-| TODO
+-}
 type Yes
     = Yes Never
 
 
+{-| TODO
+-}
 type No
     = No Never
 

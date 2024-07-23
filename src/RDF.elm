@@ -689,6 +689,8 @@ type StringOrLangString
         }
 
 
+{-| TODO Add documention
+-}
 stringOrLangStringInfo : StringOrLangString -> { string : Maybe String, langStrings : Dict String String }
 stringOrLangStringInfo (StringOrLangString stringOrLangString) =
     stringOrLangString

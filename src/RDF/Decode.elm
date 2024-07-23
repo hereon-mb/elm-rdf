@@ -113,10 +113,14 @@ many (Decoder f) =
         )
 
 
+{-| TODO
+-}
 type Decoder a
     = Decoder (Graph -> Result Error (List BlankNodeOrIriOrAnyLiteral) -> Result Error a)
 
 
+{-| TODO
+-}
 decode :
     Decoder a
     -> Graph
@@ -126,6 +130,8 @@ decode (Decoder f) graph =
     f graph << Ok << List.map RDF.toBlankNodeOrIriOrAnyLiteral
 
 
+{-| TODO
+-}
 type Error
     = InvalidDate BlankNodeOrIriOrAnyLiteral
     | InvalidDateTime BlankNodeOrIriOrAnyLiteral
@@ -141,6 +147,8 @@ type Error
     | TooManyStrings (List String)
 
 
+{-| TODO
+-}
 errorToString : Error -> String
 errorToString error_ =
     case error_ of
@@ -189,12 +197,16 @@ errorToString error_ =
             "I expected a single string, but I found multiple strings " ++ String.join ", " stringsFound ++ "."
 
 
+{-| TODO
+-}
 type NodeType
     = BlankNode
     | IriNode
     | LiteralNode
 
 
+{-| TODO
+-}
 blankNode : Decoder a -> Decoder a
 blankNode (Decoder f) =
     Decoder
@@ -217,6 +229,8 @@ blankNode (Decoder f) =
         )
 
 
+{-| TODO
+-}
 subject : Decoder RDF.BlankNode
 subject =
     Decoder
@@ -234,6 +248,8 @@ subject =
         )
 
 
+{-| TODO
+-}
 blankNodeOrIri : Decoder BlankNodeOrIri
 blankNodeOrIri =
     oneOf
@@ -242,6 +258,8 @@ blankNodeOrIri =
         ]
 
 
+{-| TODO
+-}
 bool : Decoder Bool
 bool =
     literal (RDF.xsd "boolean")
@@ -259,6 +277,8 @@ bool =
             )
 
 
+{-| TODO
+-}
 date : Decoder Time.Posix
 date =
     Decoder
@@ -276,6 +296,8 @@ date =
         )
 
 
+{-| TODO
+-}
 dateTime : Decoder Time.Posix
 dateTime =
     Decoder
@@ -293,7 +315,7 @@ dateTime =
         )
 
 
-{-| Decode an [IRI](https://www.w3.org/TR/rdf11-concepts/#section-IRIsk).
+{-| Decode an [IRI](https://www.w3.org/TR/rdf11-concepts/#section-IRIs).
 
     import RDF
     import RDF.Graph as RDF exposing (Graph)
@@ -308,7 +330,8 @@ dateTime =
             |> RDF.parse
             |> Result.withDefault RDF.emptyGraph
 
-    decode (predicate a iri) graph [ RDF.iri "http://example.org/alice" ]
+    decode (predicate a iri) graph
+        [ RDF.iri "http://example.org/alice" ]
     --> Ok (RDF.iri "http://example.org/#Person")
 
 -}
@@ -330,6 +353,8 @@ iri =
         )
 
 
+{-| TODO
+-}
 list : Decoder a -> Decoder (List a)
 list (Decoder f) =
     Decoder
@@ -370,6 +395,8 @@ list (Decoder f) =
         )
 
 
+{-| TODO
+-}
 nonEmpty : Decoder a -> Decoder (NonEmpty a)
 nonEmpty =
     list
@@ -379,11 +406,15 @@ nonEmpty =
             )
 
 
+{-| TODO
+-}
 string : Decoder String
 string =
     literal (RDF.xsd "string")
 
 
+{-| TODO
+-}
 langString : Decoder ( String, String )
 langString =
     literalData (RDF.rdf "langString")
@@ -395,6 +426,8 @@ langString =
             )
 
 
+{-| TODO
+-}
 stringOrLangString : Decoder RDF.StringOrLangString
 stringOrLangString =
     many
@@ -417,6 +450,8 @@ stringOrLangString =
             )
 
 
+{-| TODO
+-}
 literal : Iri -> Decoder String
 literal datatype =
     map .value (literalData datatype)
@@ -450,6 +485,8 @@ literalData datatype =
         )
 
 
+{-| TODO
+-}
 property : PropertyPath -> Decoder a -> Decoder a
 property path (Decoder f) =
     Decoder
@@ -509,6 +546,8 @@ predicate =
     property << RDF.PredicatePath
 
 
+{-| TODO
+-}
 propertyPath : Decoder PropertyPath
 propertyPath =
     list iri
@@ -527,16 +566,22 @@ propertyPath =
             )
 
 
+{-| TODO
+-}
 succeed : a -> Decoder a
 succeed x =
     Decoder (\_ _ -> Ok x)
 
 
+{-| TODO
+-}
 map : (a -> b) -> Decoder a -> Decoder b
 map f (Decoder g) =
     Decoder (\graph -> Result.map f << g graph)
 
 
+{-| TODO
+-}
 andThen : (a -> Decoder b) -> Decoder a -> Decoder b
 andThen f (Decoder g) =
     Decoder
@@ -554,6 +599,8 @@ andThen f (Decoder g) =
         )
 
 
+{-| TODO
+-}
 map2 : (a -> b -> c) -> Decoder a -> Decoder b -> Decoder c
 map2 f g h =
     apply (map f g) h
@@ -569,11 +616,15 @@ error e =
     Decoder (\_ _ -> Err e)
 
 
+{-| TODO
+-}
 fail : String -> Decoder a
 fail =
     error << CustomError
 
 
+{-| TODO
+-}
 oneOf : List (Decoder a) -> Decoder a
 oneOf fs =
     Decoder
@@ -604,16 +655,22 @@ oneOf fs =
         )
 
 
+{-| TODO
+-}
 required : Decoder a -> Decoder (a -> b) -> Decoder b
 required =
     flip apply
 
 
+{-| TODO
+-}
 optional : Decoder a -> Decoder (Maybe a -> b) -> Decoder b
 optional =
     required << try
 
 
+{-| TODO
+-}
 hardcoded : a -> Decoder (a -> b) -> Decoder b
 hardcoded =
     required << succeed
@@ -632,6 +689,8 @@ try (Decoder f) =
         )
 
 
+{-| TODO
+-}
 lazy : (() -> Decoder a) -> Decoder a
 lazy f =
     andThen f (succeed ())
