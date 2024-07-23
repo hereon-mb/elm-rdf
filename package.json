@@ -6,11 +6,15 @@
   "scripts": {
     "test": "elm-test",
     "test:watch": "elm-test --watch",
-    "review": "elm-review --fix-all"
+    "review": "elm-review --fix-all",
+    "format": "elm-format --validate src review tests",
+    "licenses:nodejs": "license-report --output=csv --csvHeaders --config=license-report-config.json > licenses-nodejs.csv"
   },
   "devDependencies": {
     "elm": "^0.19.1-6",
+    "elm-format": "^0.8.7",
     "elm-review": "^2.12.0",
-    "elm-test": "^0.19.1-revision12"
+    "elm-test": "^0.19.1-revision12",
+    "license-report": "^6.5.0"
   }
 }

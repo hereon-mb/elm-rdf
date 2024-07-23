@@ -10,6 +10,7 @@ module RDF.Decode exposing
     , iri
     , list, nonEmpty
     , literal
+    , predicate
     , property
     , propertyPath
     , string, stringOrLangString
@@ -24,7 +25,6 @@ module RDF.Decode exposing
     , optional
     , required
     , lazy
-    , predicate
     )
 
 {-| The `DefaultValue` API is a parser combinator for functions `Node -> a` that supports querying.
@@ -47,6 +47,7 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 @docs iri
 @docs list, nonEmpty
 @docs literal
+@docs predicate
 @docs property
 @docs propertyPath
 @docs string, stringOrLangString
@@ -482,6 +483,8 @@ property path (Decoder f) =
         )
 
 
+{-| TODO
+-}
 predicate : Iri -> Decoder a -> Decoder a
 predicate =
     property << RDF.PredicatePath

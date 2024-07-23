@@ -49,12 +49,12 @@ bunchLeaf =
                     RDF.string "something"
             in
             (Encode.node (RDF.toBlankNodeOrIri (base "root"))
-                [ Encode.bunch
+                (Encode.bunch
                     [ ( hasValue, Encode.literal valueValue )
                     , ( RDF.SequencePath hasNested [ hasUnit ], Encode.iri valueUnit )
                     , ( RDF.SequencePath hasNested [ hasConstant ], Encode.literal valueConstant )
                     ]
-                ]
+                )
                 |> Encode.encode RDF.initialSeed
                 |> Tuple.first
                 |> RDF.serialize

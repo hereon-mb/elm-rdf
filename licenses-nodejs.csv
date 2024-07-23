@@ -1,0 +1,7 @@
+department,related to,name,license period,material / not material,license type,link,remote version,installed version,defined version,author
+kessler,stuff,elm,perpetual,material,BSD-3-Clause,git+https://github.com/elm/compiler.git,0.19.1,0.19.1-6,^0.19.1-6,Evan Czaplicki evan@elm-lang.org https://github.com/evancz
+kessler,stuff,elm-format,perpetual,material,BSD-3-Clause,git+https://github.com/avh4/elm-format.git,0.8.7,0.8.7,^0.8.7,Aaron VonderHaar
+kessler,stuff,elm-license-finder,perpetual,material,MIT,git+https://github.com/wolfadex/elm-license-finder.git,1.2.1,1.2.1,^1.2.1,Wofgang Schuster wolfadex@gmail.com
+kessler,stuff,elm-review,perpetual,material,BSD-3-Clause,git+https://github.com/jfmengels/node-elm-review.git,2.12.0,2.12.0,^2.12.0,Jeroen Engels
+kessler,stuff,elm-test,perpetual,material,BSD-3-Clause,git+https://github.com/rtfeldman/node-test-runner.git,0.19.1,0.19.1-revision12,^0.19.1-revision12,Richard Feldman
+kessler,stuff,license-report,perpetual,material,MIT,git+https://github.com/ironSource/license-report.git,6.5.0,6.5.0,^6.5.0,Yaniv Kessler
