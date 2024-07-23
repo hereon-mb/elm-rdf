@@ -6,6 +6,7 @@ module RDF.Decode exposing
     , string, stringOrLangString
     , bool
     , date, dateTime
+    , subject
     , propertyPath
     , blankNode
     , predicate, property
@@ -43,6 +44,8 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 @docs string, stringOrLangString
 @docs bool
 @docs date, dateTime
+
+@docs subject
 
 @docs propertyPath
 
@@ -243,7 +246,7 @@ blankNode (Decoder f) =
 
 {-| TODO
 -}
-subject : Decoder RDF.BlankNode
+subject : Decoder RDF.BlankNodeOrIriOrAnyLiteral
 subject =
     Decoder
         (\_ ->
@@ -251,8 +254,7 @@ subject =
                 (\nodes ->
                     case nodes of
                         [ node ] ->
-                            Maybe.unwrap (Err (UnexpectedNode BlankNode node)) Ok <|
-                                RDF.toBlankNode node
+                            Ok node
 
                         _ ->
                             Err (TooManyNodes nodes)
@@ -286,7 +288,18 @@ blankNodeOrIri : Decoder BlankNodeOrIri
 blankNodeOrIri =
     oneOf
         [ map RDF.forgetCompatible iri
-        , map RDF.forgetCompatible (blankNode subject)
+        , map RDF.forgetCompatible
+            (blankNode
+                (subject
+                    |> andThen
+                        (\node ->
+                            Maybe.unwrap
+                                (error (UnexpectedNode BlankNode node))
+                                succeed
+                                (RDF.toBlankNode node)
+                        )
+                )
+            )
         ]
 
 
