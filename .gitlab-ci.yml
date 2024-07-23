@@ -60,6 +60,10 @@ test:
   extends: .frontend
   script: npm run test
 
+test-examples:
+  extends: .frontend
+  script: npm run test:examples
+
 review:
   extends: .frontend
   script: npm run review
