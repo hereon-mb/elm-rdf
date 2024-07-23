@@ -4,6 +4,9 @@
     "summary": "Work with RDF (Resource Description Framework) data",
     "license": "Apache-2.0",
     "version": "1.0.0",
+    "source-directories": [
+      "src"
+    ],
     "exposed-modules": [
         "RDF",
         "RDF.Decode",

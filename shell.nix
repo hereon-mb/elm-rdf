@@ -8,6 +8,6 @@ mkShell {
     elmPackages.elm-format
     elmPackages.elm-doc-preview
     elmPackages.elm-language-server
-    nodejs_22
+    nodejs_20
   ];
 }
