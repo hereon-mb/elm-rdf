@@ -14,6 +14,7 @@ module RDF.Decode exposing
     , Error(..), NodeType(..), errorToString
     , map
     , map2
+    , combine
     , required, optional, hardcoded
     , succeed, fail
     , andThen
@@ -63,6 +64,7 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 
 @docs map
 @docs map2
+@docs combine
 
 
 ## Pipeline
@@ -901,3 +903,8 @@ try (Decoder f) =
 lazy : (() -> Decoder a) -> Decoder a
 lazy f =
     andThen f (succeed ())
+
+
+combine : List (Decoder a) -> Decoder (List a)
+combine =
+    List.foldr (map2 (::)) (succeed [])
