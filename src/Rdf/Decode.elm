@@ -170,9 +170,14 @@ from nodeFocus (Decoder f) =
     Decoder
         (\graph _ ->
             if
-                Rdf.emptyQuery
+                (Rdf.emptyQuery
                     |> Rdf.withSubject nodeFocus
                     |> Rdf.exists graph
+                )
+                    || (Rdf.emptyQuery
+                            |> Rdf.withObject nodeFocus
+                            |> Rdf.exists graph
+                       )
             then
                 f graph (Ok [ Rdf.asBlankNodeOrIriOrAnyLiteral nodeFocus ])
 

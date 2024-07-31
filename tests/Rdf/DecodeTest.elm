@@ -14,6 +14,8 @@ suite =
     describe "Rdf.Decode"
         [ many
         , manyMany
+        , manyWithInverse
+        , manyWithInverseAndData
         , stringOrLangString
         ]
 
@@ -55,6 +57,55 @@ manyMany =
                     )
             }
                 |> expectAll [ List.sort >> Expect.equalLists [ "a", "b" ] ]
+
+
+manyWithInverse : Test
+manyWithInverse =
+    test "many with inverse" <|
+        \_ ->
+            { raw =
+                """
+                    @base <http://example.org/> .
+                    <alice> a <#Person> .
+                    <bob> a <#Person> .
+                """
+            , decoder =
+                Decode.from (example "#Person")
+                    (Decode.property (Rdf.InversePath (Rdf.PredicatePath Rdf.a))
+                        (Decode.many Decode.iri)
+                    )
+            }
+                |> expectAll
+                    [ List.map Rdf.serializeNode
+                        >> List.sort
+                        >> Expect.equalLists (List.map Rdf.serializeNode [ example "alice", example "bob" ])
+                    ]
+
+
+manyWithInverseAndData : Test
+manyWithInverseAndData =
+    test "many with inverse and data" <|
+        \_ ->
+            { raw =
+                """
+                    @base <http://example.org/> .
+                    <alice> a <#Person> ;
+                        <#knows> <bob> ;
+                        <#name> "Alice Wonderland" .
+                    <bob> a <#Person> ;
+                        <#knows> <alice> ;
+                        <#name> "Bob Builder".
+                """
+            , decoder =
+                Decode.from (example "#Person")
+                    (Decode.property (Rdf.InversePath (Rdf.PredicatePath Rdf.a))
+                        (Decode.many (Decode.predicate (example "#name") Decode.string))
+                    )
+            }
+                |> expectAll
+                    [ List.sort
+                        >> Expect.equalLists [ "Alice Wonderland", "Bob Builder" ]
+                    ]
 
 
 stringOrLangString : Test
