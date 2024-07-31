@@ -291,6 +291,29 @@ followPropertyPath data propertyPath subject =
                 |> Maybe.withDefault []
                 |> List.map (.object >> unwrap)
 
+        InversePath (PredicatePath iri) ->
+            data.byPredicateBySubject
+                |> Dict.get (serializeNode iri)
+                |> Maybe.withDefault Dict.empty
+                |> Dict.values
+                |> List.concatMap
+                    (\triples ->
+                        let
+                            objectRaw : String
+                            objectRaw =
+                                serializeNodeHelp subject
+                        in
+                        List.filterMap
+                            (\triple ->
+                                if serializeNodeHelp (unwrap triple.object) == objectRaw then
+                                    Just (unwrap triple.subject)
+
+                                else
+                                    Nothing
+                            )
+                            triples
+                    )
+
         SequencePath first rest ->
             List.foldl
                 (\next -> List.concatMap (followPropertyPath data next))

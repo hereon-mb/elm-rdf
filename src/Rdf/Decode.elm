@@ -6,7 +6,7 @@ module Rdf.Decode exposing
     , object
     , literal
     , string, stringOrLangString
-    , bool
+    , bool, int
     , date, dateTime
     , subject
     , propertyPath
@@ -20,7 +20,10 @@ module Rdf.Decode exposing
     , map
     , map2
     , combine
-    , required, optional, hardcoded
+    , required, requiredAt
+    , optional, optionalAt
+    , hardcoded
+    , custom
     , succeed, fail
     , andThen
     , oneOf
@@ -48,7 +51,7 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 
 @docs literal
 @docs string, stringOrLangString
-@docs bool
+@docs bool, int
 @docs date, dateTime
 
 @docs subject
@@ -80,7 +83,10 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 
 ## Pipeline
 
-@docs required, optional, hardcoded
+@docs required, requiredAt
+@docs optional, optionalAt
+@docs hardcoded
+@docs custom
 
 
 # Combining Decoders
@@ -96,7 +102,7 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 import Basics.Extra exposing (flip)
 import List.NonEmpty as NonEmpty exposing (NonEmpty)
 import Maybe.Extra as Maybe
-import Rdf exposing (BlankNodeOrIri, BlankNodeOrIriOrAnyLiteral, Iri, IsBlankNodeOrIri)
+import Rdf exposing (BlankNodeOrIri, BlankNodeOrIriOrAnyLiteral, Iri, IsBlankNodeOrIri, IsIri)
 import Rdf.Graph exposing (Graph)
 import Rdf.Namespaces as Rdf
 import Rdf.PropertyPath as Rdf exposing (PropertyPath)
@@ -197,6 +203,7 @@ type Error
     | UnexpectedLiteralDatatype Iri Iri
     | UnexpectedNode NodeType Rdf.BlankNodeOrIriOrAnyLiteral
     | UnexpectedBool String
+    | UnexpectedInt String
     | UnknownProperty BlankNodeOrIri PropertyPath
     | UnexpectedEmptyList
     | CustomError String
@@ -237,6 +244,9 @@ errorToString error_ =
 
         UnexpectedBool found ->
             "Expected a boolean, but found " ++ found ++ "."
+
+        UnexpectedInt found ->
+            "Expected an integer, but found " ++ found ++ "."
 
         UnknownProperty nodeFocus pathExpected ->
             "No such property " ++ Rdf.serializePropertyPath pathExpected ++ " found at " ++ Rdf.serializeNode nodeFocus ++ "."
@@ -400,6 +410,44 @@ bool =
 
                     _ ->
                         error (UnexpectedBool stringLiteral)
+            )
+
+
+{-| Decode a Literal of type `xsd:integer` into a `Int`.
+
+    import Rdf
+    import Rdf.Graph as Rdf exposing (Graph)
+    import Rdf.Namespaces exposing (a)
+
+    graph : Graph
+    graph =
+        """
+        @base <http://example.org/> .
+        <question> <#hasAnswer> 42 .
+        """
+            |> Rdf.parse
+            |> Result.withDefault Rdf.emptyGraph
+
+    decode
+        (from
+            (Rdf.iri "http://example.org/question")
+            (predicate (Rdf.iri "http://example.org/#hasAnswer") int)
+        )
+        graph
+    --> Ok 42
+
+-}
+int : Decoder Int
+int =
+    literal (Rdf.xsd "integer")
+        |> andThen
+            (\intLiteral ->
+                case String.toInt intLiteral of
+                    Nothing ->
+                        error (UnexpectedInt intLiteral)
+
+                    Just intValue ->
+                        succeed intValue
             )
 
 
@@ -767,9 +815,9 @@ property path (Decoder f) =
 
 {-| TODO
 -}
-predicate : Iri -> Decoder a -> Decoder a
+predicate : IsIri compatible -> Decoder a -> Decoder a
 predicate =
-    property << Rdf.PredicatePath
+    property << Rdf.PredicatePath << Rdf.asIri
 
 
 {-| TODO
@@ -912,8 +960,8 @@ oneOf fs =
         (from
             (Rdf.iri "http://example.org/alice")
             (succeed Person
-                |> required (predicate (Rdf.iri "http://example.org/#name") string)
-                |> required (predicate (Rdf.iri "http://example.org/#birthDate") date)
+                |> required (Rdf.iri "http://example.org/#name") string
+                |> required (Rdf.iri "http://example.org/#birthDate") date
             )
         )
         graph
@@ -923,9 +971,54 @@ oneOf fs =
     -->     }
 
 -}
-required : Decoder a -> Decoder (a -> b) -> Decoder b
-required =
-    flip apply
+required : IsIri compatible -> Decoder a -> Decoder (a -> b) -> Decoder b
+required iriPredicate decoderA decoderF =
+    map2 (\f a -> f a) decoderF (predicate iriPredicate decoderA)
+
+
+{-| TODO
+
+    import Rdf
+    import Rdf.Graph as Rdf exposing (Graph)
+    import Rdf.Namespaces exposing (a)
+    import Rdf.PropertyPath exposing (PropertyPath(..))
+    import Time
+
+    graph : Graph
+    graph =
+        """
+        @base <http://example.org/> .
+        @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+        <alice> <#knows> [ <#name> "Bob Builder" ] .
+        """
+            |> Rdf.parse
+            |> Result.withDefault Rdf.emptyGraph
+
+    type alias Person =
+        { name : String
+        }
+
+    decode
+        (from
+            (Rdf.iri "http://example.org/alice")
+            (succeed Person
+                |> requiredAt
+                    (SequencePath
+                        (PredicatePath (Rdf.iri "http://example.org/#knows"))
+                        [ PredicatePath (Rdf.iri "http://example.org/#name") ]
+                    )
+                    string
+            )
+        )
+        graph
+    --> Ok
+    -->     { name = "Bob Builder"
+    -->     }
+
+-}
+requiredAt : PropertyPath -> Decoder a -> Decoder (a -> b) -> Decoder b
+requiredAt path decoderA decoderF =
+    map2 (\f a -> f a) decoderF (property path decoderA)
 
 
 {-| TODO
@@ -953,8 +1046,8 @@ required =
         (from
             (Rdf.iri "http://example.org/alice")
             (succeed Person
-                |> required (predicate (Rdf.iri "http://example.org/#name") string)
-                |> optional (predicate (Rdf.iri "http://example.org/#birthDate") date)
+                |> required (Rdf.iri "http://example.org/#name") string
+                |> optional (Rdf.iri "http://example.org/#birthDate") (map Just date) Nothing
             )
         )
         graph
@@ -964,9 +1057,67 @@ required =
     -->     }
 
 -}
-optional : Decoder a -> Decoder (Maybe a -> b) -> Decoder b
-optional =
-    required << try
+optional : IsIri compatible -> Decoder a -> a -> Decoder (a -> b) -> Decoder b
+optional iriPredicate decoderA defaultA decoderF =
+    map2 (\f a -> f a)
+        decoderF
+        (oneOf
+            [ predicate iriPredicate decoderA
+            , succeed defaultA
+            ]
+        )
+
+
+{-| TODO
+
+    import Rdf
+    import Rdf.Graph as Rdf exposing (Graph)
+    import Rdf.Namespaces exposing (a)
+    import Rdf.PropertyPath exposing (PropertyPath(..))
+    import Time
+
+    graph : Graph
+    graph =
+        """
+        @base <http://example.org/> .
+        @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+        <alice> <#name> "Alice Wonderland" .
+        """
+            |> Rdf.parse
+            |> Result.withDefault Rdf.emptyGraph
+
+    type alias Person =
+        { name : String
+        }
+
+    decode
+        (from
+            (Rdf.iri "http://example.org/alice")
+            (succeed Person
+                |> optionalAt
+                    (SequencePath
+                        (PredicatePath (Rdf.iri "http://example.org/#knows"))
+                        [ PredicatePath (Rdf.iri "http://example.org/#name") ]
+                    )
+                    string
+                    "Unknown"
+            )
+        )
+        graph
+    --> Ok
+    -->     { name = "Unknown"
+    -->     }
+
+-}
+optionalAt : PropertyPath -> Decoder a -> a -> Decoder (a -> b) -> Decoder b
+optionalAt path decoderA defaultA decoderF =
+    map2 (\f a -> f a)
+        decoderF
+        (oneOf
+            [ property path decoderA
+            , succeed defaultA
+            ]
+        )
 
 
 {-| TODO
@@ -993,7 +1144,7 @@ optional =
         (from
             (Rdf.iri "http://example.org/alice")
             (succeed Person
-                |> required (predicate (Rdf.iri "http://example.org/#name") string)
+                |> required (Rdf.iri "http://example.org/#name") string
                 |> hardcoded True
             )
         )
@@ -1005,21 +1156,15 @@ optional =
 
 -}
 hardcoded : a -> Decoder (a -> b) -> Decoder b
-hardcoded =
-    required << succeed
+hardcoded a decoderF =
+    map (\f -> f a) decoderF
 
 
-try : Decoder a -> Decoder (Maybe a)
-try (Decoder f) =
-    Decoder
-        (\graph node ->
-            case f graph node of
-                Ok x ->
-                    Ok (Just x)
-
-                Err _ ->
-                    Ok Nothing
-        )
+{-| TODO Add documentation
+-}
+custom : Decoder a -> Decoder (a -> b) -> Decoder b
+custom decoderA decoderF =
+    map2 (\f a -> f a) decoderF decoderA
 
 
 {-| TODO
