@@ -10,6 +10,7 @@ module Rdf.Decode exposing
     , date, dateTime
     , subject
     , propertyPath
+    , from
     , blankNode
     , predicate, property
     , list, nonEmpty
@@ -57,6 +58,7 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 
 # Finding Values
 
+@docs from
 @docs blankNode
 @docs predicate, property
 @docs list, nonEmpty
@@ -94,7 +96,7 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 import Basics.Extra exposing (flip)
 import List.NonEmpty as NonEmpty exposing (NonEmpty)
 import Maybe.Extra as Maybe
-import Rdf exposing (BlankNodeOrIri, BlankNodeOrIriOrAnyLiteral, Iri, Node)
+import Rdf exposing (BlankNodeOrIri, BlankNodeOrIriOrAnyLiteral, Iri, IsBlankNodeOrIri)
 import Rdf.Graph exposing (Graph)
 import Rdf.Namespaces as Rdf
 import Rdf.PropertyPath as Rdf exposing (PropertyPath)
@@ -135,11 +137,15 @@ type Decoder a
     = Decoder (Graph -> Result Error (List BlankNodeOrIriOrAnyLiteral) -> Result Error a)
 
 
+{-| TODO Add documentation
+-}
 at : List BlankNodeOrIriOrAnyLiteral -> Decoder a -> Decoder a
 at nodes (Decoder f) =
     Decoder (\graph _ -> f graph (Ok nodes))
 
 
+{-| TODO Add documentation
+-}
 object : Decoder BlankNodeOrIriOrAnyLiteral
 object =
     Decoder
@@ -156,16 +162,30 @@ object =
         )
 
 
+{-| TODO Add documentation
+-}
+from : IsBlankNodeOrIri compatible -> Decoder a -> Decoder a
+from nodeFocus (Decoder f) =
+    Decoder
+        (\graph _ ->
+            if
+                Rdf.emptyQuery
+                    |> Rdf.withSubject nodeFocus
+                    |> Rdf.exists graph
+            then
+                f graph (Ok [ Rdf.asBlankNodeOrIriOrAnyLiteral nodeFocus ])
+
+            else
+                Err (NodeDoesNotExist (Rdf.asBlankNodeOrIri nodeFocus))
+        )
+
+
 {-| Run a [`Decoder`](#Decoder) on an actual `Graph` starting at the provided
 `Node`'s.
 -}
-decode :
-    Decoder a
-    -> Graph
-    -> List (Node compatible)
-    -> Result Error a
+decode : Decoder a -> Graph -> Result Error a
 decode (Decoder f) graph =
-    f graph << Ok << List.map Rdf.asBlankNodeOrIriOrAnyLiteral
+    f graph (Err NoFocusNode)
 
 
 {-| When the decoding fails, we get on of these. Use
@@ -184,6 +204,8 @@ type Error
     | TooManyNodes (List Rdf.BlankNodeOrIriOrAnyLiteral)
     | MissingLangString Rdf.AnyLiteral
     | TooManyStrings (List String)
+    | NodeDoesNotExist BlankNodeOrIri
+    | NoFocusNode
 
 
 {-| Turn a decoding error into a human friendly string. E.g.
@@ -238,6 +260,12 @@ errorToString error_ =
 
         TooManyStrings stringsFound ->
             "I expected a single string, but I found multiple strings " ++ String.join ", " stringsFound ++ "."
+
+        NodeDoesNotExist node ->
+            "The node " ++ Rdf.serializeNode node ++ " does not exist."
+
+        NoFocusNode ->
+            "There is no focus node to start decoding from."
 
 
 {-| -}
@@ -306,8 +334,12 @@ Node](https://www.w3.org/TR/rdf11-concepts/#section-blank-nodes) or
             |> Rdf.parse
             |> Result.withDefault Rdf.emptyGraph
 
-    decode (predicate (Rdf.iri "http://example.org/#knows") blankNodeOrIri) graph
-        [ Rdf.iri "http://example.org/alice" ]
+    decode
+        (from
+            (Rdf.iri "http://example.org/alice")
+            (predicate (Rdf.iri "http://example.org/#knows") blankNodeOrIri)
+        )
+        graph
     --> Ok (Rdf.asBlankNodeOrIri (Rdf.iri "http://example.org/bob"))
 
 -}
@@ -345,8 +377,12 @@ blankNodeOrIri =
             |> Rdf.parse
             |> Result.withDefault Rdf.emptyGraph
 
-    decode (predicate (Rdf.iri "http://example.org/#isAdmin") bool) graph
-        [ Rdf.iri "http://example.org/alice" ]
+    decode
+        (from
+            (Rdf.iri "http://example.org/alice")
+            (predicate (Rdf.iri "http://example.org/#isAdmin") bool)
+        )
+        graph
     --> Ok True
 
 -}
@@ -384,8 +420,12 @@ bool =
             |> Rdf.parse
             |> Result.withDefault Rdf.emptyGraph
 
-    decode (predicate (Rdf.iri "http://example.org/#birthDate") date) graph
-        [ Rdf.iri "http://example.org/alice" ]
+    decode
+        (from
+            (Rdf.iri "http://example.org/alice")
+            (predicate (Rdf.iri "http://example.org/#birthDate") date)
+        )
+        graph
     --> Ok (Time.millisToPosix 0)
 
 -}
@@ -423,8 +463,12 @@ date =
             |> Rdf.parse
             |> Result.withDefault Rdf.emptyGraph
 
-    decode (predicate (Rdf.iri "http://example.org/#birthTime") dateTime) graph
-        [ Rdf.iri "http://example.org/alice" ]
+    decode
+        (from
+            (Rdf.iri "http://example.org/alice")
+            (predicate (Rdf.iri "http://example.org/#birthTime") dateTime)
+        )
+        graph
     --> Ok (Time.millisToPosix 0)
 
 -}
@@ -460,8 +504,12 @@ dateTime =
             |> Rdf.parse
             |> Result.withDefault Rdf.emptyGraph
 
-    decode (predicate a iri) graph
-        [ Rdf.iri "http://example.org/alice" ]
+    decode
+        (from
+            (Rdf.iri "http://example.org/alice")
+            (predicate a iri)
+        )
+        graph
     --> Ok (Rdf.iri "http://example.org/#Person")
 
 -}
@@ -551,8 +599,12 @@ nonEmpty =
             |> Rdf.parse
             |> Result.withDefault Rdf.emptyGraph
 
-    decode (predicate (Rdf.iri "http://example.org/#name") string) graph
-        [ Rdf.iri "http://example.org/alice" ]
+    decode
+        (from
+            (Rdf.iri "http://example.org/alice")
+            (predicate (Rdf.iri "http://example.org/#name") string)
+        )
+        graph
     --> Ok "Alice Wonderland"
 
 -}
@@ -857,12 +909,14 @@ oneOf fs =
         }
 
     decode
-        (succeed Person
-            |> required (predicate (Rdf.iri "http://example.org/#name") string)
-            |> required (predicate (Rdf.iri "http://example.org/#birthDate") date)
+        (from
+            (Rdf.iri "http://example.org/alice")
+            (succeed Person
+                |> required (predicate (Rdf.iri "http://example.org/#name") string)
+                |> required (predicate (Rdf.iri "http://example.org/#birthDate") date)
+            )
         )
         graph
-        [ Rdf.iri "http://example.org/alice" ]
     --> Ok
     -->     { name = "Alice Wonderland"
     -->     , birthDate = Time.millisToPosix 0
@@ -896,12 +950,14 @@ required =
         }
 
     decode
-        (succeed Person
-            |> required (predicate (Rdf.iri "http://example.org/#name") string)
-            |> optional (predicate (Rdf.iri "http://example.org/#birthDate") date)
+        (from
+            (Rdf.iri "http://example.org/alice")
+            (succeed Person
+                |> required (predicate (Rdf.iri "http://example.org/#name") string)
+                |> optional (predicate (Rdf.iri "http://example.org/#birthDate") date)
+            )
         )
         graph
-        [ Rdf.iri "http://example.org/alice" ]
     --> Ok
     -->     { name = "Alice Wonderland"
     -->     , birthDate = Nothing
@@ -934,12 +990,14 @@ optional =
         }
 
     decode
-        (succeed Person
-            |> required (predicate (Rdf.iri "http://example.org/#name") string)
-            |> hardcoded True
+        (from
+            (Rdf.iri "http://example.org/alice")
+            (succeed Person
+                |> required (predicate (Rdf.iri "http://example.org/#name") string)
+                |> hardcoded True
+            )
         )
         graph
-        [ Rdf.iri "http://example.org/alice" ]
     --> Ok
     -->     { name = "Alice Wonderland"
     -->     , admin = True
@@ -971,6 +1029,8 @@ lazy f =
     andThen f (succeed ())
 
 
+{-| TODO Add documentation
+-}
 combine : List (Decoder a) -> Decoder (List a)
 combine =
     List.foldr (map2 (::)) (succeed [])
