@@ -1,15 +1,13 @@
 module Rdf.Decode exposing
     ( Decoder
     , iri
-    , blankNodeOrIri
-    , anyLiteral
+    , blankNodeOrIri, anyLiteral, blankNodeOrIriOrAnyLiteral
     , object
     , literal
     , string, stringOrLangString
-    , bool, int
+    , bool, int, float, number
     , date, dateTime
     , subject
-    , propertyPath
     , from
     , blankNode
     , predicate, property
@@ -45,18 +43,15 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 @docs Decoder
 
 @docs iri
-@docs blankNodeOrIri
-@docs anyLiteral
+@docs blankNodeOrIri, anyLiteral, blankNodeOrIriOrAnyLiteral
 @docs object
 
 @docs literal
 @docs string, stringOrLangString
-@docs bool, int
+@docs bool, int, float, number
 @docs date, dateTime
 
 @docs subject
-
-@docs propertyPath
 
 
 # Finding Values
@@ -204,6 +199,7 @@ type Error
     | UnexpectedNode NodeType Rdf.BlankNodeOrIriOrAnyLiteral
     | UnexpectedBool String
     | UnexpectedInt String
+    | UnexpectedFloat String
     | UnknownProperty BlankNodeOrIri PropertyPath
     | UnexpectedEmptyList
     | CustomError String
@@ -247,6 +243,9 @@ errorToString error_ =
 
         UnexpectedInt found ->
             "Expected an integer, but found " ++ found ++ "."
+
+        UnexpectedFloat found ->
+            "Expected a float, but found " ++ found ++ "."
 
         UnknownProperty nodeFocus pathExpected ->
             "No such property " ++ Rdf.serializePropertyPath pathExpected ++ " found at " ++ Rdf.serializeNode nodeFocus ++ "."
@@ -372,6 +371,26 @@ blankNodeOrIri =
         ]
 
 
+blankNodeOrIriOrAnyLiteral : Decoder BlankNodeOrIriOrAnyLiteral
+blankNodeOrIriOrAnyLiteral =
+    oneOf
+        [ map Rdf.asBlankNodeOrIriOrAnyLiteral iri
+        , map Rdf.asBlankNodeOrIriOrAnyLiteral
+            (blankNode
+                (subject
+                    |> andThen
+                        (\node ->
+                            Maybe.unwrap
+                                (error (UnexpectedNode BlankNode node))
+                                succeed
+                                (Rdf.toBlankNode node)
+                        )
+                )
+            )
+        , map Rdf.asBlankNodeOrIriOrAnyLiteral anyLiteral
+        ]
+
+
 {-| Decode a Literal of type `xsd:boolean` into a `Bool`.
 
     import Rdf
@@ -449,6 +468,54 @@ int =
                     Just intValue ->
                         succeed intValue
             )
+
+
+{-| Decode a Literal of type `xsd:double` into a `Float`.
+
+    import Rdf
+    import Rdf.Graph as Rdf exposing (Graph)
+    import Rdf.Namespaces exposing (a)
+
+    graph : Graph
+    graph =
+        """
+        @base <http://example.org/> .
+        <question> <#hasAnswer> 314E-2 .
+        """
+            |> Rdf.parse
+            |> Result.withDefault Rdf.emptyGraph
+
+    decode
+        (from
+            (Rdf.iri "http://example.org/question")
+            (predicate (Rdf.iri "http://example.org/#hasAnswer") float)
+        )
+        graph
+    --> Ok 3.14
+
+-}
+float : Decoder Float
+float =
+    literal (Rdf.xsd "double")
+        |> andThen
+            (\floatLiteral ->
+                case String.toFloat floatLiteral of
+                    Nothing ->
+                        error (UnexpectedFloat floatLiteral)
+
+                    Just floatValue ->
+                        succeed floatValue
+            )
+
+
+{-| TODO
+-}
+number : Decoder Float
+number =
+    oneOf
+        [ map toFloat int
+        , float
+        ]
 
 
 {-| Decode a Literal of type `xsd:date` into a `Time.Posix`.
@@ -818,29 +885,6 @@ property path (Decoder f) =
 predicate : IsIri compatible -> Decoder a -> Decoder a
 predicate =
     property << Rdf.PredicatePath << Rdf.asIri
-
-
-{-| TODO
--}
-propertyPath : Decoder PropertyPath
-propertyPath =
-    oneOf
-        [ map Rdf.PredicatePath iri
-        , list iri
-            |> andThen
-                (\irisOrNull ->
-                    case irisOrNull of
-                        [] ->
-                            error (CustomError "expected property path, but got []")
-
-                        iriFirst :: irisOther ->
-                            succeed
-                                (Rdf.SequencePath
-                                    (Rdf.PredicatePath iriFirst)
-                                    (List.map Rdf.PredicatePath irisOther)
-                                )
-                )
-        ]
 
 
 {-| A decoder which always succeeds with the given value.
