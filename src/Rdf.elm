@@ -1,4 +1,4 @@
-module RDF exposing
+module Rdf exposing
     ( Iri, BlankNode, Literal, LiteralData
     , BlankNodeOrIri, BlankNodeOrIriOrAnyLiteral, AnyLiteral
     , IsBlankNodeOrIri, IsIri

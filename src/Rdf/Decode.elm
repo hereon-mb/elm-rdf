@@ -1,4 +1,4 @@
-module RDF.Decode exposing
+module Rdf.Decode exposing
     ( Decoder
     , iri
     , blankNodeOrIri
@@ -29,9 +29,9 @@ module RDF.Decode exposing
 
 {-| The `DefaultValue` API is a parser combinator for functions `Node -> a` that supports querying.
 
-The `RDF` functions, say, `toIri`, are functions `Node -> a`, but do not allow for combination or querying.
+The `Rdf` functions, say, `toIri`, are functions `Node -> a`, but do not allow for combination or querying.
 
-The `RDF.Query` functions are functions `Graph -> a`, that do support querying (duh!), but no also combination.
+The `Rdf.Query` functions are functions `Graph -> a`, that do support querying (duh!), but no also combination.
 
 So there _is_ some value there, but I think inlining the module out-of-existence might not be too bad of code duplication, either.
 
@@ -94,11 +94,11 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 import Basics.Extra exposing (flip)
 import List.NonEmpty as NonEmpty exposing (NonEmpty)
 import Maybe.Extra as Maybe
-import RDF exposing (BlankNodeOrIri, BlankNodeOrIriOrAnyLiteral, Iri, Node)
-import RDF.Graph exposing (Graph)
-import RDF.Namespaces as RDF
-import RDF.PropertyPath as RDF exposing (PropertyPath)
-import RDF.Query as RDF
+import Rdf exposing (BlankNodeOrIri, BlankNodeOrIriOrAnyLiteral, Iri, Node)
+import Rdf.Graph exposing (Graph)
+import Rdf.Namespaces as Rdf
+import Rdf.PropertyPath as Rdf exposing (PropertyPath)
+import Rdf.Query as Rdf
 import Result.Extra as Result
 import Time
 
@@ -165,7 +165,7 @@ decode :
     -> List (Node compatible)
     -> Result Error a
 decode (Decoder f) graph =
-    f graph << Ok << List.map RDF.toBlankNodeOrIriOrAnyLiteral
+    f graph << Ok << List.map Rdf.toBlankNodeOrIriOrAnyLiteral
 
 
 {-| When the decoding fails, we get on of these. Use
@@ -175,14 +175,14 @@ type Error
     = InvalidDate BlankNodeOrIriOrAnyLiteral
     | InvalidDateTime BlankNodeOrIriOrAnyLiteral
     | UnexpectedLiteralDatatype Iri Iri
-    | UnexpectedNode NodeType RDF.BlankNodeOrIriOrAnyLiteral
+    | UnexpectedNode NodeType Rdf.BlankNodeOrIriOrAnyLiteral
     | UnexpectedBool String
     | UnknownProperty BlankNodeOrIri PropertyPath
     | UnexpectedEmptyList
     | CustomError String
     | Batch (List Error)
-    | TooManyNodes (List RDF.BlankNodeOrIriOrAnyLiteral)
-    | MissingLangString RDF.AnyLiteral
+    | TooManyNodes (List Rdf.BlankNodeOrIriOrAnyLiteral)
+    | MissingLangString Rdf.AnyLiteral
     | TooManyStrings (List String)
 
 
@@ -202,22 +202,22 @@ errorToString error_ =
             "Not a date time"
 
         UnexpectedLiteralDatatype datatypeExpected datatypeFound ->
-            "Expected a literal of type " ++ RDF.toUrl datatypeExpected ++ ", but found a literal of type " ++ RDF.toUrl datatypeFound ++ "."
+            "Expected a literal of type " ++ Rdf.toUrl datatypeExpected ++ ", but found a literal of type " ++ Rdf.toUrl datatypeFound ++ "."
 
         UnexpectedNode BlankNode nodeFound ->
-            "Expected a blank node, but found " ++ RDF.serializeNode nodeFound ++ "."
+            "Expected a blank node, but found " ++ Rdf.serializeNode nodeFound ++ "."
 
         UnexpectedNode IriNode nodeFound ->
-            "Expected an IRI, but found " ++ RDF.serializeNode nodeFound ++ "."
+            "Expected an IRI, but found " ++ Rdf.serializeNode nodeFound ++ "."
 
         UnexpectedNode LiteralNode nodeFound ->
-            "Expected a literal, but found " ++ RDF.serializeNode nodeFound ++ "."
+            "Expected a literal, but found " ++ Rdf.serializeNode nodeFound ++ "."
 
         UnexpectedBool found ->
             "Expected a boolean, but found " ++ found ++ "."
 
         UnknownProperty nodeFocus pathExpected ->
-            "No such property " ++ RDF.serializePropertyPath pathExpected ++ " found at " ++ RDF.serializeNode nodeFocus ++ "."
+            "No such property " ++ Rdf.serializePropertyPath pathExpected ++ " found at " ++ Rdf.serializeNode nodeFocus ++ "."
 
         UnexpectedEmptyList ->
             "Expected a non-empty list, but found an empty list."
@@ -231,10 +231,10 @@ errorToString error_ =
                     (List.map errorToString errors)
 
         TooManyNodes nodesFound ->
-            "I expected a single node, but I found multiple nodes" ++ String.join ", " (List.map RDF.serializeNode nodesFound) ++ "."
+            "I expected a single node, but I found multiple nodes" ++ String.join ", " (List.map Rdf.serializeNode nodesFound) ++ "."
 
         MissingLangString nodeFound ->
-            "I expected a lang string, but I found " ++ RDF.serializeNode nodeFound ++ "."
+            "I expected a lang string, but I found " ++ Rdf.serializeNode nodeFound ++ "."
 
         TooManyStrings stringsFound ->
             "I expected a single string, but I found multiple strings " ++ String.join ", " stringsFound ++ "."
@@ -257,9 +257,9 @@ blankNode (Decoder f) =
                 (\nodes ->
                     case nodes of
                         [ node ] ->
-                            case RDF.toBlankNode node of
+                            case Rdf.toBlankNode node of
                                 Just nodeNext ->
-                                    Ok [ RDF.forgetCompatible nodeNext ]
+                                    Ok [ Rdf.forgetCompatible nodeNext ]
                                         |> f graph
 
                                 Nothing ->
@@ -273,7 +273,7 @@ blankNode (Decoder f) =
 
 {-| TODO
 -}
-subject : Decoder RDF.BlankNodeOrIriOrAnyLiteral
+subject : Decoder Rdf.BlankNodeOrIriOrAnyLiteral
 subject =
     Decoder
         (\_ ->
@@ -293,9 +293,9 @@ subject =
 Node](https://www.w3.org/TR/rdf11-concepts/#section-blank-nodes) or
 [IRI](https://www.w3.org/TR/rdf11-concepts/#section-IRIs).
 
-    import RDF
-    import RDF.Graph as RDF exposing (Graph)
-    import RDF.Namespaces exposing (a)
+    import Rdf
+    import Rdf.Graph as Rdf exposing (Graph)
+    import Rdf.Namespaces exposing (a)
 
     graph : Graph
     graph =
@@ -303,19 +303,19 @@ Node](https://www.w3.org/TR/rdf11-concepts/#section-blank-nodes) or
         @base <http://example.org/> .
         <alice> <#knows> <bob> .
         """
-            |> RDF.parse
-            |> Result.withDefault RDF.emptyGraph
+            |> Rdf.parse
+            |> Result.withDefault Rdf.emptyGraph
 
-    decode (predicate (RDF.iri "http://example.org/#knows") blankNodeOrIri) graph
-        [ RDF.iri "http://example.org/alice" ]
-    --> Ok (RDF.toBlankNodeOrIri (RDF.iri "http://example.org/bob"))
+    decode (predicate (Rdf.iri "http://example.org/#knows") blankNodeOrIri) graph
+        [ Rdf.iri "http://example.org/alice" ]
+    --> Ok (Rdf.toBlankNodeOrIri (Rdf.iri "http://example.org/bob"))
 
 -}
 blankNodeOrIri : Decoder BlankNodeOrIri
 blankNodeOrIri =
     oneOf
-        [ map RDF.forgetCompatible iri
-        , map RDF.forgetCompatible
+        [ map Rdf.forgetCompatible iri
+        , map Rdf.forgetCompatible
             (blankNode
                 (subject
                     |> andThen
@@ -323,7 +323,7 @@ blankNodeOrIri =
                             Maybe.unwrap
                                 (error (UnexpectedNode BlankNode node))
                                 succeed
-                                (RDF.toBlankNode node)
+                                (Rdf.toBlankNode node)
                         )
                 )
             )
@@ -332,9 +332,9 @@ blankNodeOrIri =
 
 {-| Decode a Literal of type `xsd:boolean` into a `Bool`.
 
-    import RDF
-    import RDF.Graph as RDF exposing (Graph)
-    import RDF.Namespaces exposing (a)
+    import Rdf
+    import Rdf.Graph as Rdf exposing (Graph)
+    import Rdf.Namespaces exposing (a)
 
     graph : Graph
     graph =
@@ -342,17 +342,17 @@ blankNodeOrIri =
         @base <http://example.org/> .
         <alice> <#isAdmin> true .
         """
-            |> RDF.parse
-            |> Result.withDefault RDF.emptyGraph
+            |> Rdf.parse
+            |> Result.withDefault Rdf.emptyGraph
 
-    decode (predicate (RDF.iri "http://example.org/#isAdmin") bool) graph
-        [ RDF.iri "http://example.org/alice" ]
+    decode (predicate (Rdf.iri "http://example.org/#isAdmin") bool) graph
+        [ Rdf.iri "http://example.org/alice" ]
     --> Ok True
 
 -}
 bool : Decoder Bool
 bool =
-    literal (RDF.xsd "boolean")
+    literal (Rdf.xsd "boolean")
         |> andThen
             (\stringLiteral ->
                 case stringLiteral of
@@ -369,9 +369,9 @@ bool =
 
 {-| Decode a Literal of type `xsd:date` into a `Time.Posix`.
 
-    import RDF
-    import RDF.Graph as RDF exposing (Graph)
-    import RDF.Namespaces exposing (a)
+    import Rdf
+    import Rdf.Graph as Rdf exposing (Graph)
+    import Rdf.Namespaces exposing (a)
     import Time
 
     graph : Graph
@@ -381,11 +381,11 @@ bool =
         @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
         <alice> <#birthDate> "1970-01-01"^^xsd:date .
         """
-            |> RDF.parse
-            |> Result.withDefault RDF.emptyGraph
+            |> Rdf.parse
+            |> Result.withDefault Rdf.emptyGraph
 
-    decode (predicate (RDF.iri "http://example.org/#birthDate") date) graph
-        [ RDF.iri "http://example.org/alice" ]
+    decode (predicate (Rdf.iri "http://example.org/#birthDate") date) graph
+        [ Rdf.iri "http://example.org/alice" ]
     --> Ok (Time.millisToPosix 0)
 
 -}
@@ -397,7 +397,7 @@ date =
                 (\nodes ->
                     case nodes of
                         [ node ] ->
-                            RDF.toDate node
+                            Rdf.toDate node
                                 |> Result.fromMaybe (InvalidDate node)
 
                         _ ->
@@ -408,9 +408,9 @@ date =
 
 {-| Decode a Literal of type `xsd:date` into a `Time.Posix`.
 
-    import RDF
-    import RDF.Graph as RDF exposing (Graph)
-    import RDF.Namespaces exposing (a)
+    import Rdf
+    import Rdf.Graph as Rdf exposing (Graph)
+    import Rdf.Namespaces exposing (a)
     import Time
 
     graph : Graph
@@ -420,11 +420,11 @@ date =
         @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
         <alice> <#birthTime> "1970-01-01T00:00:00"^^xsd:dateTime .
         """
-            |> RDF.parse
-            |> Result.withDefault RDF.emptyGraph
+            |> Rdf.parse
+            |> Result.withDefault Rdf.emptyGraph
 
-    decode (predicate (RDF.iri "http://example.org/#birthTime") dateTime) graph
-        [ RDF.iri "http://example.org/alice" ]
+    decode (predicate (Rdf.iri "http://example.org/#birthTime") dateTime) graph
+        [ Rdf.iri "http://example.org/alice" ]
     --> Ok (Time.millisToPosix 0)
 
 -}
@@ -436,7 +436,7 @@ dateTime =
                 (\nodes ->
                     case nodes of
                         [ node ] ->
-                            RDF.toDateTime node
+                            Rdf.toDateTime node
                                 |> Result.fromMaybe (InvalidDateTime node)
 
                         _ ->
@@ -447,9 +447,9 @@ dateTime =
 
 {-| Decode an [IRI](https://www.w3.org/TR/rdf11-concepts/#section-IRIs).
 
-    import RDF
-    import RDF.Graph as RDF exposing (Graph)
-    import RDF.Namespaces exposing (a)
+    import Rdf
+    import Rdf.Graph as Rdf exposing (Graph)
+    import Rdf.Namespaces exposing (a)
 
     graph : Graph
     graph =
@@ -457,12 +457,12 @@ dateTime =
         @base <http://example.org/> .
         <alice> a <#Person> .
         """
-            |> RDF.parse
-            |> Result.withDefault RDF.emptyGraph
+            |> Rdf.parse
+            |> Result.withDefault Rdf.emptyGraph
 
     decode (predicate a iri) graph
-        [ RDF.iri "http://example.org/alice" ]
-    --> Ok (RDF.iri "http://example.org/#Person")
+        [ Rdf.iri "http://example.org/alice" ]
+    --> Ok (Rdf.iri "http://example.org/#Person")
 
 -}
 iri : Decoder Iri
@@ -474,7 +474,7 @@ iri =
                     case nodes of
                         [ node ] ->
                             node
-                                |> RDF.toIri
+                                |> Rdf.toIri
                                 |> Result.fromMaybe (UnexpectedNode IriNode node)
 
                         _ ->
@@ -501,19 +501,19 @@ list (Decoder f) =
                 >> Result.andThen
                     (\node ->
                         case node of
-                            RDF.Node (RDF.BlankNode _) ->
-                                Ok (RDF.forgetCompatible node)
+                            Rdf.Node (Rdf.BlankNode _) ->
+                                Ok (Rdf.forgetCompatible node)
 
-                            RDF.Node (RDF.Iri _) ->
+                            Rdf.Node (Rdf.Iri _) ->
                                 Err (UnexpectedNode BlankNode node)
 
-                            RDF.Node (RDF.Literal _) ->
+                            Rdf.Node (Rdf.Literal _) ->
                                 Err (UnexpectedNode BlankNode node)
                     )
                 >> Result.andThen
                     (\focusNode ->
                         focusNode
-                            |> RDF.objectToList graph
+                            |> Rdf.objectToList graph
                             |> Maybe.withDefault []
                             |> List.map
                                 (\nodeChild ->
@@ -538,9 +538,9 @@ nonEmpty =
 
 {-| Decode a Literal of type `xsd:string` into a `String`.
 
-    import RDF
-    import RDF.Graph as RDF exposing (Graph)
-    import RDF.Namespaces exposing (a)
+    import Rdf
+    import Rdf.Graph as Rdf exposing (Graph)
+    import Rdf.Namespaces exposing (a)
 
     graph : Graph
     graph =
@@ -548,27 +548,27 @@ nonEmpty =
         @base <http://example.org/> .
         <alice> <#name> "Alice Wonderland" .
         """
-            |> RDF.parse
-            |> Result.withDefault RDF.emptyGraph
+            |> Rdf.parse
+            |> Result.withDefault Rdf.emptyGraph
 
-    decode (predicate (RDF.iri "http://example.org/#name") string) graph
-        [ RDF.iri "http://example.org/alice" ]
+    decode (predicate (Rdf.iri "http://example.org/#name") string) graph
+        [ Rdf.iri "http://example.org/alice" ]
     --> Ok "Alice Wonderland"
 
 -}
 string : Decoder String
 string =
-    literal (RDF.xsd "string")
+    literal (Rdf.xsd "string")
 
 
 {-| TODO
 -}
 langString : Decoder ( String, String )
 langString =
-    literalData (RDF.rdf "langString")
+    literalData (Rdf.rdf "langString")
         |> andThen
             (\({ value, languageTag } as node) ->
-                Maybe.unwrap (error (MissingLangString (RDF.Node (RDF.Literal node))))
+                Maybe.unwrap (error (MissingLangString (Rdf.Node (Rdf.Literal node))))
                     (succeed << flip Tuple.pair value)
                     languageTag
             )
@@ -576,7 +576,7 @@ langString =
 
 {-| TODO
 -}
-stringOrLangString : Decoder RDF.StringOrLangString
+stringOrLangString : Decoder Rdf.StringOrLangString
 stringOrLangString =
     many
         (oneOf
@@ -588,10 +588,10 @@ stringOrLangString =
             (\stringsOrLangStrings ->
                 case Result.partition stringsOrLangStrings of
                     ( [], langStrings ) ->
-                        succeed (RDF.stringOrLangStringFrom Nothing langStrings)
+                        succeed (Rdf.stringOrLangStringFrom Nothing langStrings)
 
                     ( [ string_ ], langStrings ) ->
-                        succeed (RDF.stringOrLangStringFrom (Just string_) langStrings)
+                        succeed (Rdf.stringOrLangStringFrom (Just string_) langStrings)
 
                     ( strings, _ ) ->
                         error (TooManyStrings strings)
@@ -605,7 +605,7 @@ literal datatype =
     map .value (literalData datatype)
 
 
-literalData : Iri -> Decoder RDF.LiteralData
+literalData : Iri -> Decoder Rdf.LiteralData
 literalData datatype =
     Decoder
         (\_ ->
@@ -614,13 +614,13 @@ literalData datatype =
                     case nodes of
                         [ node ] ->
                             case node of
-                                RDF.Node (RDF.BlankNode _) ->
+                                Rdf.Node (Rdf.BlankNode _) ->
                                     Err (UnexpectedNode LiteralNode node)
 
-                                RDF.Node (RDF.Iri _) ->
+                                Rdf.Node (Rdf.Iri _) ->
                                     Err (UnexpectedNode LiteralNode node)
 
-                                RDF.Node (RDF.Literal literalData_) ->
+                                Rdf.Node (Rdf.Literal literalData_) ->
                                     if literalData_.datatype /= datatype then
                                         Err (UnexpectedLiteralDatatype datatype literalData_.datatype)
 
@@ -635,7 +635,7 @@ literalData datatype =
 
 {-| TODO
 -}
-anyLiteral : Decoder RDF.AnyLiteral
+anyLiteral : Decoder Rdf.AnyLiteral
 anyLiteral =
     Decoder
         (\_ ->
@@ -644,14 +644,14 @@ anyLiteral =
                     case nodes of
                         [ node ] ->
                             case node of
-                                RDF.Node (RDF.BlankNode _) ->
+                                Rdf.Node (Rdf.BlankNode _) ->
                                     Err (UnexpectedNode LiteralNode node)
 
-                                RDF.Node (RDF.Iri _) ->
+                                Rdf.Node (Rdf.Iri _) ->
                                     Err (UnexpectedNode LiteralNode node)
 
-                                RDF.Node (RDF.Literal literalData_) ->
-                                    Ok (RDF.Node (RDF.Literal literalData_))
+                                Rdf.Node (Rdf.Literal literalData_) ->
+                                    Ok (Rdf.Node (Rdf.Literal literalData_))
 
                         _ ->
                             Err (TooManyNodes nodes)
@@ -671,13 +671,13 @@ property path (Decoder f) =
                         (List.map
                             (\node ->
                                 case node of
-                                    RDF.Node (RDF.BlankNode _) ->
-                                        Ok (RDF.forgetCompatible node)
+                                    Rdf.Node (Rdf.BlankNode _) ->
+                                        Ok (Rdf.forgetCompatible node)
 
-                                    RDF.Node (RDF.Iri _) ->
-                                        Ok (RDF.forgetCompatible node)
+                                    Rdf.Node (Rdf.Iri _) ->
+                                        Ok (Rdf.forgetCompatible node)
 
-                                    RDF.Node (RDF.Literal _) ->
+                                    Rdf.Node (Rdf.Literal _) ->
                                         Err (UnexpectedNode BlankNode node)
                             )
                             nodes
@@ -686,17 +686,17 @@ property path (Decoder f) =
                 >> Result.andThen
                     (\focusNodes ->
                         let
-                            nodeChilds : Result Error (List RDF.BlankNodeOrIriOrAnyLiteral)
+                            nodeChilds : Result Error (List Rdf.BlankNodeOrIriOrAnyLiteral)
                             nodeChilds =
                                 Result.map List.concat <|
                                     Result.combine
                                         (List.map
                                             (\focusNode ->
                                                 case
-                                                    RDF.emptyQuery
-                                                        |> RDF.withSubject focusNode
-                                                        |> RDF.withPropertyPath path
-                                                        |> RDF.getObjects graph
+                                                    Rdf.emptyQuery
+                                                        |> Rdf.withSubject focusNode
+                                                        |> Rdf.withPropertyPath path
+                                                        |> Rdf.getObjects graph
                                                 of
                                                     [] ->
                                                         Err (UnknownProperty focusNode path)
@@ -717,7 +717,7 @@ property path (Decoder f) =
 -}
 predicate : Iri -> Decoder a -> Decoder a
 predicate =
-    property << RDF.PredicatePath
+    property << Rdf.PredicatePath
 
 
 {-| TODO
@@ -725,7 +725,7 @@ predicate =
 propertyPath : Decoder PropertyPath
 propertyPath =
     oneOf
-        [ map RDF.PredicatePath iri
+        [ map Rdf.PredicatePath iri
         , list iri
             |> andThen
                 (\irisOrNull ->
@@ -735,9 +735,9 @@ propertyPath =
 
                         iriFirst :: irisOther ->
                             succeed
-                                (RDF.SequencePath
-                                    (RDF.PredicatePath iriFirst)
-                                    (List.map RDF.PredicatePath irisOther)
+                                (Rdf.SequencePath
+                                    (Rdf.PredicatePath iriFirst)
+                                    (List.map Rdf.PredicatePath irisOther)
                                 )
                 )
         ]
@@ -834,9 +834,9 @@ oneOf fs =
 
 {-| TODO
 
-    import RDF
-    import RDF.Graph as RDF exposing (Graph)
-    import RDF.Namespaces exposing (a)
+    import Rdf
+    import Rdf.Graph as Rdf exposing (Graph)
+    import Rdf.Namespaces exposing (a)
     import Time
 
     graph : Graph
@@ -848,8 +848,8 @@ oneOf fs =
             <#name> "Alice Wonderland" ;
             <#birthDate> "1970-01-01"^^xsd:date .
         """
-            |> RDF.parse
-            |> Result.withDefault RDF.emptyGraph
+            |> Rdf.parse
+            |> Result.withDefault Rdf.emptyGraph
 
     type alias Person =
         { name : String
@@ -858,11 +858,11 @@ oneOf fs =
 
     decode
         (succeed Person
-            |> required (predicate (RDF.iri "http://example.org/#name") string)
-            |> required (predicate (RDF.iri "http://example.org/#birthDate") date)
+            |> required (predicate (Rdf.iri "http://example.org/#name") string)
+            |> required (predicate (Rdf.iri "http://example.org/#birthDate") date)
         )
         graph
-        [ RDF.iri "http://example.org/alice" ]
+        [ Rdf.iri "http://example.org/alice" ]
     --> Ok
     -->     { name = "Alice Wonderland"
     -->     , birthDate = Time.millisToPosix 0
@@ -876,9 +876,9 @@ required =
 
 {-| TODO
 
-    import RDF
-    import RDF.Graph as RDF exposing (Graph)
-    import RDF.Namespaces exposing (a)
+    import Rdf
+    import Rdf.Graph as Rdf exposing (Graph)
+    import Rdf.Namespaces exposing (a)
     import Time
 
     graph : Graph
@@ -887,8 +887,8 @@ required =
         @base <http://example.org/> .
         <alice> <#name> "Alice Wonderland" .
         """
-            |> RDF.parse
-            |> Result.withDefault RDF.emptyGraph
+            |> Rdf.parse
+            |> Result.withDefault Rdf.emptyGraph
 
     type alias Person =
         { name : String
@@ -897,11 +897,11 @@ required =
 
     decode
         (succeed Person
-            |> required (predicate (RDF.iri "http://example.org/#name") string)
-            |> optional (predicate (RDF.iri "http://example.org/#birthDate") date)
+            |> required (predicate (Rdf.iri "http://example.org/#name") string)
+            |> optional (predicate (Rdf.iri "http://example.org/#birthDate") date)
         )
         graph
-        [ RDF.iri "http://example.org/alice" ]
+        [ Rdf.iri "http://example.org/alice" ]
     --> Ok
     -->     { name = "Alice Wonderland"
     -->     , birthDate = Nothing
@@ -915,9 +915,9 @@ optional =
 
 {-| TODO
 
-    import RDF
-    import RDF.Graph as RDF exposing (Graph)
-    import RDF.Namespaces exposing (a)
+    import Rdf
+    import Rdf.Graph as Rdf exposing (Graph)
+    import Rdf.Namespaces exposing (a)
 
     graph : Graph
     graph =
@@ -925,8 +925,8 @@ optional =
         @base <http://example.org/> .
         <alice> <#name> "Alice Wonderland" .
         """
-            |> RDF.parse
-            |> Result.withDefault RDF.emptyGraph
+            |> Rdf.parse
+            |> Result.withDefault Rdf.emptyGraph
 
     type alias Person =
         { name : String
@@ -935,11 +935,11 @@ optional =
 
     decode
         (succeed Person
-            |> required (predicate (RDF.iri "http://example.org/#name") string)
+            |> required (predicate (Rdf.iri "http://example.org/#name") string)
             |> hardcoded True
         )
         graph
-        [ RDF.iri "http://example.org/alice" ]
+        [ Rdf.iri "http://example.org/alice" ]
     --> Ok
     -->     { name = "Alice Wonderland"
     -->     , admin = True

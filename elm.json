@@ -5,13 +5,13 @@
     "license": "Apache-2.0",
     "version": "1.0.0",
     "exposed-modules": [
-        "RDF",
-        "RDF.Decode",
-        "RDF.Encode",
-        "RDF.Graph",
-        "RDF.Namespaces",
-        "RDF.PropertyPath",
-        "RDF.Query"
+        "Rdf",
+        "Rdf.Decode",
+        "Rdf.Encode",
+        "Rdf.Graph",
+        "Rdf.Namespaces",
+        "Rdf.PropertyPath",
+        "Rdf.Query"
     ],
     "elm-version": "0.19.1 <= v < 0.20.0",
     "dependencies": {

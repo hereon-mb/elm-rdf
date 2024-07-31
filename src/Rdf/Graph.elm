@@ -1,4 +1,4 @@
-module RDF.Graph exposing
+module Rdf.Graph exposing
     ( Graph(..), GraphData
     , union
     , isEmpty
@@ -41,7 +41,8 @@ import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode exposing (Value)
 import List.Extra as List
 import Parser
-import RDF
+import Random
+import Rdf
     exposing
         ( BlankNode
         , BlankNodeOrIri
@@ -60,9 +61,8 @@ import RDF
         , serializeNodeHelp
         , unwrap
         )
-import RDF.Namespaces exposing (rdf, xsd)
-import RDF.PropertyPath exposing (PropertyPath(..))
-import Random
+import Rdf.Namespaces exposing (rdf, xsd)
+import Rdf.PropertyPath exposing (PropertyPath(..))
 import Tuple.Extra as Tuple
 import UUID
 
@@ -506,7 +506,7 @@ collectNTriplesStep statement state =
                 |> List.foldl (\predicateObject -> Result.andThen (collectPredicateObjectList predicateObject))
                     (Ok
                         { state
-                            | subjects = RDF.toBlankNodeOrIri node :: state.subjects
+                            | subjects = Rdf.toBlankNodeOrIri node :: state.subjects
                             , seed = seed
                         }
                     )
@@ -524,7 +524,7 @@ collectTriplesSubject subject predicateObjectList state =
                 Ok url ->
                     predicateObjectList
                         |> List.foldl (\predicateObject -> Result.andThen (collectPredicateObjectList predicateObject))
-                            (Ok { state | subjects = RDF.toBlankNodeOrIri (RDF.iri url) :: state.subjects })
+                            (Ok { state | subjects = Rdf.toBlankNodeOrIri (Rdf.iri url) :: state.subjects })
                         |> Result.map dropSubject
 
         Turtle.SubjectBlankNode (Turtle.BlankNodeLabel label) ->
@@ -538,7 +538,7 @@ collectTriplesSubject subject predicateObjectList state =
                         |> List.foldl (\predicateObject -> Result.andThen (collectPredicateObjectList predicateObject))
                             (Ok
                                 { state
-                                    | subjects = RDF.toBlankNodeOrIri node :: state.subjects
+                                    | subjects = Rdf.toBlankNodeOrIri node :: state.subjects
                                     , seed = seed
                                     , blankNodes = Dict.insert label node state.blankNodes
                                 }
@@ -548,7 +548,7 @@ collectTriplesSubject subject predicateObjectList state =
                 Just node ->
                     predicateObjectList
                         |> List.foldl (\predicateObject -> Result.andThen (collectPredicateObjectList predicateObject))
-                            (Ok { state | subjects = RDF.toBlankNodeOrIri node :: state.subjects })
+                            (Ok { state | subjects = Rdf.toBlankNodeOrIri node :: state.subjects })
                         |> Result.map dropSubject
 
         Turtle.SubjectBlankNode Turtle.Anon ->
@@ -560,7 +560,7 @@ collectTriplesSubject subject predicateObjectList state =
                 |> List.foldl (\predicateObject -> Result.andThen (collectPredicateObjectList predicateObject))
                     (Ok
                         { state
-                            | subjects = RDF.toBlankNodeOrIri node :: state.subjects
+                            | subjects = Rdf.toBlankNodeOrIri node :: state.subjects
                             , seed = seed
                         }
                     )
@@ -570,7 +570,7 @@ collectTriplesSubject subject predicateObjectList state =
             if List.isEmpty objects then
                 predicateObjectList
                     |> List.foldl (\predicateObject -> Result.andThen (collectPredicateObjectList predicateObject))
-                        (Ok { state | subjects = RDF.toBlankNodeOrIri (rdf "nil") :: state.subjects })
+                        (Ok { state | subjects = Rdf.toBlankNodeOrIri (rdf "nil") :: state.subjects })
                     |> Result.map dropSubject
 
             else
@@ -582,7 +582,7 @@ collectTriplesSubject subject predicateObjectList state =
                     |> List.foldl (\predicateObject -> Result.andThen (collectPredicateObjectList predicateObject))
                         (Ok
                             { state
-                                | subjects = RDF.toBlankNodeOrIri node :: state.subjects
+                                | subjects = Rdf.toBlankNodeOrIri node :: state.subjects
                                 , seed = seed
                             }
                         )
@@ -593,7 +593,7 @@ collectTriplesSubject subject predicateObjectList state =
 mintBlankNode : Seed -> ( BlankNode, Seed )
 mintBlankNode (Seed seed) =
     UUID.step seed
-        |> Tuple.mapFirst (UUID.toString >> RDF.blankNode)
+        |> Tuple.mapFirst (UUID.toString >> Rdf.blankNode)
         |> Tuple.mapSecond Seed
 
 
@@ -616,7 +616,7 @@ collectPredicateObjectList { verb, objects } state =
         Ok url ->
             objects
                 |> List.foldl (Result.andThen << collectObject)
-                    (Ok { state | predicates = RDF.iri url :: state.predicates })
+                    (Ok { state | predicates = Rdf.iri url :: state.predicates })
                 |> Result.map dropPredicate
 
 
@@ -625,7 +625,7 @@ collectObject object state =
     case object of
         Turtle.ObjectIri iri ->
             resolveIri state iri
-                |> Result.andThen (\url -> addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.iri url)) state)
+                |> Result.andThen (\url -> addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral (Rdf.iri url)) state)
 
         Turtle.ObjectBlankNode (Turtle.BlankNodeLabel label) ->
             case Dict.get label state.blankNodes of
@@ -634,25 +634,25 @@ collectObject object state =
                         ( node, seed ) =
                             mintBlankNode state.seed
                     in
-                    addTriple (RDF.toBlankNodeOrIriOrAnyLiteral node)
+                    addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral node)
                         { state
                             | seed = seed
                             , blankNodes = Dict.insert label node state.blankNodes
                         }
 
                 Just node ->
-                    addTriple (RDF.toBlankNodeOrIriOrAnyLiteral node) state
+                    addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral node) state
 
         Turtle.ObjectBlankNode Turtle.Anon ->
             let
                 ( node, seed ) =
                     mintBlankNode state.seed
             in
-            addTriple (RDF.toBlankNodeOrIriOrAnyLiteral node) { state | seed = seed }
+            addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral node) { state | seed = seed }
 
         Turtle.ObjectCollection objects ->
             if List.isEmpty objects then
-                addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (rdf "nil")) state
+                addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral (rdf "nil")) state
 
             else
                 let
@@ -660,7 +660,7 @@ collectObject object state =
                         mintBlankNode state.seed
                 in
                 { state | seed = seedFirst }
-                    |> addTriple (RDF.toBlankNodeOrIriOrAnyLiteral nodeFirst)
+                    |> addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral nodeFirst)
                     |> Result.andThen (addCollection nodeFirst objects)
 
         Turtle.ObjectBlankNodePropertyList predicateObjects ->
@@ -672,37 +672,37 @@ collectObject object state =
                 |> List.foldl (Result.andThen << collectPredicateObjectList)
                     (Ok
                         { state
-                            | subjects = RDF.toBlankNodeOrIri node :: state.subjects
+                            | subjects = Rdf.toBlankNodeOrIri node :: state.subjects
                             , seed = seed
                         }
                     )
                 |> Result.map dropSubject
-                |> Result.andThen (addTriple (RDF.toBlankNodeOrIriOrAnyLiteral node))
+                |> Result.andThen (addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral node))
 
         Turtle.ObjectLiteral (Turtle.LiteralString value) ->
-            addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.string value)) state
+            addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral (Rdf.string value)) state
 
         Turtle.ObjectLiteral (Turtle.LiteralLangString value lang) ->
-            addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.langString lang value)) state
+            addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral (Rdf.langString lang value)) state
 
         Turtle.ObjectLiteral (Turtle.LiteralTyped value datatype) ->
             resolveIri state datatype
-                |> Result.andThen (\url -> addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.literal (RDF.iri url) value)) state)
+                |> Result.andThen (\url -> addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral (Rdf.literal (Rdf.iri url) value)) state)
 
         Turtle.ObjectLiteral (Turtle.LiteralInteger value) ->
-            addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.int value)) state
+            addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral (Rdf.int value)) state
 
         Turtle.ObjectLiteral (Turtle.LiteralDecimal value) ->
-            addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.literal (xsd "decimal") value)) state
+            addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral (Rdf.literal (xsd "decimal") value)) state
 
         Turtle.ObjectLiteral (Turtle.LiteralDouble value) ->
-            addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.literal (xsd "double") (String.fromFloat value))) state
+            addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral (Rdf.literal (xsd "double") (String.fromFloat value))) state
 
         Turtle.ObjectLiteral Turtle.LiteralTrue ->
-            addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.bool True)) state
+            addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral (Rdf.bool True)) state
 
         Turtle.ObjectLiteral Turtle.LiteralFalse ->
-            addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (RDF.bool False)) state
+            addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral (Rdf.bool False)) state
 
 
 addTriple : BlankNodeOrIriOrAnyLiteral -> State -> Result Error State
@@ -718,7 +718,7 @@ addCollection : BlankNode -> List Turtle.Object -> State -> Result Error State
 addCollection nodeFirst objects state =
     case List.reverse objects of
         [] ->
-            addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (rdf "nil")) state
+            addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral (rdf "nil")) state
 
         last :: rest ->
             rest
@@ -733,7 +733,7 @@ addCollection nodeFirst objects state =
                                             mintBlankNode stateNext.seed
                                     in
                                     { stateNext
-                                        | subjects = RDF.toBlankNodeOrIri nodePrevious :: stateNext.subjects
+                                        | subjects = Rdf.toBlankNodeOrIri nodePrevious :: stateNext.subjects
                                         , predicates = rdf "first" :: stateNext.predicates
                                         , seed = seedNext
                                     }
@@ -743,7 +743,7 @@ addCollection nodeFirst objects state =
                                             (\stateNextNext ->
                                                 { stateNextNext | predicates = rdf "rest" :: stateNextNext.predicates }
                                             )
-                                        |> Result.andThen (addTriple (RDF.toBlankNodeOrIriOrAnyLiteral nodeNext))
+                                        |> Result.andThen (addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral nodeNext))
                                         |> Result.map dropPredicate
                                         |> Result.map dropSubject
                                         |> Result.map (Tuple.pair nodeNext)
@@ -753,7 +753,7 @@ addCollection nodeFirst objects state =
                 |> Result.andThen
                     (\( nodePrevious, stateNext ) ->
                         { stateNext
-                            | subjects = RDF.toBlankNodeOrIri nodePrevious :: stateNext.subjects
+                            | subjects = Rdf.toBlankNodeOrIri nodePrevious :: stateNext.subjects
                             , predicates = rdf "first" :: stateNext.predicates
                         }
                             |> collectObject last
@@ -762,7 +762,7 @@ addCollection nodeFirst objects state =
                                 (\stateNextNext ->
                                     { stateNextNext | predicates = rdf "rest" :: stateNextNext.predicates }
                                 )
-                            |> Result.andThen (addTriple (RDF.toBlankNodeOrIriOrAnyLiteral (rdf "nil")))
+                            |> Result.andThen (addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral (rdf "nil")))
                             |> Result.map dropPredicate
                             |> Result.map dropSubject
                     )

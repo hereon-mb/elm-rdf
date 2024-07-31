@@ -1,4 +1,4 @@
-module RDF.Encode.Bunch exposing
+module Rdf.Encode.Bunch exposing
     ( Tree(..), Forest
     , reduce
     )

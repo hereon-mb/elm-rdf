@@ -1,4 +1,4 @@
-module RDF.Namespaces exposing
+module Rdf.Namespaces exposing
     ( rdf, rdfs, xsd
     , a
     , owl, sh, dash
@@ -16,7 +16,7 @@ module RDF.Namespaces exposing
 
 -}
 
-import RDF exposing (Iri, iri)
+import Rdf exposing (Iri, iri)
 
 
 {-| TODO Add documentation

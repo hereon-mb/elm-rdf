@@ -1,4 +1,4 @@
-module RDF.PropertyPath exposing
+module Rdf.PropertyPath exposing
     ( PropertyPath(..)
     , serializePropertyPath
     , normalizePropertyPath
@@ -14,11 +14,7 @@ module RDF.PropertyPath exposing
 
 import List.NonEmpty as NonEmpty exposing (NonEmpty)
 import Maybe.Extra as Maybe
-import RDF
-    exposing
-        ( Iri
-        , serializeNode
-        )
+import Rdf exposing (Iri, serializeNode)
 
 
 {-| TODO Add documentation

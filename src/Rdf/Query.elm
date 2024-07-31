@@ -1,4 +1,4 @@
-module RDF.Query exposing
+module Rdf.Query exposing
     ( Query, emptyQuery
     , withSubject, withPredicate, withObject
     , withPropertyPath
@@ -32,7 +32,7 @@ module RDF.Query exposing
 import Dict exposing (Dict)
 import List.Extra as List
 import Maybe.Extra as Maybe
-import RDF
+import Rdf
     exposing
         ( AnyLiteral
         , BlankNodeOrIri
@@ -55,9 +55,9 @@ import RDF
         , toString
         , unwrap
         )
-import RDF.Graph exposing (Graph(..), GraphData)
-import RDF.Namespaces exposing (rdf, rdfs, sh, xsd)
-import RDF.PropertyPath exposing (PropertyPath(..))
+import Rdf.Graph exposing (Graph(..), GraphData)
+import Rdf.Namespaces exposing (rdf, rdfs, sh, xsd)
+import Rdf.PropertyPath exposing (PropertyPath(..))
 import Time exposing (Posix)
 
 
@@ -118,7 +118,7 @@ withObject node (Query query) =
 exists : Graph -> Query -> Bool
 exists (Graph graph) (Query query) =
     let
-        subjectMatches : RDF.NTriple -> Bool
+        subjectMatches : Rdf.NTriple -> Bool
         subjectMatches triple =
             case query.subject of
                 Nothing ->
@@ -127,7 +127,7 @@ exists (Graph graph) (Query query) =
                 Just subject ->
                     triple.subject == subject
 
-        predicateMatches : RDF.NTriple -> Bool
+        predicateMatches : Rdf.NTriple -> Bool
         predicateMatches triple =
             case query.propertyPath of
                 Just (PredicatePath predicate) ->
@@ -139,7 +139,7 @@ exists (Graph graph) (Query query) =
                 Nothing ->
                     True
 
-        objectMatches : RDF.NTriple -> Bool
+        objectMatches : Rdf.NTriple -> Bool
         objectMatches triple =
             case query.object of
                 Nothing ->
@@ -162,7 +162,7 @@ getSubjects : Graph -> Query -> List BlankNodeOrIri
 getSubjects (Graph graph) (Query query) =
     List.unique
         (let
-            filterByObject : List RDF.NTriple -> List RDF.NTriple
+            filterByObject : List Rdf.NTriple -> List Rdf.NTriple
             filterByObject result =
                 case query.object of
                     Nothing ->

@@ -1,17 +1,17 @@
-module RDF.DecodeTest exposing (suite)
+module Rdf.DecodeTest exposing (suite)
 
 import Expect
-import RDF
-import RDF.Decode as Decode exposing (Decoder, decode)
-import RDF.Graph as Graph
-import RDF.Namespaces as RDF
-import RDF.PropertyPath as RDF
+import Rdf
+import Rdf.Decode as Decode exposing (Decoder, decode)
+import Rdf.Graph as Graph
+import Rdf.Namespaces as Rdf
+import Rdf.PropertyPath as Rdf
 import Test exposing (Test, describe, test)
 
 
 suite : Test
 suite =
-    describe "RDF.Decode"
+    describe "Rdf.Decode"
         [ bool
         , many
         , manyMany
@@ -21,7 +21,7 @@ suite =
 
 bool : Test
 bool =
-    decodeLiteral "bool" Decode.bool (RDF.bool True) True
+    decodeLiteral "bool" Decode.bool (Rdf.bool True) True
 
 
 many : Test
@@ -37,11 +37,11 @@ many =
                     (\graph ->
                         Decode.decode
                             (Decode.property
-                                (RDF.PredicatePath (example "label"))
+                                (Rdf.PredicatePath (example "label"))
                                 (Decode.many Decode.string)
                             )
                             graph
-                            [ RDF.toBlankNodeOrIriOrAnyLiteral (example "x") ]
+                            [ Rdf.toBlankNodeOrIriOrAnyLiteral (example "x") ]
                             |> Result.map List.sort
                     )
                 |> Expect.equal (Ok (Ok [ "a", "b" ]))
@@ -60,11 +60,11 @@ manyMany =
                     (\graph ->
                         Decode.decode
                             (Decode.property
-                                (RDF.PredicatePath (example "label"))
+                                (Rdf.PredicatePath (example "label"))
                                 (Decode.map List.concat (Decode.many (Decode.many Decode.string)))
                             )
                             graph
-                            [ RDF.toBlankNodeOrIriOrAnyLiteral (example "x") ]
+                            [ Rdf.toBlankNodeOrIriOrAnyLiteral (example "x") ]
                             |> Result.map List.sort
                     )
                 |> Expect.equal (Ok (Ok [ "a", "b" ]))
@@ -83,16 +83,16 @@ stringOrLangString =
                 |> Result.map
                     (\graph ->
                         Decode.decode
-                            (Decode.property (RDF.PredicatePath (RDF.rdfs "label"))
+                            (Decode.property (Rdf.PredicatePath (Rdf.rdfs "label"))
                                 Decode.stringOrLangString
                             )
                             graph
-                            [ RDF.toBlankNodeOrIriOrAnyLiteral (example "x") ]
+                            [ Rdf.toBlankNodeOrIriOrAnyLiteral (example "x") ]
                     )
                 |> Expect.equal
                     (Ok
                         (Ok
-                            (RDF.stringOrLangStringFrom (Just "de")
+                            (Rdf.stringOrLangStringFrom (Just "de")
                                 [ ( "en", "en" )
                                 , ( "fr", "fr" )
                                 ]
@@ -101,12 +101,12 @@ stringOrLangString =
                     )
 
 
-example : String -> RDF.Iri
+example : String -> Rdf.Iri
 example name =
-    RDF.iri ("http://example.org/" ++ name)
+    Rdf.iri ("http://example.org/" ++ name)
 
 
-decodeLiteral : String -> Decoder a -> RDF.Literal compatible -> a -> Test
+decodeLiteral : String -> Decoder a -> Rdf.Literal compatible -> a -> Test
 decodeLiteral description decoder value expected =
     test description <|
         \_ ->
@@ -120,7 +120,7 @@ decodeLiteral description decoder value expected =
                     Expect.fail (Graph.errorToString raw errorGraph)
 
                 Ok graph ->
-                    case decode decoder graph [ RDF.toBlankNodeOrIriOrAnyLiteral value ] of
+                    case decode decoder graph [ Rdf.toBlankNodeOrIriOrAnyLiteral value ] of
                         Err errorDecode ->
                             Expect.fail (Decode.errorToString errorDecode)
 

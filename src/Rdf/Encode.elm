@@ -1,4 +1,4 @@
-module RDF.Encode exposing
+module Rdf.Encode exposing
     ( Encoder
     , encode
     , IsGraphEncoder, IsPropertyEncoder, IsLiteralEncoder, IsGraphOrLiteralEncoder
@@ -38,7 +38,7 @@ This module proposes the following DSL to solve the problem.
         [ property a (polylab "CapillaryConstant"
         , property (om "hasValue")
             (blankNode
-                [ property (om "hasNumericalValue") (RDF.string "3.14")
+                [ property (om "hasNumericalValue") (Rdf.string "3.14")
                 , property (om "hasUnit") (polylab "squareMilliMeterPerSecndSquare")
                 ]
             )
@@ -84,10 +84,10 @@ Implementation-wise, the only challenge is the fact that blank nodes can be subj
 
 import Basics.Extra exposing (flip)
 import List.NonEmpty as NonEmpty
-import RDF
-import RDF.Encode.Bunch as Bunch
-import RDF.Graph as RDF exposing (Graph, Seed)
-import RDF.PropertyPath as RDF exposing (PropertyPath)
+import Rdf
+import Rdf.Encode.Bunch as Bunch
+import Rdf.Graph as Rdf exposing (Graph, Seed)
+import Rdf.PropertyPath as Rdf exposing (PropertyPath)
 
 
 {-| TODO
@@ -105,19 +105,19 @@ type EncoderInternal
 {-| TODO
 -}
 type alias Predicate =
-    RDF.Iri
+    Rdf.Iri
 
 
 {-| TODO
 -}
 type alias Subject =
-    RDF.BlankNodeOrIri
+    Rdf.BlankNodeOrIri
 
 
 {-| TODO
 -}
 type alias Object =
-    RDF.BlankNodeOrIriOrAnyLiteral
+    Rdf.BlankNodeOrIriOrAnyLiteral
 
 
 {-| TODO
@@ -129,10 +129,10 @@ encode seed (Encoder encoder) =
             Tuple.second (f seed)
 
         PropertyEncoder _ ->
-            ( RDF.emptyGraph, seed )
+            ( Rdf.emptyGraph, seed )
 
         LiteralEncoder _ ->
-            ( RDF.emptyGraph, seed )
+            ( Rdf.emptyGraph, seed )
 
 
 {-| TODO
@@ -144,7 +144,7 @@ blankNode propertyEs =
             (\seed ->
                 let
                     ( subject, seedUpdated ) =
-                        Tuple.mapFirst RDF.forgetCompatible (RDF.generateBlankNode seed)
+                        Tuple.mapFirst Rdf.forgetCompatible (Rdf.generateBlankNode seed)
                 in
                 nodeHelp propertyEs subject seedUpdated
             )
@@ -161,14 +161,14 @@ node subject propertyEs =
 nodeHelp : List PropertyEncoder -> Subject -> Seed -> ( Subject, ( Graph, Seed ) )
 nodeHelp propertyEs subject seed =
     ( subject
-    , Tuple.mapFirst (List.foldl RDF.union RDF.emptyGraph) <|
+    , Tuple.mapFirst (List.foldl Rdf.union Rdf.emptyGraph) <|
         List.foldl
             (\(Encoder propertyE) ( graphs, seedNext ) ->
                 case propertyE of
                     PropertyEncoder f ->
                         let
                             ( graph, seedNextNext ) =
-                                f seedNext (RDF.forgetCompatible subject)
+                                f seedNext (Rdf.forgetCompatible subject)
                         in
                         ( graph :: graphs, seedNextNext )
 
@@ -192,12 +192,12 @@ bunch =
         << List.filterMap
             (\( propertyPath, object_ ) ->
                 Maybe.map (flip Tuple.pair object_)
-                    (RDF.normalizePropertyPath propertyPath)
+                    (Rdf.normalizePropertyPath propertyPath)
             )
 
 
 bunchHelp :
-    Bunch.Tree RDF.Iri ( RDF.Iri, IsGraphOrLiteralEncoder object )
+    Bunch.Tree Rdf.Iri ( Rdf.Iri, IsGraphOrLiteralEncoder object )
     -> PropertyEncoder
 bunchHelp tree =
     case tree of
@@ -216,7 +216,7 @@ property :
     -> IsGraphOrLiteralEncoder object
     -> PropertyEncoder
 property propertyPath objectE =
-    case RDF.normalizePropertyPath propertyPath of
+    case Rdf.normalizePropertyPath propertyPath of
         Just ( predicate_, predicates ) ->
             predicate predicate_
                 (List.foldr
@@ -236,7 +236,7 @@ property propertyPath objectE =
                 (PropertyEncoder
                     (\seed _ ->
                         -- XXX `propertyPath` contains non-`Iri` components, we just give up..
-                        ( RDF.emptyGraph, seed )
+                        ( Rdf.emptyGraph, seed )
                     )
                 )
 
@@ -255,25 +255,25 @@ predicate predicate_ (Encoder objectE) =
                                 f seed
 
                             ( graphProperty, seedUpdatedUpdated ) =
-                                case predicate predicate_ (forgetCompatible (iri (RDF.forgetCompatible object_))) of
+                                case predicate predicate_ (forgetCompatible (iri (Rdf.forgetCompatible object_))) of
                                     Encoder propertyE ->
                                         case propertyE of
                                             PropertyEncoder g ->
                                                 g seedUpdated subject
 
                                             GraphEncoder _ ->
-                                                ( RDF.emptyGraph, seedUpdated )
+                                                ( Rdf.emptyGraph, seedUpdated )
 
                                             LiteralEncoder _ ->
-                                                ( RDF.emptyGraph, seedUpdated )
+                                                ( Rdf.emptyGraph, seedUpdated )
                         in
-                        ( RDF.union graphObject graphProperty, seedUpdatedUpdated )
+                        ( Rdf.union graphObject graphProperty, seedUpdatedUpdated )
 
                     LiteralEncoder f ->
                         f seed subject predicate_
 
                     PropertyEncoder _ ->
-                        ( RDF.emptyGraph, seed )
+                        ( Rdf.emptyGraph, seed )
             )
         )
 
@@ -285,23 +285,23 @@ object object_ =
     Encoder
         (LiteralEncoder
             (\seed subject predicate_ ->
-                ( RDF.singleton subject predicate_ object_, seed )
+                ( Rdf.singleton subject predicate_ object_, seed )
             )
         )
 
 
 {-| TODO
 -}
-literal : RDF.Literal a -> LiteralEncoder
+literal : Rdf.Literal a -> LiteralEncoder
 literal =
-    object << RDF.forgetCompatible
+    object << Rdf.forgetCompatible
 
 
 {-| TODO
 -}
-iri : RDF.Iri -> LiteralEncoder
+iri : Rdf.Iri -> LiteralEncoder
 iri =
-    object << RDF.forgetCompatible
+    object << Rdf.forgetCompatible
 
 
 {-| TODO
