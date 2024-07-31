@@ -41,7 +41,7 @@ many =
                                 (Decode.many Decode.string)
                             )
                             graph
-                            [ Rdf.toBlankNodeOrIriOrAnyLiteral (example "x") ]
+                            [ Rdf.asBlankNodeOrIriOrAnyLiteral (example "x") ]
                             |> Result.map List.sort
                     )
                 |> Expect.equal (Ok (Ok [ "a", "b" ]))
@@ -64,7 +64,7 @@ manyMany =
                                 (Decode.map List.concat (Decode.many (Decode.many Decode.string)))
                             )
                             graph
-                            [ Rdf.toBlankNodeOrIriOrAnyLiteral (example "x") ]
+                            [ Rdf.asBlankNodeOrIriOrAnyLiteral (example "x") ]
                             |> Result.map List.sort
                     )
                 |> Expect.equal (Ok (Ok [ "a", "b" ]))
@@ -87,7 +87,7 @@ stringOrLangString =
                                 Decode.stringOrLangString
                             )
                             graph
-                            [ Rdf.toBlankNodeOrIriOrAnyLiteral (example "x") ]
+                            [ Rdf.asBlankNodeOrIriOrAnyLiteral (example "x") ]
                     )
                 |> Expect.equal
                     (Ok
@@ -120,7 +120,7 @@ decodeLiteral description decoder value expected =
                     Expect.fail (Graph.errorToString raw errorGraph)
 
                 Ok graph ->
-                    case decode decoder graph [ Rdf.toBlankNodeOrIriOrAnyLiteral value ] of
+                    case decode decoder graph [ Rdf.asBlankNodeOrIriOrAnyLiteral value ] of
                         Err errorDecode ->
                             Expect.fail (Decode.errorToString errorDecode)
 

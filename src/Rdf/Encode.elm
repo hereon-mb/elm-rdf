@@ -144,7 +144,7 @@ blankNode propertyEs =
             (\seed ->
                 let
                     ( subject, seedUpdated ) =
-                        Tuple.mapFirst Rdf.forgetCompatible (Rdf.generateBlankNode seed)
+                        Tuple.mapFirst Rdf.asBlankNodeOrIri (Rdf.generateBlankNode seed)
                 in
                 nodeHelp propertyEs subject seedUpdated
             )
@@ -168,7 +168,7 @@ nodeHelp propertyEs subject seed =
                     PropertyEncoder f ->
                         let
                             ( graph, seedNextNext ) =
-                                f seedNext (Rdf.forgetCompatible subject)
+                                f seedNext (Rdf.asBlankNodeOrIri subject)
                         in
                         ( graph :: graphs, seedNextNext )
 
@@ -255,17 +255,23 @@ predicate predicate_ (Encoder objectE) =
                                 f seed
 
                             ( graphProperty, seedUpdatedUpdated ) =
-                                case predicate predicate_ (forgetCompatible (iri (Rdf.forgetCompatible object_))) of
-                                    Encoder propertyE ->
-                                        case propertyE of
-                                            PropertyEncoder g ->
-                                                g seedUpdated subject
+                                case Rdf.toBlankNodeOrIri object_ of
+                                    Nothing ->
+                                        -- FIXME
+                                        ( Rdf.emptyGraph, seedUpdated )
 
-                                            GraphEncoder _ ->
-                                                ( Rdf.emptyGraph, seedUpdated )
+                                    Just blankNodeOrIri ->
+                                        case predicate predicate_ (forgetCompatible (object (Rdf.asBlankNodeOrIriOrAnyLiteral blankNodeOrIri))) of
+                                            Encoder propertyE ->
+                                                case propertyE of
+                                                    PropertyEncoder g ->
+                                                        g seedUpdated subject
 
-                                            LiteralEncoder _ ->
-                                                ( Rdf.emptyGraph, seedUpdated )
+                                                    GraphEncoder _ ->
+                                                        ( Rdf.emptyGraph, seedUpdated )
+
+                                                    LiteralEncoder _ ->
+                                                        ( Rdf.emptyGraph, seedUpdated )
                         in
                         ( Rdf.union graphObject graphProperty, seedUpdatedUpdated )
 
@@ -294,14 +300,14 @@ object object_ =
 -}
 literal : Rdf.Literal a -> LiteralEncoder
 literal =
-    object << Rdf.forgetCompatible
+    object << Rdf.asBlankNodeOrIriOrAnyLiteral
 
 
 {-| TODO
 -}
 iri : Rdf.Iri -> LiteralEncoder
 iri =
-    object << Rdf.forgetCompatible
+    object << Rdf.asBlankNodeOrIriOrAnyLiteral
 
 
 {-| TODO

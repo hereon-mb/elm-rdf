@@ -165,7 +165,7 @@ decode :
     -> List (Node compatible)
     -> Result Error a
 decode (Decoder f) graph =
-    f graph << Ok << List.map Rdf.toBlankNodeOrIriOrAnyLiteral
+    f graph << Ok << List.map Rdf.asBlankNodeOrIriOrAnyLiteral
 
 
 {-| When the decoding fails, we get on of these. Use
@@ -259,7 +259,7 @@ blankNode (Decoder f) =
                         [ node ] ->
                             case Rdf.toBlankNode node of
                                 Just nodeNext ->
-                                    Ok [ Rdf.forgetCompatible nodeNext ]
+                                    Ok [ Rdf.asBlankNodeOrIriOrAnyLiteral nodeNext ]
                                         |> f graph
 
                                 Nothing ->
@@ -308,14 +308,14 @@ Node](https://www.w3.org/TR/rdf11-concepts/#section-blank-nodes) or
 
     decode (predicate (Rdf.iri "http://example.org/#knows") blankNodeOrIri) graph
         [ Rdf.iri "http://example.org/alice" ]
-    --> Ok (Rdf.toBlankNodeOrIri (Rdf.iri "http://example.org/bob"))
+    --> Ok (Rdf.asBlankNodeOrIri (Rdf.iri "http://example.org/bob"))
 
 -}
 blankNodeOrIri : Decoder BlankNodeOrIri
 blankNodeOrIri =
     oneOf
-        [ map Rdf.forgetCompatible iri
-        , map Rdf.forgetCompatible
+        [ map Rdf.asBlankNodeOrIri iri
+        , map Rdf.asBlankNodeOrIri
             (blankNode
                 (subject
                     |> andThen
@@ -501,8 +501,8 @@ list (Decoder f) =
                 >> Result.andThen
                     (\node ->
                         case node of
-                            Rdf.Node (Rdf.BlankNode _) ->
-                                Ok (Rdf.forgetCompatible node)
+                            Rdf.Node (Rdf.BlankNode data) ->
+                                Ok (Rdf.Node (Rdf.BlankNode data))
 
                             Rdf.Node (Rdf.Iri _) ->
                                 Err (UnexpectedNode BlankNode node)
@@ -671,11 +671,11 @@ property path (Decoder f) =
                         (List.map
                             (\node ->
                                 case node of
-                                    Rdf.Node (Rdf.BlankNode _) ->
-                                        Ok (Rdf.forgetCompatible node)
+                                    Rdf.Node (Rdf.BlankNode data) ->
+                                        Ok (Rdf.Node (Rdf.BlankNode data))
 
-                                    Rdf.Node (Rdf.Iri _) ->
-                                        Ok (Rdf.forgetCompatible node)
+                                    Rdf.Node (Rdf.Iri data) ->
+                                        Ok (Rdf.Node (Rdf.Iri data))
 
                                     Rdf.Node (Rdf.Literal _) ->
                                         Err (UnexpectedNode BlankNode node)

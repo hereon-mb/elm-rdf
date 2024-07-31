@@ -53,8 +53,10 @@ import Rdf
         , NTriple
         , Node(..)
         , NodeInternal(..)
+        , asBlankNodeOrIri
+        , asBlankNodeOrIriOrAnyLiteral
+        , asIri
         , encodeNTriple
-        , forgetCompatible
         , nTripleDecoder
         , serializeNTriple
         , serializeNode
@@ -145,9 +147,9 @@ emptyGraph =
 singleton : IsBlankNodeOrIri compatible1 -> IsIri compatible2 -> Node compatible3 -> Graph
 singleton subject predicate object =
     fromNTriples
-        [ { subject = forgetCompatible subject
-          , predicate = forgetCompatible predicate
-          , object = forgetCompatible object
+        [ { subject = asBlankNodeOrIri subject
+          , predicate = asIri predicate
+          , object = asBlankNodeOrIriOrAnyLiteral object
           }
         ]
 
@@ -186,16 +188,16 @@ insert subject predicate object (Graph graph) =
 
         triple : NTriple
         triple =
-            { subject = forgetCompatible subject
-            , predicate = forgetCompatible predicate
-            , object = forgetCompatible object
+            { subject = asBlankNodeOrIri subject
+            , predicate = asIri predicate
+            , object = asBlankNodeOrIriOrAnyLiteral object
             }
     in
     Graph
         { graph
             | nTriples = triple :: graph.nTriples
-            , subjects = forgetCompatible subject :: graph.subjects
-            , objects = forgetCompatible object :: graph.objects
+            , subjects = asBlankNodeOrIri subject :: graph.subjects
+            , objects = asBlankNodeOrIriOrAnyLiteral object :: graph.objects
             , bySubjectByPredicate =
                 Dict.update keySubject
                     (Maybe.map
@@ -234,19 +236,6 @@ insertAt subject path object graph seed =
             ( insert subject predicate object graph, seed )
 
         SequencePath (PredicatePath predicate) propertyPaths ->
-            let
-                insertAtNext : IsBlankNodeOrIri compatible1 -> Graph -> Seed -> ( Graph, Seed )
-                insertAtNext idFocusNodeNext graphNext seedNext =
-                    case propertyPaths of
-                        [] ->
-                            ( graphNext, seedNext )
-
-                        [ first ] ->
-                            insertAt idFocusNodeNext first object graphNext seedNext
-
-                        first :: rest ->
-                            insertAt idFocusNodeNext (SequencePath first rest) object graphNext seedNext
-            in
             case getBlankNodeOrIriObject subject predicate graph of
                 Nothing ->
                     let
@@ -254,16 +243,29 @@ insertAt subject path object graph seed =
                             generateBlankNode seed
                     in
                     ( insert subject predicate idFocusNodeNext graph, seedUpdated )
-                        |> Tuple.apply (insertAtNext (forgetCompatible idFocusNodeNext))
+                        |> Tuple.apply (insertAtNext propertyPaths object (asBlankNodeOrIri idFocusNodeNext))
 
                 Just idFocusNodeNext ->
-                    insertAtNext (forgetCompatible idFocusNodeNext) graph seed
+                    insertAtNext propertyPaths object (asBlankNodeOrIri idFocusNodeNext) graph seed
 
         _ ->
             ( graph, seed )
 
 
-getBlankNodeOrIriObject : IsBlankNodeOrIri compatible1 -> Iri -> Graph -> Maybe BlankNodeOrIriOrAnyLiteral
+insertAtNext : List PropertyPath -> Node compatible2 -> IsBlankNodeOrIri compatible1 -> Graph -> Seed -> ( Graph, Seed )
+insertAtNext propertyPaths object idFocusNodeNext graphNext seedNext =
+    case propertyPaths of
+        [] ->
+            ( graphNext, seedNext )
+
+        [ first ] ->
+            insertAt idFocusNodeNext first object graphNext seedNext
+
+        first :: rest ->
+            insertAt idFocusNodeNext (SequencePath first rest) object graphNext seedNext
+
+
+getBlankNodeOrIriObject : IsBlankNodeOrIri compatible1 -> Iri -> Graph -> Maybe BlankNodeOrIri
 getBlankNodeOrIriObject subject predicate (Graph graph) =
     case List.unique (List.map Node (followPropertyPath graph predicate (unwrap subject))) of
         [ object ] ->
@@ -506,7 +508,7 @@ collectNTriplesStep statement state =
                 |> List.foldl (\predicateObject -> Result.andThen (collectPredicateObjectList predicateObject))
                     (Ok
                         { state
-                            | subjects = Rdf.toBlankNodeOrIri node :: state.subjects
+                            | subjects = asBlankNodeOrIri node :: state.subjects
                             , seed = seed
                         }
                     )
@@ -524,7 +526,7 @@ collectTriplesSubject subject predicateObjectList state =
                 Ok url ->
                     predicateObjectList
                         |> List.foldl (\predicateObject -> Result.andThen (collectPredicateObjectList predicateObject))
-                            (Ok { state | subjects = Rdf.toBlankNodeOrIri (Rdf.iri url) :: state.subjects })
+                            (Ok { state | subjects = asBlankNodeOrIri (Rdf.iri url) :: state.subjects })
                         |> Result.map dropSubject
 
         Turtle.SubjectBlankNode (Turtle.BlankNodeLabel label) ->
@@ -538,7 +540,7 @@ collectTriplesSubject subject predicateObjectList state =
                         |> List.foldl (\predicateObject -> Result.andThen (collectPredicateObjectList predicateObject))
                             (Ok
                                 { state
-                                    | subjects = Rdf.toBlankNodeOrIri node :: state.subjects
+                                    | subjects = asBlankNodeOrIri node :: state.subjects
                                     , seed = seed
                                     , blankNodes = Dict.insert label node state.blankNodes
                                 }
@@ -548,7 +550,7 @@ collectTriplesSubject subject predicateObjectList state =
                 Just node ->
                     predicateObjectList
                         |> List.foldl (\predicateObject -> Result.andThen (collectPredicateObjectList predicateObject))
-                            (Ok { state | subjects = Rdf.toBlankNodeOrIri node :: state.subjects })
+                            (Ok { state | subjects = asBlankNodeOrIri node :: state.subjects })
                         |> Result.map dropSubject
 
         Turtle.SubjectBlankNode Turtle.Anon ->
@@ -560,7 +562,7 @@ collectTriplesSubject subject predicateObjectList state =
                 |> List.foldl (\predicateObject -> Result.andThen (collectPredicateObjectList predicateObject))
                     (Ok
                         { state
-                            | subjects = Rdf.toBlankNodeOrIri node :: state.subjects
+                            | subjects = asBlankNodeOrIri node :: state.subjects
                             , seed = seed
                         }
                     )
@@ -570,7 +572,7 @@ collectTriplesSubject subject predicateObjectList state =
             if List.isEmpty objects then
                 predicateObjectList
                     |> List.foldl (\predicateObject -> Result.andThen (collectPredicateObjectList predicateObject))
-                        (Ok { state | subjects = Rdf.toBlankNodeOrIri (rdf "nil") :: state.subjects })
+                        (Ok { state | subjects = asBlankNodeOrIri (rdf "nil") :: state.subjects })
                     |> Result.map dropSubject
 
             else
@@ -582,7 +584,7 @@ collectTriplesSubject subject predicateObjectList state =
                     |> List.foldl (\predicateObject -> Result.andThen (collectPredicateObjectList predicateObject))
                         (Ok
                             { state
-                                | subjects = Rdf.toBlankNodeOrIri node :: state.subjects
+                                | subjects = asBlankNodeOrIri node :: state.subjects
                                 , seed = seed
                             }
                         )
@@ -625,7 +627,7 @@ collectObject object state =
     case object of
         Turtle.ObjectIri iri ->
             resolveIri state iri
-                |> Result.andThen (\url -> addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral (Rdf.iri url)) state)
+                |> Result.andThen (\url -> addTriple (asBlankNodeOrIriOrAnyLiteral (Rdf.iri url)) state)
 
         Turtle.ObjectBlankNode (Turtle.BlankNodeLabel label) ->
             case Dict.get label state.blankNodes of
@@ -634,25 +636,25 @@ collectObject object state =
                         ( node, seed ) =
                             mintBlankNode state.seed
                     in
-                    addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral node)
+                    addTriple (asBlankNodeOrIriOrAnyLiteral node)
                         { state
                             | seed = seed
                             , blankNodes = Dict.insert label node state.blankNodes
                         }
 
                 Just node ->
-                    addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral node) state
+                    addTriple (asBlankNodeOrIriOrAnyLiteral node) state
 
         Turtle.ObjectBlankNode Turtle.Anon ->
             let
                 ( node, seed ) =
                     mintBlankNode state.seed
             in
-            addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral node) { state | seed = seed }
+            addTriple (asBlankNodeOrIriOrAnyLiteral node) { state | seed = seed }
 
         Turtle.ObjectCollection objects ->
             if List.isEmpty objects then
-                addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral (rdf "nil")) state
+                addTriple (asBlankNodeOrIriOrAnyLiteral (rdf "nil")) state
 
             else
                 let
@@ -660,7 +662,7 @@ collectObject object state =
                         mintBlankNode state.seed
                 in
                 { state | seed = seedFirst }
-                    |> addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral nodeFirst)
+                    |> addTriple (asBlankNodeOrIriOrAnyLiteral nodeFirst)
                     |> Result.andThen (addCollection nodeFirst objects)
 
         Turtle.ObjectBlankNodePropertyList predicateObjects ->
@@ -672,37 +674,37 @@ collectObject object state =
                 |> List.foldl (Result.andThen << collectPredicateObjectList)
                     (Ok
                         { state
-                            | subjects = Rdf.toBlankNodeOrIri node :: state.subjects
+                            | subjects = asBlankNodeOrIri node :: state.subjects
                             , seed = seed
                         }
                     )
                 |> Result.map dropSubject
-                |> Result.andThen (addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral node))
+                |> Result.andThen (addTriple (asBlankNodeOrIriOrAnyLiteral node))
 
         Turtle.ObjectLiteral (Turtle.LiteralString value) ->
-            addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral (Rdf.string value)) state
+            addTriple (asBlankNodeOrIriOrAnyLiteral (Rdf.string value)) state
 
         Turtle.ObjectLiteral (Turtle.LiteralLangString value lang) ->
-            addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral (Rdf.langString lang value)) state
+            addTriple (asBlankNodeOrIriOrAnyLiteral (Rdf.langString lang value)) state
 
         Turtle.ObjectLiteral (Turtle.LiteralTyped value datatype) ->
             resolveIri state datatype
-                |> Result.andThen (\url -> addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral (Rdf.literal (Rdf.iri url) value)) state)
+                |> Result.andThen (\url -> addTriple (asBlankNodeOrIriOrAnyLiteral (Rdf.literal (Rdf.iri url) value)) state)
 
         Turtle.ObjectLiteral (Turtle.LiteralInteger value) ->
-            addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral (Rdf.int value)) state
+            addTriple (asBlankNodeOrIriOrAnyLiteral (Rdf.int value)) state
 
         Turtle.ObjectLiteral (Turtle.LiteralDecimal value) ->
-            addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral (Rdf.literal (xsd "decimal") value)) state
+            addTriple (asBlankNodeOrIriOrAnyLiteral (Rdf.literal (xsd "decimal") value)) state
 
         Turtle.ObjectLiteral (Turtle.LiteralDouble value) ->
-            addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral (Rdf.literal (xsd "double") (String.fromFloat value))) state
+            addTriple (asBlankNodeOrIriOrAnyLiteral (Rdf.literal (xsd "double") (String.fromFloat value))) state
 
         Turtle.ObjectLiteral Turtle.LiteralTrue ->
-            addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral (Rdf.bool True)) state
+            addTriple (asBlankNodeOrIriOrAnyLiteral (Rdf.bool True)) state
 
         Turtle.ObjectLiteral Turtle.LiteralFalse ->
-            addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral (Rdf.bool False)) state
+            addTriple (asBlankNodeOrIriOrAnyLiteral (Rdf.bool False)) state
 
 
 addTriple : BlankNodeOrIriOrAnyLiteral -> State -> Result Error State
@@ -718,7 +720,7 @@ addCollection : BlankNode -> List Turtle.Object -> State -> Result Error State
 addCollection nodeFirst objects state =
     case List.reverse objects of
         [] ->
-            addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral (rdf "nil")) state
+            addTriple (asBlankNodeOrIriOrAnyLiteral (rdf "nil")) state
 
         last :: rest ->
             rest
@@ -733,7 +735,7 @@ addCollection nodeFirst objects state =
                                             mintBlankNode stateNext.seed
                                     in
                                     { stateNext
-                                        | subjects = Rdf.toBlankNodeOrIri nodePrevious :: stateNext.subjects
+                                        | subjects = asBlankNodeOrIri nodePrevious :: stateNext.subjects
                                         , predicates = rdf "first" :: stateNext.predicates
                                         , seed = seedNext
                                     }
@@ -743,7 +745,7 @@ addCollection nodeFirst objects state =
                                             (\stateNextNext ->
                                                 { stateNextNext | predicates = rdf "rest" :: stateNextNext.predicates }
                                             )
-                                        |> Result.andThen (addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral nodeNext))
+                                        |> Result.andThen (addTriple (asBlankNodeOrIriOrAnyLiteral nodeNext))
                                         |> Result.map dropPredicate
                                         |> Result.map dropSubject
                                         |> Result.map (Tuple.pair nodeNext)
@@ -753,7 +755,7 @@ addCollection nodeFirst objects state =
                 |> Result.andThen
                     (\( nodePrevious, stateNext ) ->
                         { stateNext
-                            | subjects = Rdf.toBlankNodeOrIri nodePrevious :: stateNext.subjects
+                            | subjects = asBlankNodeOrIri nodePrevious :: stateNext.subjects
                             , predicates = rdf "first" :: stateNext.predicates
                         }
                             |> collectObject last
@@ -762,7 +764,7 @@ addCollection nodeFirst objects state =
                                 (\stateNextNext ->
                                     { stateNextNext | predicates = rdf "rest" :: stateNextNext.predicates }
                                 )
-                            |> Result.andThen (addTriple (Rdf.toBlankNodeOrIriOrAnyLiteral (rdf "nil")))
+                            |> Result.andThen (addTriple (asBlankNodeOrIriOrAnyLiteral (rdf "nil")))
                             |> Result.map dropPredicate
                             |> Result.map dropSubject
                     )

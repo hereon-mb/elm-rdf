@@ -1,11 +1,13 @@
 module Rdf exposing
-    ( Iri, BlankNode, Literal, LiteralData
-    , BlankNodeOrIri, BlankNodeOrIriOrAnyLiteral, AnyLiteral
-    , IsBlankNodeOrIri, IsIri
+    ( Node(..), Yes, No
+    , Iri, BlankNode, Literal, LiteralData
+    , BlankNodeOrIri, AnyLiteral, BlankNodeOrIriOrAnyLiteral
+    , asIri, asBlankNode, asLiteral
+    , asBlankNodeOrIri, asAnyLiteral, asBlankNodeOrIriOrAnyLiteral
+    , IsIri, IsBlankNode
+    , IsBlankNodeOrIri, IsAnyLiteral, IsBlankNodeOrIriOrAnyLiteral
     , NTriple
-    , Node(..), Yes, No, NodeInternal(..)
-    , forgetCompatible
-    , unwrap
+    , NodeInternal(..), unwrap
     , iri, blankNode
     , literal
     , string, langString
@@ -13,8 +15,7 @@ module Rdf exposing
     , date, dateTime
     , bool
     , toIri, toBlankNode
-    , toAnyLiteral
-    , toBlankNodeOrIri, toBlankNodeOrIriOrAnyLiteral
+    , toBlankNodeOrIri, toAnyLiteral, toBlankNodeOrIriOrAnyLiteral
     , toUrl
     , toValue
     , toString, toLangString
@@ -36,13 +37,19 @@ module Rdf exposing
 
 # Node
 
+@docs Node, Yes, No
+
 @docs Iri, BlankNode, Literal, LiteralData
-@docs BlankNodeOrIri, BlankNodeOrIriOrAnyLiteral, AnyLiteral
-@docs IsBlankNodeOrIri, IsIri
+@docs BlankNodeOrIri, AnyLiteral, BlankNodeOrIriOrAnyLiteral
+@docs asIri, asBlankNode, asLiteral
+@docs asBlankNodeOrIri, asAnyLiteral, asBlankNodeOrIriOrAnyLiteral
+
+@docs IsIri, IsBlankNode
+@docs IsBlankNodeOrIri, IsAnyLiteral, IsBlankNodeOrIriOrAnyLiteral
+
 @docs NTriple
-@docs Node, Yes, No, NodeInternal
-@docs forgetCompatible
-@docs unwrap
+
+@docs NodeInternal, unwrap
 
 
 ## Create
@@ -58,8 +65,7 @@ module Rdf exposing
 ## Transform
 
 @docs toIri, toBlankNode
-@docs toAnyLiteral
-@docs toBlankNodeOrIri, toBlankNodeOrIriOrAnyLiteral
+@docs toBlankNodeOrIri, toAnyLiteral, toBlankNodeOrIriOrAnyLiteral
 
 @docs toUrl
 @docs toValue
@@ -100,10 +106,20 @@ import Maybe.Extra as Maybe
 import Time exposing (Posix)
 
 
-{-| FIXME internals exposed for benchmarks
+{-| TODO Add documentation
 -}
 type Node compatible
     = Node NodeInternal
+
+
+{-| -}
+type Yes
+    = Yes Never
+
+
+{-| -}
+type No
+    = No Never
 
 
 {-| FIXME internals exposed for benchmarks
@@ -112,6 +128,13 @@ type NodeInternal
     = BlankNode String
     | Iri String
     | Literal LiteralData
+
+
+{-| FIXME Remove this
+-}
+unwrap : Node compatible -> NodeInternal
+unwrap (Node node) =
+    node
 
 
 {-| TODO Add documentation
@@ -123,8 +146,7 @@ type alias LiteralData =
     }
 
 
-{-| TODO Add documentation
--}
+{-| -}
 type alias Iri =
     Node
         { isBlankNode : No
@@ -136,8 +158,7 @@ type alias Iri =
         }
 
 
-{-| TODO Add documentation
--}
+{-| -}
 type alias BlankNode =
     Node
         { isBlankNode : Yes
@@ -149,8 +170,7 @@ type alias BlankNode =
         }
 
 
-{-| TODO Add documentation
--}
+{-| -}
 type alias Literal a =
     Node
         { isLiteral : a
@@ -163,8 +183,7 @@ type alias Literal a =
         }
 
 
-{-| TODO Add documentation
--}
+{-| -}
 type alias BlankNodeOrIri =
     Node
         { isBlankNode : No
@@ -176,8 +195,7 @@ type alias BlankNodeOrIri =
         }
 
 
-{-| TODO Add documentation
--}
+{-| -}
 type alias AnyLiteral =
     Node
         { isBlankNode : No
@@ -189,8 +207,7 @@ type alias AnyLiteral =
         }
 
 
-{-| TODO Add documentation
--}
+{-| -}
 type alias BlankNodeOrIriOrAnyLiteral =
     Node
         { isBlankNode : No
@@ -202,42 +219,29 @@ type alias BlankNodeOrIriOrAnyLiteral =
         }
 
 
-{-| TODO Add documentation
--}
-type alias IsBlankNodeOrIri compatible =
-    Node { compatible | isBlankNodeOrIri : Yes }
-
-
-{-| TODO Add documentation
--}
+{-| -}
 type alias IsIri compatible =
     Node { compatible | isIri : Yes }
 
 
-{-| TODO Add documentation
--}
-type Yes
-    = Yes Never
+{-| -}
+type alias IsBlankNode compatible =
+    Node { compatible | isBlankNode : Yes }
 
 
-{-| TODO Add documentation
--}
-type No
-    = No Never
+{-| -}
+type alias IsBlankNodeOrIri compatible =
+    Node { compatible | isBlankNodeOrIri : Yes }
 
 
-{-| TODO Add documentation
--}
-forgetCompatible : Node compatible1 -> Node compatible2
-forgetCompatible (Node node) =
-    Node node
+{-| -}
+type alias IsAnyLiteral compatible =
+    Node { compatible | isAnyLiteral : Yes }
 
 
-{-| TODO Add documentation
--}
-unwrap : Node compatible -> NodeInternal
-unwrap (Node node) =
-    node
+{-| -}
+type alias IsBlankNodeOrIriOrAnyLiteral compatible =
+    Node compatible
 
 
 {-| TODO Add documentation
@@ -411,6 +415,20 @@ toBlankNode (Node node) =
 
 
 {-| -}
+toBlankNodeOrIri : Node compatible -> Maybe BlankNodeOrIri
+toBlankNodeOrIri (Node node) =
+    case node of
+        BlankNode _ ->
+            Just (Node node)
+
+        Iri _ ->
+            Just (Node node)
+
+        Literal _ ->
+            Nothing
+
+
+{-| -}
 toAnyLiteral : Node compatible -> Maybe AnyLiteral
 toAnyLiteral (Node node) =
     case node of
@@ -425,14 +443,52 @@ toAnyLiteral (Node node) =
 
 
 {-| -}
-toBlankNodeOrIri : IsBlankNodeOrIri compatible -> BlankNodeOrIri
-toBlankNodeOrIri (Node node) =
+toBlankNodeOrIriOrAnyLiteral : Node compatible -> Maybe BlankNodeOrIriOrAnyLiteral
+toBlankNodeOrIriOrAnyLiteral (Node node) =
+    case node of
+        BlankNode _ ->
+            Just (Node node)
+
+        Iri _ ->
+            Just (Node node)
+
+        Literal _ ->
+            Nothing
+
+
+{-| -}
+asIri : IsIri compatible -> Iri
+asIri (Node node) =
     Node node
 
 
 {-| -}
-toBlankNodeOrIriOrAnyLiteral : Node compatible -> BlankNodeOrIriOrAnyLiteral
-toBlankNodeOrIriOrAnyLiteral (Node node) =
+asBlankNode : IsIri compatible -> BlankNode
+asBlankNode (Node node) =
+    Node node
+
+
+{-| -}
+asLiteral : IsIri compatible -> Literal a
+asLiteral (Node node) =
+    Node node
+
+
+{-| -}
+asBlankNodeOrIri : IsBlankNodeOrIri compatible -> BlankNodeOrIri
+asBlankNodeOrIri (Node node) =
+    Node node
+
+
+{-| -}
+asBlankNodeOrIriOrAnyLiteral : Node compatible -> BlankNodeOrIriOrAnyLiteral
+asBlankNodeOrIriOrAnyLiteral (Node node) =
+    Node node
+
+
+{-| -}
+asAnyLiteral : Node compatible -> AnyLiteral
+asAnyLiteral (Node node) =
     Node node
 
 

@@ -48,7 +48,7 @@ bunchLeaf =
                 valueConstant =
                     Rdf.string "something"
             in
-            (Encode.node (Rdf.toBlankNodeOrIri (base "root"))
+            (Encode.node (Rdf.asBlankNodeOrIri (base "root"))
                 (Encode.bunch
                     [ ( hasValue, Encode.literal valueValue )
                     , ( Rdf.SequencePath hasNested [ hasUnit ], Encode.iri valueUnit )

@@ -43,7 +43,9 @@ import Rdf
         , Node(..)
         , NodeInternal(..)
         , StringOrLangString(..)
-        , forgetCompatible
+        , asBlankNodeOrIri
+        , asBlankNodeOrIriOrAnyLiteral
+        , asIri
         , serializeNode
         , serializeNodeHelp
         , toAnyLiteral
@@ -89,14 +91,14 @@ emptyQuery =
 -}
 withSubject : IsBlankNodeOrIri compatible -> Query -> Query
 withSubject node (Query query) =
-    Query { query | subject = Just (forgetCompatible node) }
+    Query { query | subject = Just (asBlankNodeOrIri node) }
 
 
 {-| TODO Add documentation
 -}
 withPredicate : IsIri compatible -> Query -> Query
 withPredicate node (Query query) =
-    Query { query | propertyPath = Just (PredicatePath (forgetCompatible node)) }
+    Query { query | propertyPath = Just (PredicatePath (asIri node)) }
 
 
 {-| TODO Add documentation
@@ -110,7 +112,7 @@ withPropertyPath propertyPath (Query data) =
 -}
 withObject : Node compatible -> Query -> Query
 withObject node (Query query) =
-    Query { query | object = Just (forgetCompatible node) }
+    Query { query | object = Just (asBlankNodeOrIriOrAnyLiteral node) }
 
 
 {-| Resturns if any matching triple exists.
