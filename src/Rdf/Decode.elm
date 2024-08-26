@@ -463,7 +463,10 @@ bool =
 -}
 int : Decoder Int
 int =
-    literal (Rdf.xsd "integer")
+    oneOf
+        [ literal (Rdf.xsd "integer")
+        , literal (Rdf.xsd "int")
+        ]
         |> andThen
             (\intLiteral ->
                 case String.toInt intLiteral of
