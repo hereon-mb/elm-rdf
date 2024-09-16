@@ -10,7 +10,7 @@ module Rdf.Decode exposing
     , subject
     , from
     , blankNode
-    , predicate, property
+    , predicate, property, anyPredicate
     , list, nonEmpty
     , at
     , decode
@@ -58,7 +58,7 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 
 @docs from
 @docs blankNode
-@docs predicate, property
+@docs predicate, property, anyPredicate
 @docs list, nonEmpty
 @docs at
 
@@ -206,6 +206,7 @@ type Error
     | UnexpectedInt String
     | UnexpectedFloat String
     | UnknownProperty BlankNodeOrIri PropertyPath
+    | NoProperty BlankNodeOrIri
     | UnexpectedEmptyList
     | CustomError String
     | Batch (List Error)
@@ -254,6 +255,9 @@ errorToString error_ =
 
         UnknownProperty nodeFocus pathExpected ->
             "No such property " ++ Rdf.serializePropertyPath pathExpected ++ " found at " ++ Rdf.serializeNode nodeFocus ++ "."
+
+        NoProperty nodeFocus ->
+            "No property found at " ++ Rdf.serializeNode nodeFocus ++ "."
 
         UnexpectedEmptyList ->
             "Expected a non-empty list, but found an empty list."
@@ -893,6 +897,59 @@ property path (Decoder f) =
 predicate : IsIri compatible -> Decoder a -> Decoder a
 predicate =
     property << Rdf.PredicatePath << Rdf.asIri
+
+
+{-| TODO
+-}
+anyPredicate : Decoder a -> Decoder a
+anyPredicate (Decoder f) =
+    Decoder
+        (\graph ->
+            Result.andThen
+                (\nodes ->
+                    Result.combine
+                        (List.map
+                            (\node ->
+                                case node of
+                                    Rdf.Node (Rdf.BlankNode data) ->
+                                        Ok (Rdf.Node (Rdf.BlankNode data))
+
+                                    Rdf.Node (Rdf.Iri data) ->
+                                        Ok (Rdf.Node (Rdf.Iri data))
+
+                                    Rdf.Node (Rdf.Literal _) ->
+                                        Err (UnexpectedNode BlankNode node)
+                            )
+                            nodes
+                        )
+                )
+                >> Result.andThen
+                    (\focusNodes ->
+                        let
+                            nodeChilds : Result Error (List Rdf.BlankNodeOrIriOrAnyLiteral)
+                            nodeChilds =
+                                Result.map List.concat <|
+                                    Result.combine
+                                        (List.map
+                                            (\focusNode ->
+                                                case
+                                                    Rdf.emptyQuery
+                                                        |> Rdf.withSubject focusNode
+                                                        |> Rdf.getObjects graph
+                                                of
+                                                    [] ->
+                                                        Err (NoProperty focusNode)
+
+                                                    nodeChilds_ ->
+                                                        Ok nodeChilds_
+                                            )
+                                            focusNodes
+                                        )
+                        in
+                        nodeChilds
+                            |> f graph
+                    )
+        )
 
 
 {-| A decoder which always succeeds with the given value.
