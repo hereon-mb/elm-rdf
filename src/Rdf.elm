@@ -706,9 +706,15 @@ serializeNodeHelp node =
                 replaceLineBreaks : String -> String
                 replaceLineBreaks =
                     String.replace "\n" "\\n"
+
+                replaceQuotes : String -> String
+                replaceQuotes =
+                    String.replace "\"" "\\\""
             in
             [ "\""
-            , replaceLineBreaks data.value
+            , data.value
+                |> replaceLineBreaks
+                |> replaceQuotes
             , "\""
             , case data.languageTag of
                 Nothing ->
