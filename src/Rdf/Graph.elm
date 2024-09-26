@@ -4,7 +4,7 @@ module Rdf.Graph exposing
     , isEmpty
     , emptyGraph, singleton
     , decoder, encode
-    , parse, Error(..), errorToString
+    , parse, parseSafe, Error(..), errorToString
     , serialize
     , fromNTriples
     , Seed, initialSeed
@@ -23,7 +23,7 @@ module Rdf.Graph exposing
 
 @docs emptyGraph, singleton
 @docs decoder, encode
-@docs parse, Error, errorToString
+@docs parse, parseSafe, Error, errorToString
 @docs serialize
 @docs fromNTriples
 
@@ -336,8 +336,17 @@ parse raw =
     raw
         |> Turtle.parse
         |> Result.mapError ErrorParser
-        |> Result.andThen collectNTriples
-        |> Result.map fromNTriples
+        |> Result.andThen (collectNTriples initialSeed)
+        |> Result.map (Tuple.first >> fromNTriples)
+
+
+parseSafe : Seed -> String -> Result Error ( Graph, Seed )
+parseSafe seed raw =
+    raw
+        |> Turtle.parse
+        |> Result.mapError ErrorParser
+        |> Result.andThen (collectNTriples seed)
+        |> Result.map (Tuple.mapFirst fromNTriples)
 
 
 {-| TODO
@@ -447,8 +456,16 @@ deadEndToString { row, col, problem } =
 
 deadEndToCode : List String -> Parser.DeadEnd -> Maybe String
 deadEndToCode lines { row } =
-    List.getAt (row - 1) lines
+    [ List.getAt (row - 3) lines
+        |> Maybe.map (\line -> "  " ++ line)
+    , List.getAt (row - 2) lines
+        |> Maybe.map (\line -> "  " ++ line)
+    , List.getAt (row - 1) lines
         |> Maybe.map (\line -> "> " ++ line)
+    ]
+        |> List.filterMap identity
+        |> String.join "\n"
+        |> Just
 
 
 type alias State =
@@ -462,23 +479,23 @@ type alias State =
     }
 
 
-stateInitial : State
-stateInitial =
+stateInitial : Seed -> State
+stateInitial seed =
     { base = Nothing
     , prefixes = Dict.empty
     , nTriples = []
     , subjects = []
     , predicates = []
-    , seed = initialSeed
+    , seed = seed
     , blankNodes = Dict.empty
     }
 
 
-collectNTriples : List Turtle.Statement -> Result Error (List NTriple)
-collectNTriples statements =
+collectNTriples : Seed -> List Turtle.Statement -> Result Error ( List NTriple, Seed )
+collectNTriples seed statements =
     statements
-        |> List.foldl (\statement -> Result.andThen (collectNTriplesStep statement)) (Ok stateInitial)
-        |> Result.map .nTriples
+        |> List.foldl (\statement -> Result.andThen (collectNTriplesStep statement)) (Ok (stateInitial seed))
+        |> Result.map (\state -> ( state.nTriples, state.seed ))
 
 
 collectNTriplesStep : Turtle.Statement -> State -> Result Error State

@@ -22,6 +22,14 @@ parse =
           , [ Turtle.DirectivePrefixId "example" "http://example.org/"
             ]
           )
+        , ( "@prefix : <http://example.org/> ."
+          , [ Turtle.DirectivePrefixId "" "http://example.org/"
+            ]
+          )
+        , ( "@prefix : <http://example.org/#> ."
+          , [ Turtle.DirectivePrefixId "" "http://example.org/#"
+            ]
+          )
         , ( "@base <http://example.org/> ."
           , [ Turtle.DirectiveBase "http://example.org/"
             ]
@@ -30,8 +38,26 @@ parse =
           , [ Turtle.DirectiveSparqlPrefix "example" "http://example.org/"
             ]
           )
+        , ( "PREFIX example: <http://example.org/#>"
+          , [ Turtle.DirectiveSparqlPrefix "example" "http://example.org/#"
+            ]
+          )
+        , ( "PREFIX : <http://example.org/#>"
+          , [ Turtle.DirectiveSparqlPrefix "" "http://example.org/#"
+            ]
+          )
         , ( "BASE <http://example.org/>"
           , [ Turtle.DirectiveSparqlBase "http://example.org/"
+            ]
+          )
+        , ( [ "@base <http://purls.helmholtz-metadaten.de/herbie/pm/pre-cross-linking/1.0.0/> ."
+            , "@prefix : <http://purls.helmholtz-metadaten.de/herbie/pm/pre-cross-linking/#> ."
+            , "@prefix dash: <http://datashapes.org/dash#> ."
+            ]
+                |> String.join "\n"
+          , [ Turtle.DirectiveBase "http://purls.helmholtz-metadaten.de/herbie/pm/pre-cross-linking/1.0.0/"
+            , Turtle.DirectivePrefixId "" "http://purls.helmholtz-metadaten.de/herbie/pm/pre-cross-linking/#"
+            , Turtle.DirectivePrefixId "dash" "http://datashapes.org/dash#"
             ]
           )
 
@@ -262,6 +288,38 @@ parse =
                 )
             ]
           )
+        , ( ":alice :knows (_:a _:b) ."
+          , [ Turtle.Triples
+                (Turtle.TriplesSubject
+                    (Turtle.SubjectIri (Turtle.PrefixedName "" "alice"))
+                    [ { verb = Turtle.Predicate (Turtle.PrefixedName "" "knows")
+                      , objects =
+                            [ Turtle.ObjectCollection
+                                [ Turtle.ObjectBlankNode (Turtle.BlankNodeLabel "a")
+                                , Turtle.ObjectBlankNode (Turtle.BlankNodeLabel "b")
+                                ]
+                            ]
+                      }
+                    ]
+                )
+            ]
+          )
+        , ( ":alice :knows (:cindi :bob) ."
+          , [ Turtle.Triples
+                (Turtle.TriplesSubject
+                    (Turtle.SubjectIri (Turtle.PrefixedName "" "alice"))
+                    [ { verb = Turtle.Predicate (Turtle.PrefixedName "" "knows")
+                      , objects =
+                            [ Turtle.ObjectCollection
+                                [ Turtle.ObjectIri (Turtle.PrefixedName "" "cindi")
+                                , Turtle.ObjectIri (Turtle.PrefixedName "" "bob")
+                                ]
+                            ]
+                      }
+                    ]
+                )
+            ]
+          )
 
         -- LITERAL
         , ( ":alice :value \"Alice\" ."
@@ -269,6 +327,29 @@ parse =
                 (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.PrefixedName "" "alice"))
                     [ { verb = Turtle.Predicate (Turtle.PrefixedName "" "value")
                       , objects = [ Turtle.ObjectLiteral (Turtle.LiteralString "Alice") ]
+                      }
+                    ]
+                )
+            ]
+          )
+        , ( ":alice :value \"\"\"Alice\"\"\" ."
+          , [ Turtle.Triples
+                (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.PrefixedName "" "alice"))
+                    [ { verb = Turtle.Predicate (Turtle.PrefixedName "" "value")
+                      , objects = [ Turtle.ObjectLiteral (Turtle.LiteralString "Alice") ]
+                      }
+                    ]
+                )
+            ]
+          )
+        , ( [ ":alice :value \"\"\"Alice"
+            , "Wonderland\"\"\" ."
+            ]
+                |> String.join "\n"
+          , [ Turtle.Triples
+                (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.PrefixedName "" "alice"))
+                    [ { verb = Turtle.Predicate (Turtle.PrefixedName "" "value")
+                      , objects = [ Turtle.ObjectLiteral (Turtle.LiteralString "Alice\nWonderland") ]
                       }
                     ]
                 )
@@ -387,6 +468,34 @@ parse =
             , "    example:bob ;  # comment"
             , "  example:knows    # comment"
             , "    example:cindi  # comment"
+            , "] ."
+            ]
+                |> String.join "\n"
+          , [ Turtle.Triples
+                (Turtle.TriplesBlankNodePropertyList
+                    [ { verb = Turtle.Predicate (Turtle.PrefixedName "example" "knows")
+                      , objects = [ Turtle.ObjectIri (Turtle.PrefixedName "example" "bob") ]
+                      }
+                    , { verb = Turtle.Predicate (Turtle.PrefixedName "example" "knows")
+                      , objects = [ Turtle.ObjectIri (Turtle.PrefixedName "example" "cindi") ]
+                      }
+                    ]
+                    []
+                )
+            ]
+          )
+        , ( [ "[ example:knows"
+            , "# comment"
+            , "# comment"
+            , "    example:bob ;"
+            , " # comment"
+            , " # comment"
+            , "  example:knows"
+            , "#comment"
+            , "#comment"
+            , "    example:cindi"
+            , "# comment"
+            , "# comment"
             , "] ."
             ]
                 |> String.join "\n"

@@ -659,6 +659,39 @@ iri =
 
 
 {-| TODO
+
+    import Rdf
+    import Rdf.Graph as Rdf exposing (Graph)
+    import Rdf.Namespaces exposing (a)
+
+    graph : Graph
+    graph =
+        """
+        @base <http://example.org/> .
+        <alice> <#knows> (
+            <bob>
+            <cindi>
+        ) .
+        """
+            |> Rdf.parse
+            |> Result.withDefault Rdf.emptyGraph
+
+    decode
+        (from
+            (Rdf.iri "http://example.org/alice")
+            (predicate (Rdf.iri "http://example.org/#knows") (list iri))
+        )
+        graph
+    --> Ok [ Rdf.iri "http://example.org/bob", Rdf.iri "http://example.org/cindi" ]
+
+    decode
+        (from
+            (Rdf.iri "http://example.org/alice")
+            (predicate (Rdf.iri "http://example.org/#knows") (many (list iri)))
+        )
+        graph
+    --> Ok [ [ Rdf.iri "http://example.org/bob", Rdf.iri "http://example.org/cindi" ] ]
+
 -}
 list : Decoder a -> Decoder (List a)
 list (Decoder f) =

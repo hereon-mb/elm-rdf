@@ -133,6 +133,7 @@ prefixId =
         |= iriRef
         |. whitespaceOrComment
         |. Parser.symbol "."
+        |. whitespaceOrComment
 
 
 pnameNs : Parser String
@@ -165,14 +166,10 @@ sparqlPrefix =
     Parser.succeed DirectiveSparqlPrefix
         |. Parser.keyword "PREFIX"
         |. whitespaceOrComment
-        |= Parser.variable
-            { start = \char -> char /= ':' && isPnCharsBase char
-            , inner = \char -> char /= ':' && isPnChars char
-            , reserved = Set.empty
-            }
-        |. Parser.symbol ":"
+        |= pnameNs
         |. whitespaceOrComment
         |= iriRef
+        |. whitespaceOrComment
 
 
 sparqlBase : Parser Statement
@@ -593,8 +590,38 @@ booleanLiteral =
 string : Parser String
 string =
     Parser.succeed identity
-        |. Parser.symbol "\""
-        |= Parser.loop [] stringHelp
+        |= Parser.oneOf
+            [ Parser.succeed identity
+                |. Parser.symbol "\"\"\""
+                |= Parser.loop [] stringMultilineHelp
+            , Parser.succeed identity
+                |. Parser.symbol "\""
+                |= Parser.loop [] stringHelp
+            ]
+
+
+stringMultilineHelp : List String -> Parser (Parser.Step (List String) String)
+stringMultilineHelp revChunks =
+    Parser.oneOf
+        [ Parser.succeed (\chunk -> Parser.Loop (chunk :: revChunks))
+            |. Parser.token "\\"
+            |= Parser.oneOf
+                [ Parser.map (\_ -> "\n") (Parser.token "n")
+                , Parser.map (\_ -> "\t") (Parser.token "t")
+                , Parser.map (\_ -> "\"") (Parser.token "\"")
+                , Parser.map (\_ -> "\\") (Parser.token "\\")
+                , Parser.map (\_ -> "\u{000D}") (Parser.token "r")
+                , Parser.succeed String.fromChar
+                    |. Parser.token "u{"
+                    |= unicode
+                    |. Parser.token "}"
+                ]
+        , Parser.token "\"\"\""
+            |> Parser.map (\_ -> Parser.Done (String.concat (List.reverse revChunks)))
+        , Parser.chompWhile isUninteresting
+            |> Parser.getChompedString
+            |> Parser.map (\chunk -> Parser.Loop (chunk :: revChunks))
+        ]
 
 
 stringHelp : List String -> Parser (Parser.Step (List String) String)
@@ -704,12 +731,15 @@ whitespaceOrComment : Parser ()
 whitespaceOrComment =
     Parser.succeed ()
         |. whitespace
-        |. Parser.oneOf
-            [ Parser.succeed ()
-                |. Parser.lineComment "#"
-                |. whitespace
-            , whitespace
-            ]
+        |. Parser.loop ()
+            (\_ ->
+                Parser.oneOf
+                    [ Parser.succeed (Parser.Loop ())
+                        |. Parser.lineComment "#"
+                        |. whitespace
+                    , Parser.succeed (Parser.Done ())
+                    ]
+            )
 
 
 whitespace : Parser ()
@@ -719,7 +749,7 @@ whitespace =
 
 isWhitespace : Char -> Bool
 isWhitespace char =
-    char == ' ' || char == '\t' || char == '\n'
+    char == ' ' || char == '\t' || char == '\n' || char == '\u{000D}'
 
 
 isPnCharsBase : Char -> Bool
