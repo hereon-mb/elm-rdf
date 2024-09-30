@@ -210,8 +210,7 @@ subject =
 
 subjectIri : Parser Subject
 subjectIri =
-    Parser.succeed SubjectIri
-        |= iri
+    Parser.map SubjectIri iri
 
 
 subjectBlankNode : Parser Subject
@@ -381,8 +380,7 @@ objectBlankNodePropertyList =
 
 objectLiteral : Parser Object
 objectLiteral =
-    Parser.succeed ObjectLiteral
-        |= literal
+    Parser.map ObjectLiteral literal
 
 
 iri : Parser Iri
@@ -398,9 +396,7 @@ iri =
 pnLocal : Parser String
 pnLocal =
     Parser.oneOf
-        [ Parser.succeed ""
-            |. Parser.chompIf isWhitespace
-        , Parser.succeed ()
+        [ Parser.succeed ()
             |. Parser.chompIf
                 (\char ->
                     isPnCharsU char
@@ -422,6 +418,7 @@ pnLocal =
                     else
                         Parser.succeed chomped
                 )
+        , Parser.succeed ""
         ]
 
 
@@ -523,42 +520,66 @@ numericLiteral =
 
 numeric : Parser Literal
 numeric =
-    (Parser.succeed ()
-        |. Parser.chompIf
-            (\char ->
-                Char.isDigit char
-                    || (char == '.')
-            )
-        |. Parser.chompWhile
-            (\char ->
-                Char.isDigit char
-                    || (char == '.')
-                    || (char == 'e')
-                    || (char == 'E')
-                    || (char == '-')
-                    || (char == '+')
-            )
-    )
-        |> Parser.getChompedString
+    Parser.succeed (\start end -> start ++ end)
+        |= numericHelp
+        |= Parser.oneOf
+            [ Parser.succeed (\raw -> "e" ++ raw)
+                |. Parser.symbol "e"
+                |= numericHelp
+            , Parser.succeed (\raw -> "e" ++ raw)
+                |. Parser.symbol "E"
+                |= numericHelp
+            , Parser.succeed ""
+            ]
         |> Parser.andThen
             (\raw ->
-                case String.toInt raw of
-                    Nothing ->
-                        if String.contains "e" raw || String.contains "E" raw then
-                            String.toFloat raw
-                                |> Maybe.map (LiteralDouble >> Parser.succeed)
-                                |> Maybe.withDefault (Parser.problem ("'" ++ raw ++ "' is not a valid double literal"))
+                if String.isEmpty raw then
+                    Parser.problem "not a valid numerical value"
+
+                else
+                    case String.toInt raw of
+                        Nothing ->
+                            if String.contains "e" raw || String.contains "E" raw then
+                                String.toFloat raw
+                                    |> Maybe.map (LiteralDouble >> Parser.succeed)
+                                    |> Maybe.withDefault (Parser.problem ("'" ++ raw ++ "' is not a valid double literal"))
+
+                            else
+                                raw
+                                    |> LiteralDecimal
+                                    |> Parser.succeed
+
+                        Just int ->
+                            int
+                                |> LiteralInteger
+                                |> Parser.succeed
+            )
+
+
+numericHelp : Parser String
+numericHelp =
+    Parser.succeed (\start end -> start ++ end)
+        |= Parser.getChompedString
+            (Parser.succeed ()
+                |. Parser.chompIf Char.isDigit
+                |. Parser.chompWhile Char.isDigit
+            )
+        |= Parser.oneOf
+            [ Parser.succeed identity
+                |. Parser.backtrackable (Parser.symbol ".")
+                |. Parser.chompIf Char.isDigit
+                |. Parser.chompWhile Char.isDigit
+                |> Parser.getChompedString
+                |> Parser.andThen
+                    (\raw ->
+                        if String.isEmpty raw then
+                            Parser.problem "the fractional part must not be empty"
 
                         else
-                            raw
-                                |> LiteralDecimal
-                                |> Parser.succeed
-
-                    Just int ->
-                        int
-                            |> LiteralInteger
-                            |> Parser.succeed
-            )
+                            Parser.succeed raw
+                    )
+            , Parser.succeed ""
+            ]
 
 
 negateNumericLiteral : Literal -> Literal
@@ -589,38 +610,22 @@ booleanLiteral =
 
 string : Parser String
 string =
-    Parser.succeed identity
-        |= Parser.oneOf
-            [ Parser.succeed identity
-                |. Parser.symbol "\"\"\""
-                |= Parser.loop [] stringMultilineHelp
-            , Parser.succeed identity
-                |. Parser.symbol "\""
-                |= Parser.loop [] stringHelp
-            ]
-
-
-stringMultilineHelp : List String -> Parser (Parser.Step (List String) String)
-stringMultilineHelp revChunks =
     Parser.oneOf
-        [ Parser.succeed (\chunk -> Parser.Loop (chunk :: revChunks))
-            |. Parser.token "\\"
-            |= Parser.oneOf
-                [ Parser.map (\_ -> "\n") (Parser.token "n")
-                , Parser.map (\_ -> "\t") (Parser.token "t")
-                , Parser.map (\_ -> "\"") (Parser.token "\"")
-                , Parser.map (\_ -> "\\") (Parser.token "\\")
-                , Parser.map (\_ -> "\u{000D}") (Parser.token "r")
-                , Parser.succeed String.fromChar
-                    |. Parser.token "u{"
-                    |= unicode
-                    |. Parser.token "}"
-                ]
-        , Parser.token "\"\"\""
-            |> Parser.map (\_ -> Parser.Done (String.concat (List.reverse revChunks)))
-        , Parser.chompWhile isUninteresting
-            |> Parser.getChompedString
-            |> Parser.map (\chunk -> Parser.Loop (chunk :: revChunks))
+        [ Parser.succeed identity
+            |. Parser.symbol "\"\"\""
+            |= (Parser.chompUntil "\"\"\""
+                    |> Parser.getChompedString
+                    |> Parser.map
+                        (String.replace "\\n" "\n"
+                            >> String.replace "\\t" "\t"
+                            >> String.replace "\\\"" "\""
+                            >> String.replace "\\u{000D}" "\u{000D}"
+                        )
+               )
+            |. Parser.symbol "\"\"\""
+        , Parser.succeed identity
+            |. Parser.symbol "\""
+            |= Parser.loop [] stringHelp
         ]
 
 

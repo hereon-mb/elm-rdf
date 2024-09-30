@@ -254,6 +254,19 @@ parse =
                 )
             ]
           )
+        , ( "[] example:knows example:, example:cindi ."
+          , [ Turtle.Triples
+                (Turtle.TriplesSubject (Turtle.SubjectBlankNode Turtle.Anon)
+                    [ { verb = Turtle.Predicate (Turtle.PrefixedName "example" "knows")
+                      , objects =
+                            [ Turtle.ObjectIri (Turtle.PrefixedName "example" "")
+                            , Turtle.ObjectIri (Turtle.PrefixedName "example" "cindi")
+                            ]
+                      }
+                    ]
+                )
+            ]
+          )
 
         -- COLLECTION
         , ( "() a () ."
@@ -355,6 +368,45 @@ parse =
                 )
             ]
           )
+        , ( [ ":alice :value \"\"\"Alice\"Wonderland\"\"\" ."
+            ]
+                |> String.join "\n"
+          , [ Turtle.Triples
+                (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.PrefixedName "" "alice"))
+                    [ { verb = Turtle.Predicate (Turtle.PrefixedName "" "value")
+                      , objects = [ Turtle.ObjectLiteral (Turtle.LiteralString "Alice\"Wonderland") ]
+                      }
+                    ]
+                )
+            ]
+          )
+        , ( [ ":alice :value \"\"\"Alice\\nWonderland\"\"\" ."
+            ]
+                |> String.join "\n"
+          , [ Turtle.Triples
+                (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.PrefixedName "" "alice"))
+                    [ { verb = Turtle.Predicate (Turtle.PrefixedName "" "value")
+                      , objects = [ Turtle.ObjectLiteral (Turtle.LiteralString "Alice\nWonderland") ]
+                      }
+                    ]
+                )
+            ]
+          )
+        , ( [ ":alice :value \"\"\""
+            , "  Alice"
+            , "  Wonderland"
+            , "\"\"\" ."
+            ]
+                |> String.join "\n"
+          , [ Turtle.Triples
+                (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.PrefixedName "" "alice"))
+                    [ { verb = Turtle.Predicate (Turtle.PrefixedName "" "value")
+                      , objects = [ Turtle.ObjectLiteral (Turtle.LiteralString "\n  Alice\n  Wonderland\n") ]
+                      }
+                    ]
+                )
+            ]
+          )
         , ( ":alice :value \"Alice\"@en-US ."
           , [ Turtle.Triples
                 (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.PrefixedName "" "alice"))
@@ -376,6 +428,16 @@ parse =
             ]
           )
         , ( ":alice :value 42 ."
+          , [ Turtle.Triples
+                (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.PrefixedName "" "alice"))
+                    [ { verb = Turtle.Predicate (Turtle.PrefixedName "" "value")
+                      , objects = [ Turtle.ObjectLiteral (Turtle.LiteralInteger 42) ]
+                      }
+                    ]
+                )
+            ]
+          )
+        , ( ":alice :value 42."
           , [ Turtle.Triples
                 (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.PrefixedName "" "alice"))
                     [ { verb = Turtle.Predicate (Turtle.PrefixedName "" "value")
