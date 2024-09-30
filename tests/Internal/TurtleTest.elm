@@ -477,6 +477,36 @@ parse =
                 )
             ]
           )
+        , ( ":alice :value 0.314e+1 ."
+          , [ Turtle.Triples
+                (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.PrefixedName "" "alice"))
+                    [ { verb = Turtle.Predicate (Turtle.PrefixedName "" "value")
+                      , objects = [ Turtle.ObjectLiteral (Turtle.LiteralDouble 3.14) ]
+                      }
+                    ]
+                )
+            ]
+          )
+        , ( ":alice :value 0.314e-1 ."
+          , [ Turtle.Triples
+                (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.PrefixedName "" "alice"))
+                    [ { verb = Turtle.Predicate (Turtle.PrefixedName "" "value")
+                      , objects = [ Turtle.ObjectLiteral (Turtle.LiteralDouble 0.0314) ]
+                      }
+                    ]
+                )
+            ]
+          )
+        , ( ":alice :value 0.314e0 ."
+          , [ Turtle.Triples
+                (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.PrefixedName "" "alice"))
+                    [ { verb = Turtle.Predicate (Turtle.PrefixedName "" "value")
+                      , objects = [ Turtle.ObjectLiteral (Turtle.LiteralDouble 0.314) ]
+                      }
+                    ]
+                )
+            ]
+          )
         , ( ":alice :value 3.14 ."
           , [ Turtle.Triples
                 (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.PrefixedName "" "alice"))

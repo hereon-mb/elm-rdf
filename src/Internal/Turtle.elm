@@ -523,12 +523,23 @@ numeric =
     Parser.succeed (\start end -> start ++ end)
         |= numericHelp
         |= Parser.oneOf
-            [ Parser.succeed (\raw -> "e" ++ raw)
-                |. Parser.symbol "e"
-                |= numericHelp
-            , Parser.succeed (\raw -> "e" ++ raw)
-                |. Parser.symbol "E"
-                |= numericHelp
+            [ Parser.succeed (\sign num -> "e" ++ sign ++ num)
+                |. Parser.oneOf
+                    [ Parser.symbol "e"
+                    , Parser.symbol "E"
+                    ]
+                |= Parser.oneOf
+                    [ Parser.succeed "-"
+                        |. Parser.symbol "-"
+                    , Parser.succeed ""
+                        |. Parser.symbol "+"
+                    , Parser.succeed ""
+                    ]
+                |= Parser.getChompedString
+                    (Parser.succeed ()
+                        |. Parser.chompIf Char.isDigit
+                        |. Parser.chompWhile Char.isDigit
+                    )
             , Parser.succeed ""
             ]
         |> Parser.andThen
