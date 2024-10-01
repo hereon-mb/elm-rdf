@@ -39,11 +39,11 @@ serializePropertyPath propertyPath =
 
         SequencePath first rest ->
             (serializePropertyPath first :: List.map serializePropertyPath rest)
-                |> String.join "/"
+                |> String.join " / "
 
         AlternativePath first rest ->
             (serializePropertyPath first :: List.map serializePropertyPath rest)
-                |> String.join "|"
+                |> String.join " | "
 
         InversePath nested ->
             "^" ++ serializePropertyPath nested
