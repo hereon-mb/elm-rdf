@@ -7,7 +7,7 @@ module Rdf.Graph exposing
     , parse, parseSafe, Error(..), errorToString
     , serialize
     , fromNTriples
-    , Seed, initialSeed
+    , Seed, initialSeed, seedGenerator
     , insert, insertAt, generateBlankNode
     )
 
@@ -30,7 +30,7 @@ module Rdf.Graph exposing
 
 ## Update
 
-@docs Seed, initialSeed
+@docs Seed, initialSeed, seedGenerator
 @docs insert, insertAt, generateBlankNode
 
 -}
@@ -171,6 +171,25 @@ initialSeed =
         , seed3 = Random.initialSeed 3
         , seed4 = Random.initialSeed 4
         }
+
+
+{-| TODO Add documentation
+-}
+seedGenerator : Random.Generator Seed
+seedGenerator =
+    Random.map4
+        (\seed1 seed2 seed3 seed4 ->
+            Seed
+                { seed1 = seed1
+                , seed2 = seed2
+                , seed3 = seed3
+                , seed4 = seed4
+                }
+        )
+        Random.independentSeed
+        Random.independentSeed
+        Random.independentSeed
+        Random.independentSeed
 
 
 {-| TODO Add documentation
