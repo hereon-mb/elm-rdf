@@ -637,8 +637,10 @@ stringMultiline revChunks =
         [ stringSubstitute revChunks
         , Parser.token "\"\"\""
             |> Parser.map (\_ -> Parser.Done (String.concat (List.reverse revChunks)))
+        , Parser.token "\"\""
+            |> Parser.map (\_ -> Parser.Loop ("\"\"" :: revChunks))
         , Parser.token "\""
-            |> Parser.andThen (\_ -> Parser.problem "ran into single '\"' while parsing a multiline string")
+            |> Parser.map (\_ -> Parser.Loop ("\"" :: revChunks))
         , stringChomp revChunks
         ]
 
