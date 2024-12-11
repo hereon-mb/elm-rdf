@@ -368,13 +368,25 @@ parse =
                 )
             ]
           )
-        , ( [ ":alice :value \"\"\"Alice\"Wonderland\"\"\" ."
+        , ( [ ":alice :value \"\"\"Alice\\\"Wonderland\"\"\" ."
             ]
                 |> String.join "\n"
           , [ Turtle.Triples
                 (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.PrefixedName "" "alice"))
                     [ { verb = Turtle.Predicate (Turtle.PrefixedName "" "value")
                       , objects = [ Turtle.ObjectLiteral (Turtle.LiteralString "Alice\"Wonderland") ]
+                      }
+                    ]
+                )
+            ]
+          )
+        , ( [ ":alice :value \"\"\"AliceWonderland\\\"\"\"\" ."
+            ]
+                |> String.join "\n"
+          , [ Turtle.Triples
+                (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.PrefixedName "" "alice"))
+                    [ { verb = Turtle.Predicate (Turtle.PrefixedName "" "value")
+                      , objects = [ Turtle.ObjectLiteral (Turtle.LiteralString "AliceWonderland\"") ]
                       }
                     ]
                 )

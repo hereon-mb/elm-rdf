@@ -624,44 +624,57 @@ string =
     Parser.oneOf
         [ Parser.succeed identity
             |. Parser.symbol "\"\"\""
-            |= (Parser.chompUntil "\"\"\""
-                    |> Parser.getChompedString
-                    |> Parser.map
-                        (String.replace "\\n" "\n"
-                            >> String.replace "\\t" "\t"
-                            >> String.replace "\\\"" "\""
-                            >> String.replace "\\u{000D}" "\u{000D}"
-                        )
-               )
-            |. Parser.symbol "\"\"\""
+            |= Parser.loop [] stringMultiline
         , Parser.succeed identity
             |. Parser.symbol "\""
-            |= Parser.loop [] stringHelp
+            |= Parser.loop [] stringSingleline
         ]
 
 
-stringHelp : List String -> Parser (Parser.Step (List String) String)
-stringHelp revChunks =
+stringMultiline : List String -> Parser (Parser.Step (List String) String)
+stringMultiline revChunks =
     Parser.oneOf
-        [ Parser.succeed (\chunk -> Parser.Loop (chunk :: revChunks))
-            |. Parser.token "\\"
-            |= Parser.oneOf
-                [ Parser.map (\_ -> "\n") (Parser.token "n")
-                , Parser.map (\_ -> "\t") (Parser.token "t")
-                , Parser.map (\_ -> "\"") (Parser.token "\"")
-                , Parser.map (\_ -> "\\") (Parser.token "\\")
-                , Parser.map (\_ -> "\u{000D}") (Parser.token "r")
-                , Parser.succeed String.fromChar
-                    |. Parser.token "u{"
-                    |= unicode
-                    |. Parser.token "}"
-                ]
+        [ stringSubstitute revChunks
+        , Parser.token "\"\"\""
+            |> Parser.map (\_ -> Parser.Done (String.concat (List.reverse revChunks)))
+        , Parser.token "\""
+            |> Parser.andThen (\_ -> Parser.problem "ran into single '\"' while parsing a multiline string")
+        , stringChomp revChunks
+        ]
+
+
+stringSingleline : List String -> Parser (Parser.Step (List String) String)
+stringSingleline revChunks =
+    Parser.oneOf
+        [ stringSubstitute revChunks
         , Parser.token "\""
             |> Parser.map (\_ -> Parser.Done (String.concat (List.reverse revChunks)))
-        , Parser.chompWhile isUninteresting
-            |> Parser.getChompedString
-            |> Parser.map (\chunk -> Parser.Loop (chunk :: revChunks))
+        , stringChomp revChunks
         ]
+
+
+stringSubstitute : List String -> Parser (Parser.Step (List String) String)
+stringSubstitute revChunks =
+    Parser.succeed (\chunk -> Parser.Loop (chunk :: revChunks))
+        |. Parser.token "\\"
+        |= Parser.oneOf
+            [ Parser.map (\_ -> "\n") (Parser.token "n")
+            , Parser.map (\_ -> "\t") (Parser.token "t")
+            , Parser.map (\_ -> "\"") (Parser.token "\"")
+            , Parser.map (\_ -> "\\") (Parser.token "\\")
+            , Parser.map (\_ -> "\u{000D}") (Parser.token "r")
+            , Parser.succeed String.fromChar
+                |. Parser.token "u{"
+                |= unicode
+                |. Parser.token "}"
+            ]
+
+
+stringChomp : List String -> Parser (Parser.Step (List String) String)
+stringChomp revChunks =
+    Parser.chompWhile isUninteresting
+        |> Parser.getChompedString
+        |> Parser.map (\chunk -> Parser.Loop (chunk :: revChunks))
 
 
 unicode : Parser Char
