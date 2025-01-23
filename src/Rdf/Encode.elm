@@ -87,7 +87,7 @@ import List.NonEmpty as NonEmpty
 import Rdf
 import Rdf.Encode.Bunch as Bunch
 import Rdf.Graph as Rdf exposing (Graph, Seed)
-import Rdf.PropertyPath as Rdf exposing (PropertyPath)
+import Rdf.PropertyPath as PropertyPath exposing (PropertyPath)
 
 
 {-| TODO
@@ -192,21 +192,34 @@ bunch =
         << List.filterMap
             (\( propertyPath, object_ ) ->
                 Maybe.map (flip Tuple.pair object_)
-                    (Rdf.normalizePropertyPath propertyPath)
+                    (PropertyPath.normalizePropertyPath propertyPath)
             )
 
 
 bunchHelp :
-    Bunch.Tree Rdf.Iri ( Rdf.Iri, IsGraphOrLiteralEncoder object )
+    Bunch.Tree
+        PropertyPath.ConstructablePath
+        ( PropertyPath.ConstructablePath, IsGraphOrLiteralEncoder object )
     -> PropertyEncoder
 bunchHelp tree =
     case tree of
-        Bunch.Leaf ( predicate_, object_ ) ->
-            predicate predicate_ object_
+        Bunch.Leaf ( constructablePath, object_ ) ->
+            case constructablePath of
+                PropertyPath.Predicate predicate_ ->
+                    predicate predicate_ object_
 
-        Bunch.Node predicate_ trees ->
-            predicate predicate_
-                (blankNode (List.map bunchHelp (NonEmpty.toList trees)))
+                PropertyPath.Inverse predicate_ ->
+                    inverse predicate_ object_
+
+        Bunch.Node constructablePath trees ->
+            case constructablePath of
+                PropertyPath.Predicate predicate_ ->
+                    predicate predicate_
+                        (blankNode (List.map bunchHelp (NonEmpty.toList trees)))
+
+                PropertyPath.Inverse predicate_ ->
+                    inverse predicate_
+                        (blankNode (List.map bunchHelp (NonEmpty.toList trees)))
 
 
 {-| TODO
@@ -216,16 +229,48 @@ property :
     -> IsGraphOrLiteralEncoder object
     -> PropertyEncoder
 property propertyPath objectE =
-    case Rdf.normalizePropertyPath propertyPath of
-        Just ( predicate_, predicates ) ->
+    case PropertyPath.normalizePropertyPath propertyPath of
+        Just ( PropertyPath.Predicate predicate_, predicates ) ->
             predicate predicate_
                 (List.foldr
                     (\predicateCurrent objectCurrentE ->
-                        forgetCompatible
-                            (blankNode
-                                [ predicate predicateCurrent objectCurrentE
-                                ]
-                            )
+                        case predicateCurrent of
+                            PropertyPath.Predicate predicateCurrent_ ->
+                                forgetCompatible
+                                    (blankNode
+                                        [ predicate predicateCurrent_ objectCurrentE
+                                        ]
+                                    )
+
+                            PropertyPath.Inverse predicateCurrent_ ->
+                                forgetCompatible
+                                    (blankNode
+                                        [ inverse predicateCurrent_ objectCurrentE
+                                        ]
+                                    )
+                    )
+                    objectE
+                    predicates
+                )
+
+        Just ( PropertyPath.Inverse predicate_, predicates ) ->
+            inverse predicate_
+                (List.foldr
+                    (\predicateCurrent objectCurrentE ->
+                        case predicateCurrent of
+                            PropertyPath.Predicate predicateCurrent_ ->
+                                forgetCompatible
+                                    (blankNode
+                                        [ predicate predicateCurrent_ objectCurrentE
+                                        ]
+                                    )
+
+                            PropertyPath.Inverse predicateCurrent_ ->
+                                forgetCompatible
+                                    (blankNode
+                                        [ inverse predicateCurrent_ objectCurrentE
+                                        ]
+                                    )
                     )
                     objectE
                     predicates
@@ -235,7 +280,8 @@ property propertyPath objectE =
             Encoder
                 (PropertyEncoder
                     (\seed _ ->
-                        -- XXX `propertyPath` contains non-`Iri` components, we just give up..
+                        -- XXX `propertyPath` contains non-`Iri` components, we
+                        -- just give up..
                         ( Rdf.emptyGraph, seed )
                     )
                 )
@@ -277,6 +323,57 @@ predicate predicate_ (Encoder objectE) =
 
                     LiteralEncoder f ->
                         f seed subject predicate_
+
+                    PropertyEncoder _ ->
+                        ( Rdf.emptyGraph, seed )
+            )
+        )
+
+
+{-| TODO
+-}
+inverse : Predicate -> IsGraphOrLiteralEncoder object -> PropertyEncoder
+inverse predicate_ (Encoder objectE) =
+    Encoder
+        (PropertyEncoder
+            (\seed subject ->
+                case objectE of
+                    GraphEncoder f ->
+                        let
+                            ( object_, ( graphObject, seedUpdated ) ) =
+                                f seed
+
+                            ( graphProperty, seedUpdatedUpdated ) =
+                                case Rdf.toBlankNodeOrIri object_ of
+                                    Nothing ->
+                                        -- FIXME
+                                        ( Rdf.emptyGraph, seedUpdated )
+
+                                    Just blankNodeOrIri ->
+                                        case
+                                            predicate predicate_
+                                                (forgetCompatible
+                                                    (object
+                                                        (Rdf.asBlankNodeOrIriOrAnyLiteral subject)
+                                                    )
+                                                )
+                                        of
+                                            Encoder propertyE ->
+                                                case propertyE of
+                                                    PropertyEncoder g ->
+                                                        g seedUpdated blankNodeOrIri
+
+                                                    GraphEncoder _ ->
+                                                        ( Rdf.emptyGraph, seedUpdated )
+
+                                                    LiteralEncoder _ ->
+                                                        ( Rdf.emptyGraph, seedUpdated )
+                        in
+                        ( Rdf.union graphObject graphProperty, seedUpdatedUpdated )
+
+                    LiteralEncoder f ->
+                        -- f seed subject predicate_
+                        ( Rdf.emptyGraph, seed )
 
                     PropertyEncoder _ ->
                         ( Rdf.emptyGraph, seed )

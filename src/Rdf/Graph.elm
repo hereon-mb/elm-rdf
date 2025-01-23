@@ -61,6 +61,7 @@ import Rdf
         , serializeNTriple
         , serializeNode
         , serializeNodeHelp
+        , toBlankNodeOrIri
         , unwrap
         )
 import Rdf.Namespaces exposing (rdf, xsd)
@@ -266,6 +267,15 @@ insertAt subject path object graph seed =
 
                 Just idFocusNodeNext ->
                     insertAtNext propertyPaths object (asBlankNodeOrIri idFocusNodeNext) graph seed
+
+        InversePath (PredicatePath predicate) ->
+            case toBlankNodeOrIri object of
+                Nothing ->
+                    -- FIXME We want to error here
+                    ( graph, seed )
+
+                Just blankNodeOrIri ->
+                    ( insert blankNodeOrIri predicate subject graph, seed )
 
         _ ->
             ( graph, seed )
