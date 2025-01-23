@@ -3,6 +3,7 @@ module PropertyPathTest exposing (normalize1, normalize2, normalize3, normalize4
 import Expect
 import List.NonEmpty as NonEmpty exposing (NonEmpty)
 import Rdf
+import Rdf.Predicate as Predicate exposing (Predicate(..))
 import Rdf.PropertyPath as Rdf
 import Test exposing (Test, test)
 
@@ -15,7 +16,7 @@ normalize1 =
             [ Rdf.PredicatePath (Rdf.iri "b")
             ]
         )
-        (NonEmpty.fromCons (Rdf.iri "a") [ Rdf.iri "b" ])
+        (NonEmpty.fromCons (Predicate (Rdf.iri "a")) [ Predicate (Rdf.iri "b") ])
 
 
 normalize2 : Test
@@ -25,7 +26,7 @@ normalize2 =
             (Rdf.SequencePath (Rdf.PredicatePath (Rdf.iri "a")) [])
             []
         )
-        (NonEmpty.fromCons (Rdf.iri "a") [])
+        (NonEmpty.fromCons (Predicate (Rdf.iri "a")) [])
 
 
 normalize3 : Test
@@ -38,9 +39,9 @@ normalize3 =
             ]
         )
         (NonEmpty.fromCons
-            (Rdf.iri "a")
-            [ Rdf.iri "b"
-            , Rdf.iri "c"
+            (Predicate (Rdf.iri "a"))
+            [ Predicate (Rdf.iri "b")
+            , Predicate (Rdf.iri "c")
             ]
         )
 
@@ -56,9 +57,9 @@ normalize4 =
             ]
         )
         (NonEmpty.fromCons
-            (Rdf.iri "a")
-            [ Rdf.iri "b"
-            , Rdf.iri "c"
+            (Predicate (Rdf.iri "a"))
+            [ Predicate (Rdf.iri "b")
+            , Predicate (Rdf.iri "c")
             ]
         )
 
@@ -74,16 +75,16 @@ normalize5 =
             ]
         )
         (NonEmpty.fromCons
-            (Rdf.iri "a")
-            [ Rdf.iri "b"
-            , Rdf.iri "c"
+            (Predicate (Rdf.iri "a"))
+            [ Predicate (Rdf.iri "b")
+            , Predicate (Rdf.iri "c")
             ]
         )
 
 
-normalizeHelp : String -> Rdf.PropertyPath -> NonEmpty Rdf.Iri -> Test
+normalizeHelp : String -> Rdf.PropertyPath -> NonEmpty Predicate -> Test
 normalizeHelp label propertyPath expected =
     test label <|
         \_ ->
-            Rdf.normalizePropertyPath propertyPath
+            Predicate.fromPropertyPath propertyPath
                 |> Expect.equal (Just expected)
