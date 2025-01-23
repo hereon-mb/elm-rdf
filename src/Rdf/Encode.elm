@@ -87,6 +87,7 @@ import List.NonEmpty as NonEmpty
 import Rdf
 import Rdf.Encode.Bunch as Bunch
 import Rdf.Graph as Rdf exposing (Graph, Seed)
+import Rdf.Predicate as Predicate
 import Rdf.PropertyPath as PropertyPath exposing (PropertyPath)
 
 
@@ -192,32 +193,32 @@ bunch =
         << List.filterMap
             (\( propertyPath, object_ ) ->
                 Maybe.map (flip Tuple.pair object_)
-                    (PropertyPath.normalizePropertyPath propertyPath)
+                    (Predicate.fromPropertyPath propertyPath)
             )
 
 
 bunchHelp :
     Bunch.Tree
-        PropertyPath.ConstructablePath
-        ( PropertyPath.ConstructablePath, IsGraphOrLiteralEncoder object )
+        Predicate.Predicate
+        ( Predicate.Predicate, IsGraphOrLiteralEncoder object )
     -> PropertyEncoder
 bunchHelp tree =
     case tree of
         Bunch.Leaf ( constructablePath, object_ ) ->
             case constructablePath of
-                PropertyPath.Predicate predicate_ ->
+                Predicate.Predicate predicate_ ->
                     predicate predicate_ object_
 
-                PropertyPath.Inverse predicate_ ->
+                Predicate.Inverse predicate_ ->
                     inverse predicate_ object_
 
         Bunch.Node constructablePath trees ->
             case constructablePath of
-                PropertyPath.Predicate predicate_ ->
+                Predicate.Predicate predicate_ ->
                     predicate predicate_
                         (blankNode (List.map bunchHelp (NonEmpty.toList trees)))
 
-                PropertyPath.Inverse predicate_ ->
+                Predicate.Inverse predicate_ ->
                     inverse predicate_
                         (blankNode (List.map bunchHelp (NonEmpty.toList trees)))
 
@@ -229,20 +230,20 @@ property :
     -> IsGraphOrLiteralEncoder object
     -> PropertyEncoder
 property propertyPath objectE =
-    case PropertyPath.normalizePropertyPath propertyPath of
-        Just ( PropertyPath.Predicate predicate_, predicates ) ->
+    case Predicate.fromPropertyPath propertyPath of
+        Just ( Predicate.Predicate predicate_, predicates ) ->
             predicate predicate_
                 (List.foldr
                     (\predicateCurrent objectCurrentE ->
                         case predicateCurrent of
-                            PropertyPath.Predicate predicateCurrent_ ->
+                            Predicate.Predicate predicateCurrent_ ->
                                 forgetCompatible
                                     (blankNode
                                         [ predicate predicateCurrent_ objectCurrentE
                                         ]
                                     )
 
-                            PropertyPath.Inverse predicateCurrent_ ->
+                            Predicate.Inverse predicateCurrent_ ->
                                 forgetCompatible
                                     (blankNode
                                         [ inverse predicateCurrent_ objectCurrentE
@@ -253,19 +254,19 @@ property propertyPath objectE =
                     predicates
                 )
 
-        Just ( PropertyPath.Inverse predicate_, predicates ) ->
+        Just ( Predicate.Inverse predicate_, predicates ) ->
             inverse predicate_
                 (List.foldr
                     (\predicateCurrent objectCurrentE ->
                         case predicateCurrent of
-                            PropertyPath.Predicate predicateCurrent_ ->
+                            Predicate.Predicate predicateCurrent_ ->
                                 forgetCompatible
                                     (blankNode
                                         [ predicate predicateCurrent_ objectCurrentE
                                         ]
                                     )
 
-                            PropertyPath.Inverse predicateCurrent_ ->
+                            Predicate.Inverse predicateCurrent_ ->
                                 forgetCompatible
                                     (blankNode
                                         [ inverse predicateCurrent_ objectCurrentE

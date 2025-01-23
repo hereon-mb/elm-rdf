@@ -1,14 +1,12 @@
 module Rdf.PropertyPath exposing
     ( PropertyPath(..)
     , serializePropertyPath
-    , ConstructablePath(..), normalizePropertyPath, constructablePathToIri
     )
 
 {-|
 
 @docs PropertyPath
 @docs serializePropertyPath
-@docs ConstructablePath, normalizePropertyPath, constructablePathToIri
 
 -}
 
@@ -56,52 +54,3 @@ serializePropertyPath propertyPath =
 
         ZeroOrOnePath nested ->
             serializePropertyPath nested ++ "?"
-
-
-type ConstructablePath
-    = Predicate Iri
-    | Inverse Iri
-
-
-constructablePathToIri : ConstructablePath -> Iri
-constructablePathToIri constructablePath =
-    case constructablePath of
-        Predicate iri ->
-            iri
-
-        Inverse iri ->
-            iri
-
-
-{-| XXX Normalizes a `PropertyPath` into a `NonEmpty Iri`. Ideally, we distinguish between `PropertyPath` and `NonEmpty Iri` in our code-base. But since we use the super-class `PropertyPath` everywhere, we have to special case the impossible variants, cf. `property` which is a no-op if it encounters a such special property path.
--}
-normalizePropertyPath : PropertyPath -> Maybe (NonEmpty ConstructablePath)
-normalizePropertyPath propertyPath =
-    case propertyPath of
-        PredicatePath x ->
-            Just (NonEmpty.singleton (Predicate x))
-
-        SequencePath firstPropertyPath otherPropertyPaths ->
-            Maybe.map NonEmpty.concat
-                (Maybe.map2 Tuple.pair
-                    (normalizePropertyPath firstPropertyPath)
-                    (Maybe.combine (List.map normalizePropertyPath otherPropertyPaths))
-                )
-
-        AlternativePath _ _ ->
-            Nothing
-
-        InversePath (PredicatePath x) ->
-            Just (NonEmpty.singleton (Inverse x))
-
-        InversePath _ ->
-            Nothing
-
-        ZeroOrMorePath _ ->
-            Nothing
-
-        OneOrMorePath _ ->
-            Nothing
-
-        ZeroOrOnePath _ ->
-            Nothing
