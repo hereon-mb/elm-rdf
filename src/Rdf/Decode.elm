@@ -11,6 +11,7 @@ module Rdf.Decode exposing
     , from
     , blankNode
     , predicate, property, anyPredicate
+    , noProperty
     , list, nonEmpty
     , at
     , decode
@@ -59,6 +60,7 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 @docs from
 @docs blankNode
 @docs predicate, property, anyPredicate
+@docs noProperty
 @docs list, nonEmpty
 @docs at
 
@@ -206,6 +208,7 @@ type Error
     | UnexpectedInt String
     | UnexpectedFloat String
     | UnknownProperty BlankNodeOrIri PropertyPath
+    | PropertyPresent BlankNodeOrIri PropertyPath
     | NoProperty BlankNodeOrIri
     | UnexpectedEmptyList
     | CustomError String
@@ -256,6 +259,9 @@ errorToString error_ =
         UnknownProperty nodeFocus pathExpected ->
             "No such property " ++ Rdf.serializePropertyPath pathExpected ++ " found at " ++ Rdf.serializeNode nodeFocus ++ "."
 
+        PropertyPresent nodeFocus pathExpected ->
+            "Found property at " ++ Rdf.serializeNode nodeFocus ++ "."
+
         NoProperty nodeFocus ->
             "No property found at " ++ Rdf.serializeNode nodeFocus ++ "."
 
@@ -271,7 +277,9 @@ errorToString error_ =
                     (List.map errorToString errors)
 
         TooManyNodes nodesFound ->
-            "I expected a single node, but I found multiple nodes" ++ String.join ", " (List.map Rdf.serializeNode nodesFound) ++ "."
+            "I expected a single node, but I found multiple: "
+                ++ String.join ", " (List.map Rdf.serializeNode nodesFound)
+                ++ "."
 
         MissingLangString nodeFound ->
             "I expected a lang string, but I found " ++ Rdf.serializeNode nodeFound ++ "."
@@ -921,6 +929,54 @@ property path (Decoder f) =
                         in
                         nodeChilds
                             |> f graph
+                    )
+        )
+
+
+{-| TODO
+-}
+noProperty : PropertyPath -> Decoder ()
+noProperty path =
+    Decoder
+        (\graph ->
+            Result.andThen
+                (\nodes ->
+                    Result.combine
+                        (List.map
+                            (\node ->
+                                case node of
+                                    Rdf.Node (Rdf.BlankNode data) ->
+                                        Ok (Rdf.Node (Rdf.BlankNode data))
+
+                                    Rdf.Node (Rdf.Iri data) ->
+                                        Ok (Rdf.Node (Rdf.Iri data))
+
+                                    Rdf.Node (Rdf.Literal _) ->
+                                        Err (UnexpectedNode BlankNode node)
+                            )
+                            nodes
+                        )
+                )
+                >> Result.andThen
+                    (\focusNodes ->
+                        Result.map (\_ -> ()) <|
+                            Result.combine
+                                (List.map
+                                    (\focusNode ->
+                                        case
+                                            Rdf.emptyQuery
+                                                |> Rdf.withSubject focusNode
+                                                |> Rdf.withPropertyPath path
+                                                |> Rdf.getObjects graph
+                                        of
+                                            [] ->
+                                                Ok ()
+
+                                            _ ->
+                                                Err (PropertyPresent focusNode path)
+                                    )
+                                    focusNodes
+                                )
                     )
         )
 

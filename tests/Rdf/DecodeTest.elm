@@ -17,6 +17,20 @@ suite =
         , manyWithInverse
         , manyWithInverseAndData
         , stringOrLangString
+        , describe "property"
+            [ propertyWithCorrectObject
+            , propertyWithIncorrectObject
+            , propertyMissing
+            , propertyWithPathAndWithManyInstances
+            ]
+        , describe "noProperty"
+            [ noPropertySuccess
+            , noPropertyWithProperty
+            ]
+        , describe "combine"
+            [ combineSuccess
+            , combineOneFails
+            ]
         ]
 
 
@@ -134,9 +148,195 @@ stringOrLangString =
                     ]
 
 
+propertyWithCorrectObject : Test
+propertyWithCorrectObject =
+    test "with correct object" <|
+        \_ ->
+            { raw =
+                """
+                    @base <http://example.org/> .
+                    <x> <hasString> "string" .
+                """
+            , decoder =
+                Decode.from (example "x")
+                    (Decode.property (Rdf.PredicatePath (example "hasString"))
+                        Decode.string
+                    )
+            }
+                |> expectAll [ Expect.equal "string" ]
+
+
+propertyWithIncorrectObject : Test
+propertyWithIncorrectObject =
+    test "with incorrect object" <|
+        \_ ->
+            { raw =
+                """
+                    @base <http://example.org/> .
+                    <x> <hasString> 42 .
+                """
+            , decoder =
+                Decode.from (example "x")
+                    (Decode.property (Rdf.PredicatePath (example "hasString"))
+                        Decode.string
+                    )
+            }
+                |> expectAllError
+                    [ Expect.equal
+                        (Decode.UnexpectedLiteralDatatype
+                            (xsd "string")
+                            (xsd "integer")
+                        )
+                    ]
+
+
+propertyMissing : Test
+propertyMissing =
+    test "missing" <|
+        \_ ->
+            { raw =
+                """
+                    @base <http://example.org/> .
+                    <x> <hasInteger> 42 .
+                """
+            , decoder =
+                Decode.from (example "x")
+                    (Decode.property (Rdf.PredicatePath (example "hasString"))
+                        Decode.string
+                    )
+            }
+                |> expectAllError
+                    [ Expect.equal
+                        (Decode.UnknownProperty
+                            (Rdf.asBlankNodeOrIri (example "x"))
+                            (Rdf.PredicatePath (example "hasString"))
+                        )
+                    ]
+
+
+propertyWithPathAndWithManyInstances : Test
+propertyWithPathAndWithManyInstances =
+    test "success" <|
+        \_ ->
+            { raw =
+                """
+                    @base <http://example.org/> .
+                    <x> <hasInstance>
+                        [ <hasInteger> 42 ] ,
+                        [ <hasInteger> 84 ] .
+                """
+            , decoder =
+                Decode.from (example "x")
+                    (Decode.property
+                        (Rdf.SequencePath
+                            (Rdf.PredicatePath (example "hasInstance"))
+                            [ Rdf.PredicatePath (example "hasInteger") ]
+                        )
+                        (Decode.many Decode.int)
+                    )
+            }
+                |> expectAll [ Expect.equal [ 84, 42 ] ]
+
+
+noPropertySuccess : Test
+noPropertySuccess =
+    test "success" <|
+        \_ ->
+            { raw =
+                """
+                    @base <http://example.org/> .
+                    <x> <hasInteger> 42 .
+                """
+            , decoder =
+                Decode.from (example "x")
+                    (Decode.noProperty (Rdf.PredicatePath (example "hasString")))
+            }
+                |> expectAll [ Expect.equal () ]
+
+
+noPropertyWithProperty : Test
+noPropertyWithProperty =
+    test "with property" <|
+        \_ ->
+            { raw =
+                """
+                    @base <http://example.org/> .
+                    <x> <hasString> "string" .
+                """
+            , decoder =
+                Decode.from (example "x")
+                    (Decode.noProperty (Rdf.PredicatePath (example "hasString")))
+            }
+                |> expectAllError
+                    [ Expect.equal
+                        (Decode.PropertyPresent
+                            (Rdf.asBlankNodeOrIri (example "x"))
+                            (Rdf.PredicatePath (example "hasString"))
+                        )
+                    ]
+
+
+combineSuccess : Test
+combineSuccess =
+    test "success" <|
+        \_ ->
+            { raw =
+                """
+                    @base <http://example.org/> .
+                    <x> <hasIntegerA> 42 ;
+                        <hasIntegerB> 84 .
+                """
+            , decoder =
+                Decode.from (example "x")
+                    (Decode.combine
+                        [ Decode.predicate (example "hasIntegerA") Decode.int
+                        , Decode.predicate (example "hasIntegerB") Decode.int
+                        ]
+                    )
+            }
+                |> expectAll [ Expect.equal [ 42, 84 ] ]
+
+
+combineOneFails : Test
+combineOneFails =
+    test "one fails" <|
+        \_ ->
+            { raw =
+                """
+                    @base <http://example.org/> .
+                    <x> <hasIntegerA> 42 ;
+                        <hasIntegerB> "string" .
+                """
+            , decoder =
+                Decode.from (example "x")
+                    (Decode.combine
+                        [ Decode.predicate (example "hasIntegerA") Decode.int
+                        , Decode.predicate (example "hasIntegerB") Decode.int
+                        ]
+                    )
+            }
+                |> expectAllError
+                    [ Expect.equal
+                        (Decode.Batch
+                            [ Decode.UnexpectedLiteralDatatype
+                                (xsd "integer")
+                                (xsd "string")
+                            , Decode.UnexpectedLiteralDatatype
+                                (xsd "int")
+                                (xsd "string")
+                            ]
+                        )
+                    ]
+
+
 example : String -> Rdf.Iri
 example name =
     Rdf.iri ("http://example.org/" ++ name)
+
+
+xsd : String -> Rdf.Iri
+xsd name =
+    Rdf.iri ("http://www.w3.org/2001/XMLSchema#" ++ name)
 
 
 expectAll : List (a -> Expectation) -> { raw : String, decoder : Decoder a } -> Expectation
@@ -152,3 +352,18 @@ expectAll expectations { raw, decoder } =
 
                 Ok value ->
                     Expect.all expectations value
+
+
+expectAllError : List (Decode.Error -> Expectation) -> { raw : String, decoder : Decoder a } -> Expectation
+expectAllError expectations { raw, decoder } =
+    case Graph.parse raw of
+        Err error ->
+            Expect.fail ("Could not parse the graph: " ++ Graph.errorToString raw error)
+
+        Ok graph ->
+            case Decode.decode decoder graph of
+                Err error ->
+                    Expect.all expectations error
+
+                Ok _ ->
+                    Expect.fail "Could decode the value."
