@@ -260,7 +260,11 @@ errorToString error_ =
             "No such property " ++ Rdf.serializePropertyPath pathExpected ++ " found at " ++ Rdf.serializeNode nodeFocus ++ "."
 
         PropertyPresent nodeFocus pathExpected ->
-            "Found property at " ++ Rdf.serializeNode nodeFocus ++ "."
+            "Found object for property "
+                ++ Rdf.serializePropertyPath pathExpected
+                ++ " at "
+                ++ Rdf.serializeNode nodeFocus
+                ++ "."
 
         NoProperty nodeFocus ->
             "No property found at " ++ Rdf.serializeNode nodeFocus ++ "."
