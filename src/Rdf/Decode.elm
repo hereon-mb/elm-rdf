@@ -23,7 +23,7 @@ module Rdf.Decode exposing
     , optional, optionalAt
     , hardcoded
     , custom
-    , succeed, fail
+    , succeed, fail, failWith
     , andThen
     , oneOf
     , many
@@ -88,7 +88,7 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 
 # Combining Decoders
 
-@docs succeed, fail
+@docs succeed, fail, failWith
 @docs andThen
 @docs oneOf
 @docs many
@@ -236,7 +236,11 @@ errorToString error_ =
             "Not a date time"
 
         UnexpectedLiteralDatatype datatypeExpected datatypeFound ->
-            "Expected a literal of type " ++ Rdf.toUrl datatypeExpected ++ ", but found a literal of type " ++ Rdf.toUrl datatypeFound ++ "."
+            "Expected a literal of type "
+                ++ Rdf.toUrl datatypeExpected
+                ++ ", but found a literal of type "
+                ++ Rdf.toUrl datatypeFound
+                ++ "."
 
         UnexpectedNode BlankNode nodeFound ->
             "Expected a blank node, but found " ++ Rdf.serializeNode nodeFound ++ "."
@@ -257,7 +261,11 @@ errorToString error_ =
             "Expected a float, but found " ++ found ++ "."
 
         UnknownProperty nodeFocus pathExpected ->
-            "No such property " ++ Rdf.serializePropertyPath pathExpected ++ " found at " ++ Rdf.serializeNode nodeFocus ++ "."
+            "No such property "
+                ++ Rdf.serializePropertyPath pathExpected
+                ++ " found at "
+                ++ Rdf.serializeNode nodeFocus
+                ++ "."
 
         PropertyPresent nodeFocus pathExpected ->
             "Found object for property "
@@ -276,26 +284,49 @@ errorToString error_ =
             s
 
         Batch errors ->
-            "Decoding failed in one of the following ways:"
-                ++ (String.join "\n" << List.map (\item -> "  - " ++ item))
-                    (List.map errorToString errors)
+            "Decoding failed in one of the following ways:\n"
+                ++ indent
+                    (String.join "\n"
+                        (List.map
+                            (\errorNested ->
+                                "- " ++ errorToString errorNested
+                            )
+                            errors
+                        )
+                    )
 
         TooManyNodes nodesFound ->
-            "I expected a single node, but I found multiple: "
-                ++ String.join ", " (List.map Rdf.serializeNode nodesFound)
-                ++ "."
+            "I expected a single node, but I found multiple:\n"
+                ++ indent
+                    (String.join "\n"
+                        (List.map Rdf.serializeNode nodesFound)
+                    )
 
         MissingLangString nodeFound ->
-            "I expected a lang string, but I found " ++ Rdf.serializeNode nodeFound ++ "."
+            "I expected a lang string, but I found "
+                ++ Rdf.serializeNode nodeFound
+                ++ "."
 
         TooManyStrings stringsFound ->
-            "I expected a single string, but I found multiple strings " ++ String.join ", " stringsFound ++ "."
+            "I expected a single string, but I found multiple strings "
+                ++ String.join ", " stringsFound
+                ++ "."
 
         NodeDoesNotExist node ->
-            "The node " ++ Rdf.serializeNode node ++ " does not exist."
+            "The node "
+                ++ Rdf.serializeNode node
+                ++ " does not exist."
 
         NoFocusNode ->
             "There is no focus node to start decoding from."
+
+
+indent : String -> String
+indent lines =
+    lines
+        |> String.lines
+        |> List.map (\line -> "    " ++ line)
+        |> String.join "\n"
 
 
 {-| -}
@@ -1055,8 +1086,21 @@ succeed x =
 {-| A decoder which always fails with the given message.
 -}
 fail : String -> Decoder a
-fail =
-    error << CustomError
+fail msg =
+    failWith (always msg)
+
+
+{-| A decoder which always fails with the given message.
+-}
+failWith : (List BlankNodeOrIriOrAnyLiteral -> String) -> Decoder a
+failWith toMsg =
+    Decoder
+        (\_ ->
+            Result.andThen
+                (\nodes ->
+                    Err (CustomError (toMsg nodes))
+                )
+        )
 
 
 {-| TODO
