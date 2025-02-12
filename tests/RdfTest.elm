@@ -11,6 +11,11 @@ suite : Test
 suite =
     describe "Rdf"
         [ parse
+        , describe "utils"
+            [ appendPath
+            , dropFragment
+            , setFragment
+            ]
         ]
 
 
@@ -339,3 +344,69 @@ testParseCase raw expected =
             raw
                 |> Rdf.Graph.parse
                 |> Expect.equal (Ok (Rdf.Graph.fromNTriples expected))
+
+
+appendPath : Test
+appendPath =
+    describe "appendPath"
+        [ test "without fragment or query" <|
+            \_ ->
+                "http://example.org/"
+                    |> Rdf.iri
+                    |> Rdf.appendPath "segment"
+                    |> Expect.equal (Rdf.iri "http://example.org/segment")
+        , test "with query" <|
+            \_ ->
+                "http://example.org/?query"
+                    |> Rdf.iri
+                    |> Rdf.appendPath "segment"
+                    |> Expect.equal (Rdf.iri "http://example.org/segment?query")
+        , test "with fragment" <|
+            \_ ->
+                "http://example.org/#fragment"
+                    |> Rdf.iri
+                    |> Rdf.appendPath "segment"
+                    |> Expect.equal (Rdf.iri "http://example.org/segment#fragment")
+        , test "with query and fragment" <|
+            \_ ->
+                "http://example.org/?query#fragment"
+                    |> Rdf.iri
+                    |> Rdf.appendPath "segment"
+                    |> Expect.equal (Rdf.iri "http://example.org/segment?query#fragment")
+        ]
+
+
+dropFragment : Test
+dropFragment =
+    describe "dropFragment"
+        [ test "with fragment" <|
+            \_ ->
+                "http://example.org/#fragment"
+                    |> Rdf.iri
+                    |> Rdf.dropFragment
+                    |> Expect.equal (Rdf.iri "http://example.org/")
+        , test "without fragment" <|
+            \_ ->
+                "http://example.org/"
+                    |> Rdf.iri
+                    |> Rdf.dropFragment
+                    |> Expect.equal (Rdf.iri "http://example.org/")
+        ]
+
+
+setFragment : Test
+setFragment =
+    describe "setFragment"
+        [ test "with fragment" <|
+            \_ ->
+                "http://example.org/#original"
+                    |> Rdf.iri
+                    |> Rdf.setFragment "fragment"
+                    |> Expect.equal (Rdf.iri "http://example.org/#fragment")
+        , test "without fragment" <|
+            \_ ->
+                "http://example.org/"
+                    |> Rdf.iri
+                    |> Rdf.setFragment "fragment"
+                    |> Expect.equal (Rdf.iri "http://example.org/#fragment")
+        ]

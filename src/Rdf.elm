@@ -22,6 +22,7 @@ module Rdf exposing
     , toInt, toFloat, toDecimal
     , toDate, toDateTime
     , toBool
+    , appendPath, dropFragment, setFragment
     , serializeNode, serializeNTriple, serializeNodeHelp
     , encodeNTriple
     , nTripleDecoder
@@ -73,6 +74,8 @@ module Rdf exposing
 @docs toInt, toFloat, toDecimal
 @docs toDate, toDateTime
 @docs toBool
+
+@docs appendPath, dropFragment, setFragment
 
 
 ## Serialize
@@ -677,6 +680,88 @@ toBool (Node node) =
 
             else
                 Nothing
+
+
+{-| -}
+appendPath : String -> IsIri compatible -> Iri
+appendPath segment (Node node) =
+    case node of
+        BlankNode stuff ->
+            Node node
+
+        Iri url ->
+            case String.split "?" url of
+                [ _ ] ->
+                    case String.split "#" url of
+                        [ _ ] ->
+                            Node (Iri (url ++ segment))
+
+                        [ beforeFragment, fragment ] ->
+                            Node (Iri (beforeFragment ++ segment ++ "#" ++ fragment))
+
+                        _ ->
+                            Node (Iri (url ++ segment))
+
+                [ beforeQuery, rest ] ->
+                    case String.split "#" rest of
+                        [ _ ] ->
+                            Node (Iri (beforeQuery ++ segment ++ "?" ++ rest))
+
+                        [ query, fragment ] ->
+                            Node (Iri (beforeQuery ++ segment ++ "?" ++ query ++ "#" ++ fragment))
+
+                        _ ->
+                            Node (Iri (url ++ segment))
+
+                _ ->
+                    Node (Iri (url ++ segment))
+
+        Literal stuff ->
+            Node node
+
+
+{-| -}
+dropFragment : IsIri compatible -> Iri
+dropFragment (Node node) =
+    case node of
+        BlankNode stuff ->
+            Node node
+
+        Iri url ->
+            case String.split "#" url of
+                [ _ ] ->
+                    Node node
+
+                [ beforeFragment, fragment ] ->
+                    Node (Iri beforeFragment)
+
+                _ ->
+                    Node node
+
+        Literal stuff ->
+            Node node
+
+
+{-| -}
+setFragment : String -> IsIri compatible -> Iri
+setFragment fragment (Node node) =
+    case node of
+        BlankNode stuff ->
+            Node node
+
+        Iri url ->
+            case String.split "#" url of
+                [ _ ] ->
+                    Node (Iri (url ++ "#" ++ fragment))
+
+                [ beforeFragment, _ ] ->
+                    Node (Iri (beforeFragment ++ "#" ++ fragment))
+
+                _ ->
+                    Node node
+
+        Literal stuff ->
+            Node node
 
 
 
