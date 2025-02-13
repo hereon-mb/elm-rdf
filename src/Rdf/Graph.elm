@@ -5,10 +5,12 @@ module Rdf.Graph exposing
     , emptyGraph, singleton
     , decoder, encode
     , parse, parseSafe, Error(..), errorToString
-    , serialize
+    , serialize, serializeTurtle
     , fromNTriples
     , Seed, initialSeed, seedGenerator
     , insert, insertAt, generateBlankNode
+    , setBase, addPrefix
+    , getBase, getPrefixes
     )
 
 {-|
@@ -24,7 +26,7 @@ module Rdf.Graph exposing
 @docs emptyGraph, singleton
 @docs decoder, encode
 @docs parse, parseSafe, Error, errorToString
-@docs serialize
+@docs serialize, serializeTurtle, SerializeOptions
 @docs fromNTriples
 
 
@@ -32,6 +34,12 @@ module Rdf.Graph exposing
 
 @docs Seed, initialSeed, seedGenerator
 @docs insert, insertAt, generateBlankNode
+@docs setBase, addPrefix
+
+
+## Info
+
+@docs getBase, getPrefixes
 
 -}
 
@@ -53,6 +61,7 @@ import Rdf
         , NTriple
         , Node(..)
         , NodeInternal(..)
+        , SerializeConfig
         , asBlankNodeOrIri
         , asBlankNodeOrIriOrAnyLiteral
         , asIri
@@ -61,6 +70,7 @@ import Rdf
         , serializeNTriple
         , serializeNode
         , serializeNodeHelp
+        , serializeNodeTurtle
         , toBlankNodeOrIri
         , unwrap
         )
@@ -79,7 +89,9 @@ type Graph
 {-| TODO Add documentation
 -}
 type alias GraphData =
-    { nTriples : List NTriple
+    { base : Maybe String
+    , prefixes : Dict String String
+    , nTriples : List NTriple
     , subjects : List BlankNodeOrIri
     , objects : List BlankNodeOrIriOrAnyLiteral
     , bySubjectByPredicate : Dict String (Dict String (List NTriple))
@@ -135,7 +147,9 @@ type Seed
 emptyGraph : Graph
 emptyGraph =
     Graph
-        { nTriples = []
+        { base = Nothing
+        , prefixes = Dict.empty
+        , nTriples = []
         , subjects = []
         , objects = []
         , bySubjectByPredicate = Dict.empty
@@ -153,6 +167,26 @@ singleton subject predicate object =
           , object = asBlankNodeOrIriOrAnyLiteral object
           }
         ]
+
+
+setBase : String -> Graph -> Graph
+setBase base (Graph data) =
+    Graph { data | base = Just base }
+
+
+getBase : Graph -> Maybe String
+getBase (Graph data) =
+    data.base
+
+
+addPrefix : String -> String -> Graph -> Graph
+addPrefix prefix value (Graph data) =
+    Graph { data | prefixes = Dict.insert prefix value data.prefixes }
+
+
+getPrefixes : Graph -> Dict String String
+getPrefixes (Graph data) =
+    data.prefixes
 
 
 {-| TODO Add documentation
@@ -341,6 +375,54 @@ serialize (Graph data) =
 
 {-| TODO Add documentation
 -}
+serializeTurtle : Graph -> String
+serializeTurtle (Graph data) =
+    let
+        config =
+            { base = data.base
+            , prefixes = Dict.toList data.prefixes
+            }
+    in
+    String.concat
+        [ case data.base of
+            Nothing ->
+                ""
+
+            Just base ->
+                "@base <" ++ base ++ "> .\n"
+        , if Dict.isEmpty data.prefixes then
+            ""
+
+          else
+            String.concat
+                [ data.prefixes
+                    |> Dict.toList
+                    |> List.sortBy Tuple.first
+                    |> List.map (\( prefix, value ) -> "@prefix " ++ prefix ++ ": <" ++ value ++ "> .")
+                    |> String.join "\n"
+                , "\n\n"
+                ]
+        , data.bySubjectByPredicate
+            |> Dict.values
+            |> List.concatMap Dict.values
+            |> List.concat
+            |> List.map (serializeNTripleWith config)
+            |> String.join "\n"
+        ]
+
+
+serializeNTripleWith : SerializeConfig -> NTriple -> String
+serializeNTripleWith config { subject, predicate, object } =
+    [ serializeNodeTurtle config subject
+    , serializeNodeTurtle config predicate
+    , serializeNodeTurtle config object
+    , "."
+    ]
+        |> String.join " "
+
+
+{-| TODO Add documentation
+-}
 decoder : Decoder Graph
 decoder =
     Decode.list nTripleDecoder
@@ -366,7 +448,21 @@ parse raw =
         |> Turtle.parse
         |> Result.mapError ErrorParser
         |> Result.andThen (collectNTriples initialSeed)
-        |> Result.map (Tuple.first >> fromNTriples)
+        |> Result.map
+            (\state ->
+                List.foldl (Tuple.apply addPrefix)
+                    (state.nTriples
+                        |> fromNTriples
+                        |> (case state.base of
+                                Nothing ->
+                                    identity
+
+                                Just base ->
+                                    setBase base
+                           )
+                    )
+                    (Dict.toList state.prefixes)
+            )
 
 
 parseSafe : Seed -> String -> Result Error ( Graph, Seed )
@@ -375,7 +471,23 @@ parseSafe seed raw =
         |> Turtle.parse
         |> Result.mapError ErrorParser
         |> Result.andThen (collectNTriples seed)
-        |> Result.map (Tuple.mapFirst fromNTriples)
+        |> Result.map
+            (\state ->
+                ( List.foldl (Tuple.apply addPrefix)
+                    (state.nTriples
+                        |> fromNTriples
+                        |> (case state.base of
+                                Nothing ->
+                                    identity
+
+                                Just base ->
+                                    setBase base
+                           )
+                    )
+                    (Dict.toList state.prefixes)
+                , state.seed
+                )
+            )
 
 
 {-| TODO
@@ -520,11 +632,10 @@ stateInitial seed =
     }
 
 
-collectNTriples : Seed -> List Turtle.Statement -> Result Error ( List NTriple, Seed )
+collectNTriples : Seed -> List Turtle.Statement -> Result Error State
 collectNTriples seed statements =
     statements
         |> List.foldl (\statement -> Result.andThen (collectNTriplesStep statement)) (Ok (stateInitial seed))
-        |> Result.map (\state -> ( state.nTriples, state.seed ))
 
 
 collectNTriplesStep : Turtle.Statement -> State -> Result Error State
@@ -863,7 +974,9 @@ dropPredicate state =
 fromNTriples : List NTriple -> Graph
 fromNTriples nTriples =
     Graph
-        { nTriples = nTriples
+        { base = Nothing
+        , prefixes = Dict.empty
+        , nTriples = nTriples
         , subjects = List.map .subject nTriples
         , objects = List.map .object nTriples
         , bySubjectByPredicate =

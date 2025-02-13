@@ -23,7 +23,7 @@ module Rdf exposing
     , toDate, toDateTime
     , toBool
     , appendPath, dropFragment, setFragment
-    , serializeNode, serializeNTriple, serializeNodeHelp
+    , serializeNode, serializeNodeTurtle, serializeNTriple, serializeNodeHelp
     , encodeNTriple
     , nTripleDecoder
     , StringOrLangString(..)
@@ -31,6 +31,7 @@ module Rdf exposing
     , stringOrLangStringFrom, stringOrLangStringFromList
     , mergeStringOrLangStrings
     , stringOrLangStringInfo
+    , SerializeConfig
     )
 
 {-|
@@ -80,7 +81,7 @@ module Rdf exposing
 
 ## Serialize
 
-@docs serializeNode, serializeNTriple, serializeNodeHelp
+@docs serializeNode, serializeNodeTurtle, serializeNTriple, serializeNodeHelp
 
 
 ## Json
@@ -105,7 +106,9 @@ import Iso8601
 import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline as Decode
 import Json.Encode as Encode exposing (Value)
+import List.Extra as List
 import Maybe.Extra as Maybe
+import String.Extra as String
 import Time exposing (Posix)
 
 
@@ -809,6 +812,96 @@ serializeNodeHelp node =
                     "@" ++ languageTag
             ]
                 |> String.concat
+
+
+type alias SerializeConfig =
+    { base : Maybe String
+    , prefixes : List ( String, String )
+    }
+
+
+{-| TODO Add documentation
+-}
+serializeNodeTurtle : SerializeConfig -> Node compatible -> String
+serializeNodeTurtle config (Node node) =
+    serializeNodeTurtleHelp config node
+
+
+{-| TODO Add documentation
+-}
+serializeNodeTurtleHelp : SerializeConfig -> NodeInternal -> String
+serializeNodeTurtleHelp config node =
+    case node of
+        BlankNode value ->
+            "_:" ++ value
+
+        Iri url ->
+            case config.base of
+                Nothing ->
+                    case List.find (\( _, value ) -> String.startsWith value url) config.prefixes of
+                        Nothing ->
+                            "<" ++ url ++ ">"
+
+                        Just ( prefix, value ) ->
+                            prefix ++ ":" ++ String.rightOf value url
+
+                Just base ->
+                    if String.startsWith base url then
+                        "<" ++ String.rightOf base url ++ ">"
+
+                    else
+                        case List.find (\( _, value ) -> String.startsWith value url) config.prefixes of
+                            Nothing ->
+                                "<" ++ url ++ ">"
+
+                            Just ( prefix, value ) ->
+                                prefix ++ ":" ++ String.rightOf value url
+
+        Literal data ->
+            let
+                replaceLineBreaks : String -> String
+                replaceLineBreaks =
+                    String.replace "\n" "\\n"
+
+                replaceQuotes : String -> String
+                replaceQuotes =
+                    String.replace "\"" "\\\""
+            in
+            if data.datatype == xsdString then
+                [ "\""
+                , data.value
+                    |> replaceLineBreaks
+                    |> replaceQuotes
+                , "\""
+                , case data.languageTag of
+                    Nothing ->
+                        ""
+
+                    Just languageTag ->
+                        "@" ++ languageTag
+                ]
+                    |> String.concat
+
+            else if
+                (data.datatype == xsdInteger)
+                    || (data.datatype == xsdInt)
+            then
+                data.value
+
+            else
+                [ "\""
+                , data.value
+                    |> replaceLineBreaks
+                    |> replaceQuotes
+                , "\""
+                , case data.languageTag of
+                    Nothing ->
+                        "^^" ++ serializeNode data.datatype
+
+                    Just languageTag ->
+                        "@" ++ languageTag
+                ]
+                    |> String.concat
 
 
 {-| TODO Add documentation
