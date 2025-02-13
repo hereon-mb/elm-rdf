@@ -836,26 +836,30 @@ serializeNodeTurtleHelp config node =
             "_:" ++ value
 
         Iri url ->
-            case config.base of
-                Nothing ->
-                    case List.find (\( _, value ) -> String.startsWith value url) config.prefixes of
-                        Nothing ->
-                            "<" ++ url ++ ">"
+            if url == "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" then
+                "a"
 
-                        Just ( prefix, value ) ->
-                            prefix ++ ":" ++ String.rightOf value url
-
-                Just base ->
-                    if String.startsWith base url then
-                        "<" ++ String.rightOf base url ++ ">"
-
-                    else
+            else
+                case config.base of
+                    Nothing ->
                         case List.find (\( _, value ) -> String.startsWith value url) config.prefixes of
                             Nothing ->
                                 "<" ++ url ++ ">"
 
                             Just ( prefix, value ) ->
                                 prefix ++ ":" ++ String.rightOf value url
+
+                    Just base ->
+                        if String.startsWith base url then
+                            "<" ++ String.rightOf base url ++ ">"
+
+                        else
+                            case List.find (\( _, value ) -> String.startsWith value url) config.prefixes of
+                                Nothing ->
+                                    "<" ++ url ++ ">"
+
+                                Just ( prefix, value ) ->
+                                    prefix ++ ":" ++ String.rightOf value url
 
         Literal data ->
             let
