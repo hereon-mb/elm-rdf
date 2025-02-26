@@ -13,6 +13,7 @@ module Rdf.Encode exposing
     , iri
     , literal
     , object
+    , from
     )
 
 {-| A domain-specific language for encoding `Graph`s.
@@ -20,7 +21,8 @@ module Rdf.Encode exposing
 
 # Introduction
 
-The minimal motivation for this module is to encode the following example in an ergonomic DSL. Note that in this example, blank nodes are nested.
+The minimal motivation for this module is to encode the following example in an
+ergonomic DSL. Note that in this example, blank nodes are nested.
 
 ```turtle
 [
@@ -48,7 +50,8 @@ The following aspects of the DSL are note-worthy:
 
   - blank node generation happens transparently
 
-  - blank nodes may appear as root nodes (subjects) as well as arguments to `property` (object nodes)
+  - blank nodes may appear as root nodes (subjects) as well as arguments to
+    `property` (object nodes)
 
 The following are deliberate limitations of the current implementation:
 
@@ -56,7 +59,9 @@ The following are deliberate limitations of the current implementation:
 
   - blank nodes cannot freely refer to each other (unclear if solvable)
 
-Implementation-wise, the only challenge is the fact that blank nodes can be subjects as well as objects. We deploy the same technique as `RDF` does for typing `Node`s.
+Implementation-wise, the only challenge is the fact that blank nodes can be
+subjects as well as objects. We deploy the same technique as `RDF` does for
+typing `Node`s.
 
 
 # Interface
@@ -79,6 +84,11 @@ Implementation-wise, the only challenge is the fact that blank nodes can be subj
 @docs iri
 @docs literal
 @docs object
+
+
+## Experimental
+
+@docs from
 
 -}
 
@@ -154,14 +164,33 @@ blankNode propertyEs =
 
 {-| TODO
 -}
-node : Subject -> List PropertyEncoder -> GraphEncoder
+from :
+    Rdf.IsBlankNodeOrIri compatible
+    -> List PropertyEncoder
+    -> PropertyEncoder
+from subject propertyEs =
+    Encoder
+        (GraphEncoder
+            (\seed ->
+                nodeHelp propertyEs subject seed
+            )
+        )
+
+
+{-| TODO
+-}
+node : Rdf.IsBlankNodeOrIri compatible -> List PropertyEncoder -> GraphEncoder
 node subject propertyEs =
     Encoder (GraphEncoder (\seed -> nodeHelp propertyEs subject seed))
 
 
-nodeHelp : List PropertyEncoder -> Subject -> Seed -> ( Subject, ( Graph, Seed ) )
+nodeHelp :
+    List PropertyEncoder
+    -> Rdf.IsBlankNodeOrIri compatible
+    -> Seed
+    -> ( Subject, ( Graph, Seed ) )
 nodeHelp propertyEs subject seed =
-    ( subject
+    ( Rdf.asBlankNodeOrIri subject
     , Tuple.mapFirst (List.foldl Rdf.union Rdf.emptyGraph) <|
         List.foldl
             (\(Encoder propertyE) ( graphs, seedNext ) ->
@@ -173,8 +202,12 @@ nodeHelp propertyEs subject seed =
                         in
                         ( graph :: graphs, seedNextNext )
 
-                    GraphEncoder _ ->
-                        ( graphs, seedNext )
+                    GraphEncoder f ->
+                        let
+                            ( subjectNext, ( graph, seedNextNext ) ) =
+                                f seedNext
+                        in
+                        ( graph :: graphs, seedNextNext )
 
                     LiteralEncoder _ ->
                         ( graphs, seedNext )
@@ -215,7 +248,10 @@ encoderFromTree tree =
                 |> encoderFromPredicate p
 
 
-encoderFromPredicate : Predicate.Predicate -> IsGraphOrLiteralEncoder object -> PropertyEncoder
+encoderFromPredicate :
+    Predicate.Predicate
+    -> IsGraphOrLiteralEncoder object
+    -> PropertyEncoder
 encoderFromPredicate p encoder =
     case p of
         Predicate.Predicate predicate_ ->
@@ -258,7 +294,10 @@ property propertyPath encoder =
 
 {-| TODO
 -}
-predicate : Predicate -> IsGraphOrLiteralEncoder object -> PropertyEncoder
+predicate :
+    Rdf.IsIri compatible
+    -> IsGraphOrLiteralEncoder object
+    -> PropertyEncoder
 predicate p (Encoder encoder) =
     let
         encoderNew seed subject =
@@ -292,7 +331,7 @@ predicate p (Encoder encoder) =
                     )
 
                 LiteralEncoder f ->
-                    f seed subject p
+                    f seed subject (Rdf.asIri p)
 
                 PropertyEncoder _ ->
                     ( Rdf.emptyGraph, seed )
@@ -348,7 +387,7 @@ inverse predicate_ (Encoder encoder) =
 
 {-| TODO
 -}
-object : Object -> LiteralEncoder
+object : Rdf.IsBlankNodeOrIriOrAnyLiteral compatible -> LiteralEncoder
 object object_ =
     Encoder
         (LiteralEncoder
