@@ -8,7 +8,7 @@ module Rdf.Decode exposing
     , bool, int, float, number
     , date, dateTime
     , subject
-    , from
+    , from, fromSubject
     , blankNode
     , predicate, property, anyPredicate
     , noProperty
@@ -57,7 +57,7 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 
 # Finding Values
 
-@docs from
+@docs from, fromSubject
 @docs blankNode
 @docs predicate, property, anyPredicate
 @docs noProperty
@@ -185,6 +185,20 @@ from nodeFocus (Decoder f) =
 
             else
                 Err (NodeDoesNotExist (Rdf.asBlankNodeOrIri nodeFocus))
+        )
+
+
+{-| TODO Add documentation
+-}
+fromSubject : Decoder a -> Decoder a
+fromSubject (Decoder f) =
+    Decoder
+        (\graph _ ->
+            Rdf.emptyQuery
+                |> Rdf.getSubjects graph
+                |> List.map Rdf.asBlankNodeOrIriOrAnyLiteral
+                |> Ok
+                |> f graph
         )
 
 
