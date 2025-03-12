@@ -900,7 +900,7 @@ serializeNodeTurtleHelp config node =
                 , "\""
                 , case data.languageTag of
                     Nothing ->
-                        "^^" ++ serializeNode data.datatype
+                        "^^" ++ serializeNodeTurtle config data.datatype
 
                     Just languageTag ->
                         "@" ++ languageTag

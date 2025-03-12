@@ -48,6 +48,7 @@ import Internal.Turtle as Turtle
 import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode exposing (Value)
 import List.Extra as List
+import Maybe.Extra as Maybe
 import Parser
 import Random
 import Rdf
@@ -76,6 +77,7 @@ import Rdf
         )
 import Rdf.Namespaces exposing (rdf, xsd)
 import Rdf.PropertyPath exposing (PropertyPath(..))
+import Set exposing (Set)
 import Tuple.Extra as Tuple
 import UUID
 
@@ -387,6 +389,33 @@ serializeTurtle (Graph data) =
             { base = data.base
             , prefixes = Dict.toList data.prefixes
             }
+
+        ( inlinedSubjects, _ ) =
+            List.foldl
+                (\{ object } ( inlined, notInlined ) ->
+                    let
+                        key =
+                            serializeNode object
+                    in
+                    if Maybe.isJust (Rdf.toBlankNode object) then
+                        if Set.member key notInlined then
+                            ( inlined, notInlined )
+
+                        else if Set.member key inlined then
+                            ( Set.remove key inlined
+                            , Set.insert key notInlined
+                            )
+
+                        else
+                            ( Set.insert key inlined
+                            , notInlined
+                            )
+
+                    else
+                        ( inlined, notInlined )
+                )
+                ( Set.empty, Set.empty )
+                data.nTriples
     in
     String.concat
         [ case data.base of
@@ -408,6 +437,7 @@ serializeTurtle (Graph data) =
                 , "\n\n"
                 ]
         , data.bySubjectByPredicate
+            |> Dict.filter (\key _ -> not (Set.member key inlinedSubjects))
             |> Dict.values
             |> List.filterMap
                 (\predicateObjectsDict ->
@@ -423,7 +453,10 @@ serializeTurtle (Graph data) =
                             Just
                                 (serializeNodeTurtle config subject
                                     ++ "\n"
-                                    ++ serializePredicateObjects config predicateObjectsList
+                                    ++ serializePredicateObjects config
+                                        data.bySubjectByPredicate
+                                        inlinedSubjects
+                                        predicateObjectsList
                                     ++ " ."
                                 )
                 )
@@ -431,8 +464,13 @@ serializeTurtle (Graph data) =
         ]
 
 
-serializePredicateObjects : SerializeConfig -> List (List NTriple) -> String
-serializePredicateObjects config predicateObjects =
+serializePredicateObjects :
+    SerializeConfig
+    -> Dict String (Dict String (List NTriple))
+    -> Set String
+    -> List (List NTriple)
+    -> String
+serializePredicateObjects config bySubjectByPredicate inlinedSubjects predicateObjects =
     predicateObjects
         |> List.sortWith
             (\left right ->
@@ -449,10 +487,12 @@ serializePredicateObjects config predicateObjects =
                     )
             )
         |> List.map
-            (\nTriples ->
-                nTriples
-                    |> List.map (serializePredicateObjectWith config)
-                    |> String.join " ;\n"
+            (List.map
+                (serializePredicateObjectWith config
+                    bySubjectByPredicate
+                    inlinedSubjects
+                )
+                >> String.join " ;\n"
             )
         |> String.join " ;\n"
         |> indent
@@ -548,10 +588,35 @@ serializeNTripleWith config { subject, predicate, object } =
         |> String.join " "
 
 
-serializePredicateObjectWith : SerializeConfig -> NTriple -> String
-serializePredicateObjectWith config { predicate, object } =
+serializePredicateObjectWith :
+    SerializeConfig
+    -> Dict String (Dict String (List NTriple))
+    -> Set String
+    -> NTriple
+    -> String
+serializePredicateObjectWith config bySubjectByPredicate inlinedSubjects { predicate, object } =
+    let
+        keyObject =
+            serializeNode object
+    in
     [ serializeNodeTurtle config predicate
-    , serializeNodeTurtle config object
+    , if Set.member keyObject inlinedSubjects then
+        case Dict.get keyObject bySubjectByPredicate of
+            Nothing ->
+                serializeNodeTurtle config object
+
+            Just predicateObjects ->
+                "[\n"
+                    ++ indent
+                        (serializePredicateObjects config
+                            bySubjectByPredicate
+                            inlinedSubjects
+                            (Dict.values predicateObjects)
+                            ++ " ]"
+                        )
+
+      else
+        serializeNodeTurtle config object
     ]
         |> String.join " "
 
