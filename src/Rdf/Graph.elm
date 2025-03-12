@@ -409,11 +409,133 @@ serializeTurtle (Graph data) =
                 ]
         , data.bySubjectByPredicate
             |> Dict.values
-            |> List.concatMap Dict.values
-            |> List.concat
-            |> List.map (serializeNTripleWith config)
-            |> String.join "\n"
+            |> List.filterMap
+                (\predicateObjectsDict ->
+                    let
+                        predicateObjectsList =
+                            Dict.values predicateObjectsDict
+                    in
+                    case Maybe.andThen List.head (List.head predicateObjectsList) of
+                        Nothing ->
+                            Nothing
+
+                        Just { subject } ->
+                            Just
+                                (serializeNodeTurtle config subject
+                                    ++ "\n"
+                                    ++ serializePredicateObjects config predicateObjectsList
+                                    ++ " ."
+                                )
+                )
+            |> String.join "\n\n"
         ]
+
+
+serializePredicateObjects : SerializeConfig -> List (List NTriple) -> String
+serializePredicateObjects config predicateObjects =
+    predicateObjects
+        |> List.sortWith
+            (\left right ->
+                Maybe.withDefault EQ
+                    (Maybe.map2 predicateToOrder
+                        (left
+                            |> List.head
+                            |> Maybe.map .predicate
+                        )
+                        (right
+                            |> List.head
+                            |> Maybe.map .predicate
+                        )
+                    )
+            )
+        |> List.map
+            (\nTriples ->
+                nTriples
+                    |> List.map (serializePredicateObjectWith config)
+                    |> String.join " ;\n"
+            )
+        |> String.join " ;\n"
+        |> indent
+
+
+predicateToOrder : Iri -> Iri -> Order
+predicateToOrder left right =
+    case iriToKind left of
+        RdfType ->
+            LT
+
+        RdfSyntax ->
+            case iriToKind right of
+                RdfType ->
+                    GT
+
+                RdfSyntax ->
+                    compare (Rdf.toUrl left) (Rdf.toUrl right)
+
+                _ ->
+                    LT
+
+        RdfSchema ->
+            case iriToKind right of
+                RdfType ->
+                    GT
+
+                RdfSyntax ->
+                    GT
+
+                RdfSchema ->
+                    compare (Rdf.toUrl left) (Rdf.toUrl right)
+
+                _ ->
+                    LT
+
+        OtherScope ->
+            case iriToKind right of
+                RdfType ->
+                    GT
+
+                RdfSyntax ->
+                    GT
+
+                RdfSchema ->
+                    GT
+
+                OtherScope ->
+                    compare (Rdf.toUrl left) (Rdf.toUrl right)
+
+
+type Kind
+    = RdfType
+    | RdfSyntax
+    | RdfSchema
+    | OtherScope
+
+
+iriToKind : Iri -> Kind
+iriToKind iri =
+    let
+        url =
+            Rdf.toUrl iri
+    in
+    if url == "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" then
+        RdfType
+
+    else if String.startsWith "http://www.w3.org/1999/02/22-rdf-syntax-ns#" url then
+        RdfSyntax
+
+    else if String.startsWith "http://www.w3.org/2000/01/rdf-schema#" url then
+        RdfSchema
+
+    else
+        OtherScope
+
+
+indent : String -> String
+indent text =
+    text
+        |> String.lines
+        |> List.map (\line -> "  " ++ line)
+        |> String.join "\n"
 
 
 serializeNTripleWith : SerializeConfig -> NTriple -> String
@@ -422,6 +544,14 @@ serializeNTripleWith config { subject, predicate, object } =
     , serializeNodeTurtle config predicate
     , serializeNodeTurtle config object
     , "."
+    ]
+        |> String.join " "
+
+
+serializePredicateObjectWith : SerializeConfig -> NTriple -> String
+serializePredicateObjectWith config { predicate, object } =
+    [ serializeNodeTurtle config predicate
+    , serializeNodeTurtle config object
     ]
         |> String.join " "
 
