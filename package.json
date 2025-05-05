@@ -10,7 +10,7 @@
     "review": "elm-review --fix-all",
     "format": "elm-format --validate src review tests",
     "licenses:nodejs": "license-report --output=csv --csvHeaders --config=license-report-config.json > licenses-nodejs.csv",
-    "doc": "elm-doc-preview"
+    "doc": "elm-doc-preview --port 9000"
   },
   "devDependencies": {
     "elm": "^0.19.1-6",
