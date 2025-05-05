@@ -23,7 +23,7 @@ module Rdf exposing
     , toDate, toDateTime
     , toBool
     , appendPath, dropFragment, setFragment
-    , serializeNode, serializeNodeTurtle, serializeNTriple, serializeNodeHelp
+    , serializeNode, serializeNodeTurtle, SerializeConfig, serializeNTriple, serializeNodeHelp
     , encodeNTriple
     , nTripleDecoder
     , StringOrLangString(..)
@@ -31,7 +31,6 @@ module Rdf exposing
     , stringOrLangStringFrom, stringOrLangStringFromList
     , mergeStringOrLangStrings
     , stringOrLangStringInfo
-    , SerializeConfig
     )
 
 {-|
@@ -81,7 +80,7 @@ module Rdf exposing
 
 ## Serialize
 
-@docs serializeNode, serializeNodeTurtle, serializeNTriple, serializeNodeHelp
+@docs serializeNode, serializeNodeTurtle, SerializeConfig, serializeNTriple, serializeNodeHelp
 
 
 ## Json
@@ -689,7 +688,7 @@ toBool (Node node) =
 appendPath : String -> IsIri compatible -> Iri
 appendPath segment (Node node) =
     case node of
-        BlankNode stuff ->
+        BlankNode _ ->
             Node node
 
         Iri url ->
@@ -719,7 +718,7 @@ appendPath segment (Node node) =
                 _ ->
                     Node (Iri (url ++ segment))
 
-        Literal stuff ->
+        Literal _ ->
             Node node
 
 
@@ -727,7 +726,7 @@ appendPath segment (Node node) =
 dropFragment : IsIri compatible -> Iri
 dropFragment (Node node) =
     case node of
-        BlankNode stuff ->
+        BlankNode _ ->
             Node node
 
         Iri url ->
@@ -735,13 +734,13 @@ dropFragment (Node node) =
                 [ _ ] ->
                     Node node
 
-                [ beforeFragment, fragment ] ->
+                [ beforeFragment, _ ] ->
                     Node (Iri beforeFragment)
 
                 _ ->
                     Node node
 
-        Literal stuff ->
+        Literal _ ->
             Node node
 
 
@@ -749,7 +748,7 @@ dropFragment (Node node) =
 setFragment : String -> IsIri compatible -> Iri
 setFragment fragment (Node node) =
     case node of
-        BlankNode stuff ->
+        BlankNode _ ->
             Node node
 
         Iri url ->
@@ -763,7 +762,7 @@ setFragment fragment (Node node) =
                 _ ->
                     Node node
 
-        Literal stuff ->
+        Literal _ ->
             Node node
 
 

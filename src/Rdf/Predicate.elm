@@ -1,20 +1,28 @@
 module Rdf.Predicate exposing
     ( Predicate(..)
-    , fromPropertyPath
-    , toIri
+    , fromPropertyPath, toIri
     )
+
+{-|
+
+@docs Predicate
+@docs fromPropertyPath, toIri
+
+-}
 
 import List.NonEmpty as NonEmpty exposing (NonEmpty)
 import Maybe.Extra as Maybe
-import Rdf exposing (Iri, serializeNode)
+import Rdf exposing (Iri)
 import Rdf.PropertyPath as PropertyPath exposing (PropertyPath)
 
 
+{-| -}
 type Predicate
     = Predicate Iri
     | Inverse Iri
 
 
+{-| -}
 toIri : Predicate -> Iri
 toIri constructablePath =
     case constructablePath of

@@ -10,8 +10,6 @@ module Rdf.PropertyPath exposing
 
 -}
 
-import List.NonEmpty as NonEmpty exposing (NonEmpty)
-import Maybe.Extra as Maybe
 import Rdf exposing (Iri, serializeNode)
 
 

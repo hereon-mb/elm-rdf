@@ -10,6 +10,7 @@
         "Rdf.Encode",
         "Rdf.Graph",
         "Rdf.Namespaces",
+        "Rdf.Predicate",
         "Rdf.PropertyPath",
         "Rdf.Query"
     ],

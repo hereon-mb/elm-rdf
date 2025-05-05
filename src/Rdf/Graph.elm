@@ -26,7 +26,7 @@ module Rdf.Graph exposing
 @docs emptyGraph, singleton
 @docs decoder, encode
 @docs parse, parseSafe, Error, errorToString
-@docs serialize, serializeTurtle, SerializeOptions
+@docs serialize, serializeTurtle
 @docs fromNTriples
 
 
@@ -395,6 +395,10 @@ serialize (Graph data) =
 serializeTurtle : Graph -> String
 serializeTurtle (Graph data) =
     let
+        config :
+            { base : Maybe String
+            , prefixes : List ( String, String )
+            }
         config =
             { base = data.base
             , prefixes = Dict.toList data.prefixes
@@ -403,11 +407,12 @@ serializeTurtle (Graph data) =
         ( inlinedSubjects, _ ) =
             List.foldl
                 (\{ object } ( inlined, notInlined ) ->
-                    let
-                        key =
-                            serializeNode object
-                    in
                     if Maybe.isJust (Rdf.toBlankNode object) then
+                        let
+                            key : String
+                            key =
+                                serializeNode object
+                        in
                         if Set.member key notInlined then
                             ( inlined, notInlined )
 
@@ -452,6 +457,7 @@ serializeTurtle (Graph data) =
             |> List.filterMap
                 (\predicateObjectsDict ->
                     let
+                        predicateObjectsList : List (List NTriple)
                         predicateObjectsList =
                             Dict.values predicateObjectsDict
                     in
@@ -564,6 +570,7 @@ type Kind
 iriToKind : Iri -> Kind
 iriToKind iri =
     let
+        url : String
         url =
             Rdf.toUrl iri
     in
@@ -588,16 +595,6 @@ indent text =
         |> String.join "\n"
 
 
-serializeNTripleWith : SerializeConfig -> NTriple -> String
-serializeNTripleWith config { subject, predicate, object } =
-    [ serializeNodeTurtle config subject
-    , serializeNodeTurtle config predicate
-    , serializeNodeTurtle config object
-    , "."
-    ]
-        |> String.join " "
-
-
 serializePredicateObjectWith :
     SerializeConfig
     -> Dict String (Dict String (List NTriple))
@@ -606,6 +603,7 @@ serializePredicateObjectWith :
     -> String
 serializePredicateObjectWith config bySubjectByPredicate inlinedSubjects { predicate, object } =
     let
+        keyObject : String
         keyObject =
             serializeNode object
     in

@@ -92,13 +92,12 @@ typing `Node`s.
 
 -}
 
-import Basics.Extra exposing (flip)
 import List.NonEmpty as NonEmpty
 import Rdf
 import Rdf.Encode.Bunch as Bunch
 import Rdf.Graph as Rdf exposing (Graph, Seed)
 import Rdf.Predicate as Predicate
-import Rdf.PropertyPath as PropertyPath exposing (PropertyPath)
+import Rdf.PropertyPath exposing (PropertyPath)
 
 
 {-| TODO
@@ -204,7 +203,7 @@ nodeHelp propertyEs subject seed =
 
                     GraphEncoder f ->
                         let
-                            ( subjectNext, ( graph, seedNextNext ) ) =
+                            ( _, ( graph, seedNextNext ) ) =
                                 f seedNext
                         in
                         ( graph :: graphs, seedNextNext )
@@ -300,6 +299,7 @@ predicate :
     -> PropertyEncoder
 predicate p (Encoder encoder) =
     let
+        encoderNew : Seed -> Subject -> ( Graph, Seed )
         encoderNew seed subject =
             case encoder of
                 GraphEncoder f ->
@@ -344,6 +344,7 @@ predicate p (Encoder encoder) =
 inverse : Predicate -> IsGraphOrLiteralEncoder object -> PropertyEncoder
 inverse predicate_ (Encoder encoder) =
     let
+        encoderNew : Seed -> Rdf.Node compatible -> ( Graph, Seed )
         encoderNew seed subject =
             case encoder of
                 GraphEncoder f ->
@@ -374,7 +375,7 @@ inverse predicate_ (Encoder encoder) =
                     , seedUpdatedUpdated
                     )
 
-                LiteralEncoder f ->
+                LiteralEncoder _ ->
                     -- Since RDF Literals can never be the subject of a Triple,
                     -- this case should not happen
                     ( Rdf.emptyGraph, seed )
