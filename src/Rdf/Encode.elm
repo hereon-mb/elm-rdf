@@ -92,6 +92,7 @@ typing `Node`s.
 
 -}
 
+import Internal.Node exposing (Node)
 import List.NonEmpty as NonEmpty
 import Rdf
 import Rdf.Encode.Bunch as Bunch
@@ -344,7 +345,7 @@ predicate p (Encoder encoder) =
 inverse : Predicate -> IsGraphOrLiteralEncoder object -> PropertyEncoder
 inverse predicate_ (Encoder encoder) =
     let
-        encoderNew : Seed -> Rdf.Node compatible -> ( Graph, Seed )
+        encoderNew : Seed -> Node compatible -> ( Graph, Seed )
         encoderNew seed subject =
             case encoder of
                 GraphEncoder f ->

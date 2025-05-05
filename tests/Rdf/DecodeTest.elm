@@ -183,7 +183,7 @@ propertyWithIncorrectObject =
             }
                 |> expectAllError
                     [ Expect.equal
-                        (Decode.UnexpectedLiteralDatatype
+                        (Decode.ExpectedLiteralDatatype
                             (xsd "string")
                             (xsd "integer")
                         )
@@ -318,10 +318,10 @@ combineOneFails =
                 |> expectAllError
                     [ Expect.equal
                         (Decode.Batch
-                            [ Decode.UnexpectedLiteralDatatype
+                            [ Decode.ExpectedLiteralDatatype
                                 (xsd "integer")
                                 (xsd "string")
-                            , Decode.UnexpectedLiteralDatatype
+                            , Decode.ExpectedLiteralDatatype
                                 (xsd "int")
                                 (xsd "string")
                             ]

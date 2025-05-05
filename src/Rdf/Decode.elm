@@ -15,7 +15,7 @@ module Rdf.Decode exposing
     , list, nonEmpty
     , at
     , decode
-    , Error(..), NodeType(..), errorToString
+    , Error(..), errorToString
     , map
     , map2
     , combine
@@ -68,7 +68,7 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 # Running Decoders
 
 @docs decode
-@docs Error, NodeType, errorToString
+@docs Error, errorToString
 
 
 # Transforming Values
@@ -98,6 +98,7 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 
 import Basics.Extra exposing (flip)
 import Dict exposing (Dict)
+import Internal.Node exposing (DataLiteral, Node(..), Variant(..))
 import List.Extra as List
 import List.NonEmpty as NonEmpty exposing (NonEmpty)
 import Maybe.Extra as Maybe
@@ -219,11 +220,14 @@ decode (Decoder f) graph =
 type Error
     = InvalidDate BlankNodeOrIriOrAnyLiteral
     | InvalidDateTime BlankNodeOrIriOrAnyLiteral
-    | UnexpectedLiteralDatatype Iri Iri
-    | UnexpectedNode NodeType Rdf.BlankNodeOrIriOrAnyLiteral
-    | UnexpectedBool String
-    | UnexpectedInt String
-    | UnexpectedFloat String
+    | ExpectedBlankNode BlankNodeOrIriOrAnyLiteral
+    | ExpectedIri BlankNodeOrIriOrAnyLiteral
+    | ExpectedBlankNodeOrIri BlankNodeOrIriOrAnyLiteral
+    | ExpectedAnyLiteral BlankNodeOrIriOrAnyLiteral
+    | ExpectedBool String
+    | ExpectedInt String
+    | ExpectedFloat String
+    | ExpectedLiteralDatatype Iri Iri
     | UnknownProperty BlankNodeOrIri PropertyPath
     | PropertyPresent BlankNodeOrIri PropertyPath
     | NoProperty BlankNodeOrIri
@@ -239,7 +243,7 @@ type Error
 
 {-| Turn a decoding error into a human friendly string. E.g.
 
-    errorToString (UnexpectedBool "42")
+    errorToString (ExpectedBool "42")
     --> "Expected a boolean, but found 42."
 
 -}
@@ -252,29 +256,32 @@ errorToString error_ =
         InvalidDateTime _ ->
             "Not a date time"
 
-        UnexpectedLiteralDatatype datatypeExpected datatypeFound ->
+        ExpectedLiteralDatatype datatypeExpected datatypeFound ->
             "Expected a literal of type "
                 ++ Rdf.toUrl datatypeExpected
                 ++ ", but found a literal of type "
                 ++ Rdf.toUrl datatypeFound
                 ++ "."
 
-        UnexpectedNode BlankNode nodeFound ->
+        ExpectedBlankNode nodeFound ->
             "Expected a blank node, but found " ++ Rdf.serializeNode nodeFound ++ "."
 
-        UnexpectedNode IriNode nodeFound ->
+        ExpectedIri nodeFound ->
             "Expected an IRI, but found " ++ Rdf.serializeNode nodeFound ++ "."
 
-        UnexpectedNode LiteralNode nodeFound ->
+        ExpectedBlankNodeOrIri nodeFound ->
+            "Expected a blank node or an IRI, but found " ++ Rdf.serializeNode nodeFound ++ "."
+
+        ExpectedAnyLiteral nodeFound ->
             "Expected a literal, but found " ++ Rdf.serializeNode nodeFound ++ "."
 
-        UnexpectedBool found ->
+        ExpectedBool found ->
             "Expected a boolean, but found " ++ found ++ "."
 
-        UnexpectedInt found ->
+        ExpectedInt found ->
             "Expected an integer, but found " ++ found ++ "."
 
-        UnexpectedFloat found ->
+        ExpectedFloat found ->
             "Expected a float, but found " ++ found ++ "."
 
         UnknownProperty nodeFocus pathExpected ->
@@ -346,14 +353,6 @@ indent lines =
         |> String.join "\n"
 
 
-{-| TODO Add documentation
--}
-type NodeType
-    = BlankNode
-    | IriNode
-    | LiteralNode
-
-
 {-| TODO
 -}
 blankNode : Decoder a -> Decoder a
@@ -370,7 +369,7 @@ blankNode (Decoder f) =
                                         |> f graph
 
                                 Nothing ->
-                                    Err (UnexpectedNode BlankNode node)
+                                    Err (ExpectedBlankNode node)
 
                         _ ->
                             Err (TooManyNodes nodes)
@@ -432,7 +431,7 @@ blankNodeOrIri =
                     |> andThen
                         (\node ->
                             Maybe.unwrap
-                                (error (UnexpectedNode BlankNode node))
+                                (error (ExpectedBlankNode node))
                                 succeed
                                 (Rdf.toBlankNode node)
                         )
@@ -453,7 +452,7 @@ blankNodeOrIriOrAnyLiteral =
                     |> andThen
                         (\node ->
                             Maybe.unwrap
-                                (error (UnexpectedNode BlankNode node))
+                                (error (ExpectedBlankNode node))
                                 succeed
                                 (Rdf.toBlankNode node)
                         )
@@ -500,7 +499,7 @@ bool =
                         succeed False
 
                     _ ->
-                        error (UnexpectedBool stringLiteral)
+                        error (ExpectedBool stringLiteral)
             )
 
 
@@ -538,7 +537,7 @@ int =
             (\intLiteral ->
                 case String.toInt intLiteral of
                     Nothing ->
-                        error (UnexpectedInt intLiteral)
+                        error (ExpectedInt intLiteral)
 
                     Just intValue ->
                         succeed intValue
@@ -576,7 +575,7 @@ float =
             (\floatLiteral ->
                 case String.toFloat floatLiteral of
                     Nothing ->
-                        error (UnexpectedFloat floatLiteral)
+                        error (ExpectedFloat floatLiteral)
 
                     Just floatValue ->
                         succeed floatValue
@@ -711,9 +710,15 @@ iri =
                 (\nodes ->
                     case nodes of
                         [ node ] ->
-                            node
-                                |> Rdf.toIri
-                                |> Result.fromMaybe (UnexpectedNode IriNode node)
+                            case node of
+                                Node (BlankNode _) ->
+                                    Err (ExpectedIri node)
+
+                                Node ((Iri _) as variant) ->
+                                    Ok (Node variant)
+
+                                Node (Literal _) ->
+                                    Err (ExpectedIri node)
 
                         _ ->
                             Err (TooManyNodes nodes)
@@ -772,14 +777,14 @@ list (Decoder f) =
                 >> Result.andThen
                     (\node ->
                         case node of
-                            Rdf.Node (Rdf.BlankNode data) ->
-                                Ok (Rdf.Node (Rdf.BlankNode data))
+                            Node ((BlankNode _) as variant) ->
+                                Ok (Node variant)
 
-                            Rdf.Node (Rdf.Iri _) ->
-                                Err (UnexpectedNode BlankNode node)
+                            Node (Iri _) ->
+                                Err (ExpectedBlankNode node)
 
-                            Rdf.Node (Rdf.Literal _) ->
-                                Err (UnexpectedNode BlankNode node)
+                            Node (Literal _) ->
+                                Err (ExpectedBlankNode node)
                     )
                 >> Result.andThen
                     (\focusNode ->
@@ -843,7 +848,7 @@ langString =
     literalData (Rdf.rdf "langString")
         |> andThen
             (\({ value, languageTag } as node) ->
-                Maybe.unwrap (error (MissingLangString (Rdf.Node (Rdf.Literal node))))
+                Maybe.unwrap (error (MissingLangString (Node (Literal node))))
                     (succeed << flip Tuple.pair value)
                     languageTag
             )
@@ -880,7 +885,7 @@ literal datatype =
     map .value (literalData datatype)
 
 
-literalData : Iri -> Decoder Rdf.LiteralData
+literalData : Iri -> Decoder DataLiteral
 literalData datatype =
     Decoder
         (\_ ->
@@ -889,15 +894,15 @@ literalData datatype =
                     case nodes of
                         [ node ] ->
                             case node of
-                                Rdf.Node (Rdf.BlankNode _) ->
-                                    Err (UnexpectedNode LiteralNode node)
+                                Node (BlankNode _) ->
+                                    Err (ExpectedAnyLiteral node)
 
-                                Rdf.Node (Rdf.Iri _) ->
-                                    Err (UnexpectedNode LiteralNode node)
+                                Node (Iri _) ->
+                                    Err (ExpectedAnyLiteral node)
 
-                                Rdf.Node (Rdf.Literal literalData_) ->
-                                    if literalData_.datatype /= datatype then
-                                        Err (UnexpectedLiteralDatatype datatype literalData_.datatype)
+                                Node (Literal literalData_) ->
+                                    if literalData_.datatype /= Rdf.toUrl datatype then
+                                        Err (ExpectedLiteralDatatype datatype (Rdf.iri literalData_.datatype))
 
                                     else
                                         Ok literalData_
@@ -919,14 +924,14 @@ anyLiteral =
                     case nodes of
                         [ node ] ->
                             case node of
-                                Rdf.Node (Rdf.BlankNode _) ->
-                                    Err (UnexpectedNode LiteralNode node)
+                                Node (BlankNode _) ->
+                                    Err (ExpectedAnyLiteral node)
 
-                                Rdf.Node (Rdf.Iri _) ->
-                                    Err (UnexpectedNode LiteralNode node)
+                                Node (Iri _) ->
+                                    Err (ExpectedAnyLiteral node)
 
-                                Rdf.Node (Rdf.Literal literalData_) ->
-                                    Ok (Rdf.Node (Rdf.Literal literalData_))
+                                Node ((Literal _) as variant) ->
+                                    Ok (Node variant)
 
                         _ ->
                             Err (TooManyNodes nodes)
@@ -946,14 +951,14 @@ property path (Decoder f) =
                         (List.map
                             (\node ->
                                 case node of
-                                    Rdf.Node (Rdf.BlankNode data) ->
-                                        Ok (Rdf.Node (Rdf.BlankNode data))
+                                    Node ((BlankNode _) as variant) ->
+                                        Ok (Node variant)
 
-                                    Rdf.Node (Rdf.Iri data) ->
-                                        Ok (Rdf.Node (Rdf.Iri data))
+                                    Node ((Iri _) as variant) ->
+                                        Ok (Node variant)
 
-                                    Rdf.Node (Rdf.Literal _) ->
-                                        Err (UnexpectedNode BlankNode node)
+                                    Node (Literal _) ->
+                                        Err (ExpectedBlankNodeOrIri node)
                             )
                             nodes
                         )
@@ -995,14 +1000,14 @@ noProperty path =
                         (List.map
                             (\node ->
                                 case node of
-                                    Rdf.Node (Rdf.BlankNode data) ->
-                                        Ok (Rdf.Node (Rdf.BlankNode data))
+                                    Node ((BlankNode _) as variant) ->
+                                        Ok (Node variant)
 
-                                    Rdf.Node (Rdf.Iri data) ->
-                                        Ok (Rdf.Node (Rdf.Iri data))
+                                    Node ((Iri _) as variant) ->
+                                        Ok (Node variant)
 
-                                    Rdf.Node (Rdf.Literal _) ->
-                                        Err (UnexpectedNode BlankNode node)
+                                    Node (Literal _) ->
+                                        Err (ExpectedAnyLiteral node)
                             )
                             nodes
                         )
@@ -1045,14 +1050,14 @@ anyPredicate (Decoder f) =
                         (List.map
                             (\node ->
                                 case node of
-                                    Rdf.Node (Rdf.BlankNode data) ->
-                                        Ok (Rdf.Node (Rdf.BlankNode data))
+                                    Node ((BlankNode _) as variant) ->
+                                        Ok (Node variant)
 
-                                    Rdf.Node (Rdf.Iri data) ->
-                                        Ok (Rdf.Node (Rdf.Iri data))
+                                    Node ((Iri _) as variant) ->
+                                        Ok (Node variant)
 
-                                    Rdf.Node (Rdf.Literal _) ->
-                                        Err (UnexpectedNode BlankNode node)
+                                    Node (Literal _) ->
+                                        Err (ExpectedBlankNodeOrIri node)
                             )
                             nodes
                         )
@@ -1549,8 +1554,8 @@ followPropertyPath data propertyPath nodeFocus =
                         |> List.concatMap (followPropertyPath data next)
 
                 asBlankNodeOrIriCompatible : Rdf.BlankNodeOrIri -> Rdf.IsBlankNodeOrIri compatible
-                asBlankNodeOrIriCompatible (Rdf.Node node) =
-                    Rdf.Node node
+                asBlankNodeOrIriCompatible (Node node) =
+                    Node node
             in
             rest
                 |> List.foldl step nodesAtFirst

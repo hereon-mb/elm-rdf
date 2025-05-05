@@ -1,13 +1,12 @@
 module Rdf exposing
-    ( Node(..), Yes, No
-    , Iri, BlankNode, Literal, LiteralData
+    ( Node, Yes, No
+    , Iri, BlankNode, Literal
     , BlankNodeOrIri, AnyLiteral, BlankNodeOrIriOrAnyLiteral
     , asIri, asBlankNode, asLiteral
     , asBlankNodeOrIri, asAnyLiteral, asBlankNodeOrIriOrAnyLiteral
     , IsIri, IsBlankNode
     , IsBlankNodeOrIri, IsAnyLiteral, IsBlankNodeOrIriOrAnyLiteral
     , NTriple
-    , NodeInternal(..)
     , iri, blankNode
     , literal
     , string, langString
@@ -23,7 +22,7 @@ module Rdf exposing
     , toDate, toDateTime
     , toBool
     , appendPath, dropFragment, setFragment
-    , serializeNode, serializeNodeTurtle, SerializeConfig, serializeNTriple, serializeNodeHelp
+    , serializeNode, serializeNodeTurtle, SerializeConfig, serializeNTriple
     , encodeNTriple
     , nTripleDecoder
     , StringOrLangString(..)
@@ -40,7 +39,7 @@ module Rdf exposing
 
 @docs Node, Yes, No
 
-@docs Iri, BlankNode, Literal, LiteralData
+@docs Iri, BlankNode, Literal
 @docs BlankNodeOrIri, AnyLiteral, BlankNodeOrIriOrAnyLiteral
 @docs asIri, asBlankNode, asLiteral
 @docs asBlankNodeOrIri, asAnyLiteral, asBlankNodeOrIriOrAnyLiteral
@@ -49,8 +48,6 @@ module Rdf exposing
 @docs IsBlankNodeOrIri, IsAnyLiteral, IsBlankNodeOrIriOrAnyLiteral
 
 @docs NTriple
-
-@docs NodeInternal
 
 
 ## Create
@@ -80,7 +77,7 @@ module Rdf exposing
 
 ## Serialize
 
-@docs serializeNode, serializeNodeTurtle, SerializeConfig, serializeNTriple, serializeNodeHelp
+@docs serializeNode, serializeNodeTurtle, SerializeConfig, serializeNTriple
 
 
 ## Json
@@ -101,6 +98,12 @@ module Rdf exposing
 
 import Decimal exposing (Decimal)
 import Dict exposing (Dict)
+import Internal.Node as Internal
+    exposing
+        ( DataLiteral
+        , Node(..)
+        , Variant(..)
+        )
 import Iso8601
 import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline as Decode
@@ -113,8 +116,8 @@ import Time exposing (Posix)
 
 {-| TODO Add documentation
 -}
-type Node compatible
-    = Node NodeInternal
+type alias Node compatible =
+    Internal.Node compatible
 
 
 {-| TODO Add documentation
@@ -127,23 +130,6 @@ type Yes
 -}
 type No
     = No Never
-
-
-{-| FIXME internals exposed for benchmarks
--}
-type NodeInternal
-    = BlankNode String
-    | Iri String
-    | Literal LiteralData
-
-
-{-| TODO Add documentation
--}
-type alias LiteralData =
-    { value : String
-    , datatype : Iri
-    , languageTag : Maybe String
-    }
 
 
 {-| TODO Add documentation
@@ -289,7 +275,7 @@ literal datatype value =
     Node
         (Literal
             { value = value
-            , datatype = datatype
+            , datatype = toUrl datatype
             , languageTag = Nothing
             }
         )
@@ -302,7 +288,7 @@ string value =
     Node
         (Literal
             { value = value
-            , datatype = xsdString
+            , datatype = urlXsdString
             , languageTag = Nothing
             }
         )
@@ -315,7 +301,7 @@ langString languageTag value =
     Node
         (Literal
             { value = value
-            , datatype = rdfLangString
+            , datatype = urlRdfLangString
             , languageTag = Just languageTag
             }
         )
@@ -328,7 +314,7 @@ int value =
     Node
         (Literal
             { value = String.fromInt value
-            , datatype = xsdInteger
+            , datatype = urlXsdInteger
             , languageTag = Nothing
             }
         )
@@ -341,7 +327,7 @@ float value =
     Node
         (Literal
             { value = String.fromFloat value
-            , datatype = xsdDouble
+            , datatype = urlXsdDouble
             , languageTag = Nothing
             }
         )
@@ -354,7 +340,7 @@ decimal value =
     Node
         (Literal
             { value = Decimal.toString value
-            , datatype = xsdDecimal
+            , datatype = urlXsdDecimal
             , languageTag = Nothing
             }
         )
@@ -367,7 +353,7 @@ date value =
     Node
         (Literal
             { value = String.left (4 + 1 + 2 + 1 + 2) (Iso8601.fromTime value)
-            , datatype = xsdDate
+            , datatype = urlXsdDate
             , languageTag = Nothing
             }
         )
@@ -380,7 +366,7 @@ dateTime value =
     Node
         (Literal
             { value = Iso8601.fromTime value
-            , datatype = xsdDateTime
+            , datatype = urlXsdDateTime
             , languageTag = Nothing
             }
         )
@@ -398,7 +384,7 @@ bool value =
 
                 else
                     "false"
-            , datatype = xsdBoolean
+            , datatype = urlXsdBoolean
             , languageTag = Nothing
             }
         )
@@ -567,7 +553,7 @@ toString (Node node) =
             Nothing
 
         Literal data ->
-            if data.datatype == xsdString then
+            if data.datatype == urlXsdString then
                 Just data.value
 
             else
@@ -586,7 +572,7 @@ toLangString (Node node) =
             Nothing
 
         Literal data ->
-            if data.datatype == rdfLangString then
+            if data.datatype == urlRdfLangString then
                 Maybe.map2 Tuple.pair data.languageTag (Just data.value)
 
             else
@@ -605,10 +591,10 @@ toInt (Node node) =
             Nothing
 
         Literal data ->
-            if data.datatype == xsdInt then
+            if data.datatype == urlXsdInt then
                 String.toInt data.value
 
-            else if data.datatype == xsdInteger then
+            else if data.datatype == urlXsdInteger then
                 String.toInt data.value
 
             else
@@ -627,7 +613,7 @@ toFloat (Node node) =
             Nothing
 
         Literal data ->
-            if data.datatype == xsdDouble then
+            if data.datatype == urlXsdDouble then
                 String.toFloat data.value
 
             else
@@ -646,7 +632,7 @@ toDecimal (Node node) =
             Nothing
 
         Literal data ->
-            if data.datatype == xsdDecimal then
+            if data.datatype == urlXsdDecimal then
                 Decimal.fromString data.value
 
             else
@@ -665,7 +651,7 @@ toDate (Node node) =
             Nothing
 
         Literal data ->
-            if data.datatype == xsdDate then
+            if data.datatype == urlXsdDate then
                 (data.value ++ "T00:00:00.000Z")
                     |> Iso8601.toTime
                     |> Result.toMaybe
@@ -686,7 +672,7 @@ toDateTime (Node node) =
             Nothing
 
         Literal data ->
-            if data.datatype == xsdDateTime then
+            if data.datatype == urlXsdDateTime then
                 data.value
                     |> Iso8601.toTime
                     |> Result.toMaybe
@@ -707,7 +693,7 @@ toBool (Node node) =
             Nothing
 
         Literal data ->
-            if data.datatype == xsdBoolean then
+            if data.datatype == urlXsdBoolean then
                 case data.value of
                     "true" ->
                         Just True
@@ -814,44 +800,8 @@ setFragment fragment (Node node) =
 {-| TODO Add documentation
 -}
 serializeNode : Node compatible -> String
-serializeNode (Node node) =
-    serializeNodeHelp node
-
-
-{-| TODO Add documentation
--}
-serializeNodeHelp : NodeInternal -> String
-serializeNodeHelp node =
-    case node of
-        BlankNode value ->
-            "_:" ++ value
-
-        Iri value ->
-            "<" ++ value ++ ">"
-
-        Literal data ->
-            let
-                replaceLineBreaks : String -> String
-                replaceLineBreaks =
-                    String.replace "\n" "\\n"
-
-                replaceQuotes : String -> String
-                replaceQuotes =
-                    String.replace "\"" "\\\""
-            in
-            [ "\""
-            , data.value
-                |> replaceLineBreaks
-                |> replaceQuotes
-            , "\""
-            , case data.languageTag of
-                Nothing ->
-                    "^^" ++ serializeNode data.datatype
-
-                Just languageTag ->
-                    "@" ++ languageTag
-            ]
-                |> String.concat
+serializeNode (Node variant) =
+    Internal.serializeVariant variant
 
 
 {-| TODO Add documentation
@@ -871,7 +821,7 @@ serializeNodeTurtle config (Node node) =
 
 {-| TODO Add documentation
 -}
-serializeNodeTurtleHelp : SerializeConfig -> NodeInternal -> String
+serializeNodeTurtleHelp : SerializeConfig -> Variant -> String
 serializeNodeTurtleHelp config node =
     case node of
         BlankNode value ->
@@ -913,7 +863,7 @@ serializeNodeTurtleHelp config node =
                 replaceQuotes =
                     String.replace "\"" "\\\""
             in
-            if data.datatype == xsdString then
+            if data.datatype == urlXsdString then
                 [ "\""
                 , data.value
                     |> replaceLineBreaks
@@ -929,8 +879,8 @@ serializeNodeTurtleHelp config node =
                     |> String.concat
 
             else if
-                (data.datatype == xsdInteger)
-                    || (data.datatype == xsdInt)
+                (data.datatype == urlXsdInteger)
+                    || (data.datatype == urlXsdInt)
             then
                 data.value
 
@@ -942,7 +892,7 @@ serializeNodeTurtleHelp config node =
                 , "\""
                 , case data.languageTag of
                     Nothing ->
-                        "^^" ++ serializeNodeTurtle config data.datatype
+                        "^^" ++ serializeNodeTurtle config (iri data.datatype)
 
                     Just languageTag ->
                         "@" ++ languageTag
@@ -1080,7 +1030,7 @@ objectDecoder =
         |> Decode.map Node
 
 
-blankNodeDecoder : Decoder NodeInternal
+blankNodeDecoder : Decoder Variant
 blankNodeDecoder =
     Decode.string
         |> Decode.field "termType"
@@ -1096,8 +1046,13 @@ blankNodeDecoder =
             )
 
 
-iriDecoder : Decoder NodeInternal
+iriDecoder : Decoder Variant
 iriDecoder =
+    Decode.map Iri urlDecoder
+
+
+urlDecoder : Decoder String
+urlDecoder =
     Decode.string
         |> Decode.field "termType"
         |> Decode.andThen
@@ -1105,23 +1060,22 @@ iriDecoder =
                 if termType == "NamedNode" then
                     Decode.string
                         |> Decode.field "value"
-                        |> Decode.map Iri
 
                 else
                     Decode.fail "not a named node"
             )
 
 
-literalDecoder : Decoder NodeInternal
+literalDecoder : Decoder Variant
 literalDecoder =
     Decode.string
         |> Decode.field "termType"
         |> Decode.andThen
             (\termType ->
                 if termType == "Literal" then
-                    Decode.succeed LiteralData
+                    Decode.succeed DataLiteral
                         |> Decode.required "value" Decode.string
-                        |> Decode.required "datatype" (Decode.map Node iriDecoder)
+                        |> Decode.required "datatype" urlDecoder
                         |> Decode.required "language"
                             (Decode.oneOf
                                 [ Decode.null Nothing
@@ -1209,18 +1163,11 @@ encodeIri url =
         |> Encode.object
 
 
-encodeLiteral : LiteralData -> Value
+encodeLiteral : DataLiteral -> Value
 encodeLiteral data =
     [ ( "termType", Encode.string "Literal" )
     , ( "value", Encode.string data.value )
-    , ( "datatype"
-      , case data.datatype of
-            Node (Iri url) ->
-                encodeIri url
-
-            _ ->
-                Encode.null
-      )
+    , ( "datatype", encodeIri data.datatype )
     , ( "language"
       , case data.languageTag of
             Nothing ->
@@ -1235,58 +1182,49 @@ encodeLiteral data =
 
 
 -- CONSTANTS
+-- URLS
 
 
-xsdString : Iri
-xsdString =
-    xsd "string"
+urlXsdString : String
+urlXsdString =
+    "http://www.w3.org/2001/XMLSchema#string"
 
 
-rdfLangString : Iri
-rdfLangString =
-    rdf "langString"
+urlXsdInt : String
+urlXsdInt =
+    "http://www.w3.org/2001/XMLSchema#int"
 
 
-xsdInt : Iri
-xsdInt =
-    xsd "int"
+urlXsdInteger : String
+urlXsdInteger =
+    "http://www.w3.org/2001/XMLSchema#integer"
 
 
-xsdInteger : Iri
-xsdInteger =
-    xsd "integer"
+urlXsdDouble : String
+urlXsdDouble =
+    "http://www.w3.org/2001/XMLSchema#double"
 
 
-xsdDouble : Iri
-xsdDouble =
-    xsd "double"
+urlXsdDecimal : String
+urlXsdDecimal =
+    "http://www.w3.org/2001/XMLSchema#decimal"
 
 
-xsdDecimal : Iri
-xsdDecimal =
-    xsd "decimal"
+urlXsdDate : String
+urlXsdDate =
+    "http://www.w3.org/2001/XMLSchema#date"
 
 
-xsdDate : Iri
-xsdDate =
-    xsd "date"
+urlXsdDateTime : String
+urlXsdDateTime =
+    "http://www.w3.org/2001/XMLSchema#dateTime"
 
 
-xsdDateTime : Iri
-xsdDateTime =
-    xsd "dateTime"
+urlXsdBoolean : String
+urlXsdBoolean =
+    "http://www.w3.org/2001/XMLSchema#boolean"
 
 
-xsdBoolean : Iri
-xsdBoolean =
-    xsd "boolean"
-
-
-xsd : String -> Iri
-xsd name =
-    Node (Iri ("http://www.w3.org/2001/XMLSchema#" ++ name))
-
-
-rdf : String -> Iri
-rdf name =
-    Node (Iri ("http://www.w3.org/1999/02/22-rdf-syntax-ns#" ++ name))
+urlRdfLangString : String
+urlRdfLangString =
+    "http://www.w3.org/1999/02/22-rdf-syntax-ns#langString"

@@ -44,6 +44,7 @@ module Rdf.Graph exposing
 -}
 
 import Dict exposing (Dict)
+import Internal.Node exposing (Node(..), Variant(..))
 import Internal.Turtle as Turtle
 import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode exposing (Value)
@@ -60,8 +61,6 @@ import Rdf
         , IsBlankNodeOrIri
         , IsIri
         , NTriple
-        , Node(..)
-        , NodeInternal(..)
         , SerializeConfig
         , asBlankNodeOrIri
         , asBlankNodeOrIriOrAnyLiteral
