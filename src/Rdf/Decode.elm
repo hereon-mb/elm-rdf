@@ -97,13 +97,22 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 -}
 
 import Basics.Extra exposing (flip)
+import Dict exposing (Dict)
+import List.Extra as List
 import List.NonEmpty as NonEmpty exposing (NonEmpty)
 import Maybe.Extra as Maybe
-import Rdf exposing (BlankNodeOrIri, BlankNodeOrIriOrAnyLiteral, Iri, IsBlankNodeOrIri, IsIri)
-import Rdf.Graph exposing (Graph)
-import Rdf.Namespaces as Rdf
+import Rdf
+    exposing
+        ( BlankNodeOrIri
+        , BlankNodeOrIriOrAnyLiteral
+        , Iri
+        , IsBlankNodeOrIri
+        , IsBlankNodeOrIriOrAnyLiteral
+        , IsIri
+        )
+import Rdf.Graph exposing (Graph(..))
+import Rdf.Namespaces as Rdf exposing (rdf)
 import Rdf.PropertyPath as Rdf exposing (PropertyPath)
-import Rdf.Query as Rdf
 import Result.Extra as Result
 import Time
 
@@ -172,14 +181,8 @@ from nodeFocus (Decoder f) =
     Decoder
         (\graph _ ->
             if
-                (Rdf.emptyQuery
-                    |> Rdf.withSubject nodeFocus
-                    |> Rdf.exists graph
-                )
-                    || (Rdf.emptyQuery
-                            |> Rdf.withObject nodeFocus
-                            |> Rdf.exists graph
-                       )
+                hasTripleWithSubject nodeFocus graph
+                    || hasTripleWithObject nodeFocus graph
             then
                 f graph (Ok [ Rdf.asBlankNodeOrIriOrAnyLiteral nodeFocus ])
 
@@ -194,8 +197,8 @@ fromSubject : Decoder a -> Decoder a
 fromSubject (Decoder f) =
     Decoder
         (\graph _ ->
-            Rdf.emptyQuery
-                |> Rdf.getSubjects graph
+            graph
+                |> getSubjects
                 |> List.map Rdf.asBlankNodeOrIriOrAnyLiteral
                 |> Ok
                 |> f graph
@@ -781,7 +784,7 @@ list (Decoder f) =
                 >> Result.andThen
                     (\focusNode ->
                         focusNode
-                            |> Rdf.objectToList graph
+                            |> objectToList graph
                             |> Maybe.withDefault []
                             |> List.map
                                 (\nodeChild ->
@@ -964,12 +967,7 @@ property path (Decoder f) =
                                     Result.combine
                                         (List.map
                                             (\focusNode ->
-                                                case
-                                                    Rdf.emptyQuery
-                                                        |> Rdf.withSubject focusNode
-                                                        |> Rdf.withPropertyPath path
-                                                        |> Rdf.getObjects graph
-                                                of
+                                                case getObjectsAt focusNode path graph of
                                                     [] ->
                                                         Err (UnknownProperty focusNode path)
 
@@ -1015,12 +1013,7 @@ noProperty path =
                             Result.combine
                                 (List.map
                                     (\focusNode ->
-                                        case
-                                            Rdf.emptyQuery
-                                                |> Rdf.withSubject focusNode
-                                                |> Rdf.withPropertyPath path
-                                                |> Rdf.getObjects graph
-                                        of
+                                        case getObjectsAt focusNode path graph of
                                             [] ->
                                                 Ok ()
 
@@ -1073,11 +1066,7 @@ anyPredicate (Decoder f) =
                                     Result.combine
                                         (List.map
                                             (\focusNode ->
-                                                case
-                                                    Rdf.emptyQuery
-                                                        |> Rdf.withSubject focusNode
-                                                        |> Rdf.getObjects graph
-                                                of
+                                                case getObjects focusNode graph of
                                                     [] ->
                                                         Err (NoProperty focusNode)
 
@@ -1442,3 +1431,209 @@ lazy f =
 combine : List (Decoder a) -> Decoder (List a)
 combine =
     List.foldr (map2 (::)) (succeed [])
+
+
+
+--  QUERY
+
+
+hasTripleWithSubject : IsBlankNodeOrIri compatible -> Graph -> Bool
+hasTripleWithSubject nodeFocusCompatible (Graph data) =
+    let
+        subjectMatches : Rdf.NTriple -> Bool
+        subjectMatches triple =
+            triple.subject == nodeFocus
+
+        nodeFocus : Rdf.BlankNodeOrIri
+        nodeFocus =
+            Rdf.asBlankNodeOrIri nodeFocusCompatible
+    in
+    data.nTriples
+        |> List.filter subjectMatches
+        |> List.isEmpty
+        |> not
+
+
+hasTripleWithObject : IsBlankNodeOrIriOrAnyLiteral compatible -> Graph -> Bool
+hasTripleWithObject nodeFocusCompatible (Graph data) =
+    let
+        objectMatches : Rdf.NTriple -> Bool
+        objectMatches triple =
+            triple.object == nodeFocus
+
+        nodeFocus : Rdf.BlankNodeOrIriOrAnyLiteral
+        nodeFocus =
+            Rdf.asBlankNodeOrIriOrAnyLiteral nodeFocusCompatible
+    in
+    data.nTriples
+        |> List.filter objectMatches
+        |> List.isEmpty
+        |> not
+
+
+getSubjects : Graph -> List BlankNodeOrIri
+getSubjects (Graph data) =
+    data.nTriples
+        |> List.map .subject
+        -- FIXME Make sure, subjects are already unique when stored.
+        |> List.unique
+
+
+getObjectsAt : IsBlankNodeOrIri compatible -> PropertyPath -> Graph -> List BlankNodeOrIriOrAnyLiteral
+getObjectsAt nodeFocus path (Graph data) =
+    nodeFocus
+        |> followPropertyPath data path
+        |> List.unique
+
+
+type alias GraphData rest =
+    { rest
+        | bySubjectByPredicate : Dict String (Dict String (List Rdf.NTriple))
+        , byPredicateBySubject : Dict String (Dict String (List Rdf.NTriple))
+    }
+
+
+followPropertyPath :
+    GraphData rest
+    -> PropertyPath
+    -> IsBlankNodeOrIri compatible
+    -> List BlankNodeOrIriOrAnyLiteral
+followPropertyPath data propertyPath nodeFocus =
+    case propertyPath of
+        Rdf.PredicatePath iriPredicate ->
+            data.bySubjectByPredicate
+                |> Dict.get (Rdf.serializeNode nodeFocus)
+                |> Maybe.withDefault Dict.empty
+                |> Dict.get (Rdf.serializeNode iriPredicate)
+                |> Maybe.withDefault []
+                |> List.map .object
+
+        Rdf.InversePath (Rdf.PredicatePath iriPredicate) ->
+            data.byPredicateBySubject
+                |> Dict.get (Rdf.serializeNode iriPredicate)
+                |> Maybe.withDefault Dict.empty
+                |> Dict.values
+                |> List.concatMap
+                    (\triples ->
+                        let
+                            objectRaw : String
+                            objectRaw =
+                                Rdf.serializeNode nodeFocus
+                        in
+                        List.filterMap
+                            (\triple ->
+                                if Rdf.serializeNode triple.object == objectRaw then
+                                    Just triple.subject
+
+                                else
+                                    Nothing
+                            )
+                            triples
+                    )
+                |> List.map Rdf.asBlankNodeOrIriOrAnyLiteral
+
+        Rdf.SequencePath first rest ->
+            let
+                nodesAtFirst : List Rdf.BlankNodeOrIriOrAnyLiteral
+                nodesAtFirst =
+                    followPropertyPath data first nodeFocus
+
+                step :
+                    Rdf.PropertyPath
+                    -> List Rdf.BlankNodeOrIriOrAnyLiteral
+                    -> List Rdf.BlankNodeOrIriOrAnyLiteral
+                step next nodes =
+                    nodes
+                        |> List.filterMap Rdf.toBlankNodeOrIri
+                        |> List.map asBlankNodeOrIriCompatible
+                        |> List.concatMap (followPropertyPath data next)
+
+                asBlankNodeOrIriCompatible : Rdf.BlankNodeOrIri -> Rdf.IsBlankNodeOrIri compatible
+                asBlankNodeOrIriCompatible (Rdf.Node node) =
+                    Rdf.Node node
+            in
+            rest
+                |> List.foldl step nodesAtFirst
+
+        _ ->
+            []
+
+
+getObjects : IsBlankNodeOrIri compatible -> Graph -> List BlankNodeOrIriOrAnyLiteral
+getObjects nodeFocus (Graph data) =
+    data.bySubjectByPredicate
+        |> Dict.get (Rdf.serializeNode nodeFocus)
+        |> Maybe.withDefault Dict.empty
+        |> Dict.values
+        |> List.concat
+        |> List.map .object
+        -- FIXME Make sure, objects are already unique when stored.
+        |> List.unique
+
+
+objectToList : Graph -> BlankNodeOrIri -> Maybe (List BlankNodeOrIriOrAnyLiteral)
+objectToList graph nodeFocus =
+    if Rdf.toIri nodeFocus == Just rdfNil then
+        Just []
+
+    else
+        Maybe.map2
+            (\first rest ->
+                first :: rest
+            )
+            (getFirst nodeFocus graph)
+            (getRest nodeFocus graph
+                |> Maybe.andThen (objectToList graph)
+            )
+
+
+getFirst : IsBlankNodeOrIri compatible -> Graph -> Maybe BlankNodeOrIriOrAnyLiteral
+getFirst nodeFocus (Graph data) =
+    case
+        data.bySubjectByPredicate
+            |> Dict.get (Rdf.serializeNode nodeFocus)
+            |> Maybe.withDefault Dict.empty
+            |> Dict.get (Rdf.serializeNode rdfFirst)
+            |> Maybe.withDefault []
+            |> List.map .object
+            |> List.unique
+    of
+        [ value ] ->
+            Just value
+
+        _ ->
+            Nothing
+
+
+getRest : IsBlankNodeOrIri compatible -> Graph -> Maybe BlankNodeOrIri
+getRest nodeFocus (Graph data) =
+    case
+        data.bySubjectByPredicate
+            |> Dict.get (Rdf.serializeNode nodeFocus)
+            |> Maybe.withDefault Dict.empty
+            |> Dict.get (Rdf.serializeNode rdfRest)
+            |> Maybe.withDefault []
+            |> List.map .object
+            |> List.filterMap Rdf.toBlankNodeOrIri
+            |> List.unique
+    of
+        [ value ] ->
+            Just value
+
+        _ ->
+            Nothing
+
+
+rdfNil : Iri
+rdfNil =
+    rdf "nil"
+
+
+rdfFirst : Iri
+rdfFirst =
+    rdf "first"
+
+
+rdfRest : Iri
+rdfRest =
+    rdf "rest"
