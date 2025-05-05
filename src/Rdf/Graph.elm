@@ -70,10 +70,8 @@ import Rdf
         , nTripleDecoder
         , serializeNTriple
         , serializeNode
-        , serializeNodeHelp
         , serializeNodeTurtle
         , toBlankNodeOrIri
-        , unwrap
         )
 import Rdf.Namespaces exposing (rdf, xsd)
 import Rdf.PropertyPath exposing (PropertyPath(..))
@@ -361,7 +359,11 @@ insertAtNext propertyPaths object idFocusNodeNext graphNext seedNext =
 
 getBlankNodeOrIriObject : IsBlankNodeOrIri compatible1 -> Iri -> Graph -> Maybe BlankNodeOrIri
 getBlankNodeOrIriObject subject predicate (Graph graph) =
-    case List.unique (List.map Node (followPropertyPath graph predicate (unwrap subject))) of
+    case
+        followPropertyPath graph predicate subject
+            |> List.filterMap Rdf.toBlankNodeOrIri
+            |> List.unique
+    of
         [ object ] ->
             Just object
 
@@ -369,14 +371,14 @@ getBlankNodeOrIriObject subject predicate (Graph graph) =
             Nothing
 
 
-followPropertyPath : GraphData -> Iri -> NodeInternal -> List NodeInternal
+followPropertyPath : GraphData -> Iri -> IsBlankNodeOrIri compatible -> List BlankNodeOrIriOrAnyLiteral
 followPropertyPath data predicate subject =
     data.bySubjectByPredicate
-        |> Dict.get (serializeNodeHelp subject)
+        |> Dict.get (serializeNode subject)
         |> Maybe.withDefault Dict.empty
         |> Dict.get (serializeNode predicate)
         |> Maybe.withDefault []
-        |> List.map (.object >> unwrap)
+        |> List.map .object
 
 
 {-| TODO Add documentation

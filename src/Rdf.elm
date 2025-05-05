@@ -7,7 +7,7 @@ module Rdf exposing
     , IsIri, IsBlankNode
     , IsBlankNodeOrIri, IsAnyLiteral, IsBlankNodeOrIriOrAnyLiteral
     , NTriple
-    , NodeInternal(..), unwrap
+    , NodeInternal(..)
     , iri, blankNode
     , literal
     , string, langString
@@ -50,7 +50,7 @@ module Rdf exposing
 
 @docs NTriple
 
-@docs NodeInternal, unwrap
+@docs NodeInternal
 
 
 ## Create
@@ -135,13 +135,6 @@ type NodeInternal
     = BlankNode String
     | Iri String
     | Literal LiteralData
-
-
-{-| FIXME Remove this
--}
-unwrap : Node compatible -> NodeInternal
-unwrap (Node node) =
-    node
 
 
 {-| TODO Add documentation
