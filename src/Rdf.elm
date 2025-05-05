@@ -478,14 +478,14 @@ asIri (Node node) =
 
 {-| TODO Add documentation
 -}
-asBlankNode : IsIri compatible -> BlankNode
+asBlankNode : IsBlankNode compatible -> BlankNode
 asBlankNode (Node node) =
     Node node
 
 
 {-| TODO Add documentation
 -}
-asLiteral : IsIri compatible -> Literal a
+asLiteral : IsAnyLiteral compatible -> Literal a
 asLiteral (Node node) =
     Node node
 
@@ -499,14 +499,14 @@ asBlankNodeOrIri (Node node) =
 
 {-| TODO Add documentation
 -}
-asBlankNodeOrIriOrAnyLiteral : Node compatible -> BlankNodeOrIriOrAnyLiteral
+asBlankNodeOrIriOrAnyLiteral : IsBlankNodeOrIriOrAnyLiteral compatible -> BlankNodeOrIriOrAnyLiteral
 asBlankNodeOrIriOrAnyLiteral (Node node) =
     Node node
 
 
 {-| TODO Add documentation
 -}
-asAnyLiteral : Node compatible -> AnyLiteral
+asAnyLiteral : IsAnyLiteral compatible -> AnyLiteral
 asAnyLiteral (Node node) =
     Node node
 
