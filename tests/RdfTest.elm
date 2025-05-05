@@ -343,6 +343,7 @@ testParseCase raw expected =
         \_ ->
             raw
                 |> Rdf.Graph.parse
+                |> Result.map (Rdf.Graph.clearBase >> Rdf.Graph.clearPrefixes)
                 |> Expect.equal (Ok (Rdf.Graph.fromNTriples expected))
 
 

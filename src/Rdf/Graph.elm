@@ -9,7 +9,7 @@ module Rdf.Graph exposing
     , fromNTriples
     , Seed, initialSeed, seedGenerator
     , insert, insertAt, generateBlankNode
-    , setBase, addPrefix, addPrefixes
+    , setBase, clearBase, addPrefix, addPrefixes, clearPrefixes
     , getBase, getPrefixes
     )
 
@@ -34,7 +34,7 @@ module Rdf.Graph exposing
 
 @docs Seed, initialSeed, seedGenerator
 @docs insert, insertAt, generateBlankNode
-@docs setBase, addPrefix, addPrefixes
+@docs setBase, clearBase, addPrefix, addPrefixes, clearPrefixes
 
 
 ## Info
@@ -181,6 +181,11 @@ getBase (Graph data) =
     data.base
 
 
+clearBase : Graph -> Graph
+clearBase (Graph data) =
+    Graph { data | base = Nothing }
+
+
 addPrefix : String -> String -> Graph -> Graph
 addPrefix prefix value (Graph data) =
     Graph { data | prefixes = Dict.insert prefix value data.prefixes }
@@ -189,6 +194,11 @@ addPrefix prefix value (Graph data) =
 addPrefixes : Dict String String -> Graph -> Graph
 addPrefixes prefixes (Graph data) =
     Graph { data | prefixes = Dict.union prefixes data.prefixes }
+
+
+clearPrefixes : Graph -> Graph
+clearPrefixes (Graph data) =
+    Graph { data | prefixes = Dict.empty }
 
 
 getPrefixes : Graph -> Dict String String
