@@ -117,12 +117,14 @@ type Node compatible
     = Node NodeInternal
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 type Yes
     = Yes Never
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 type No
     = No Never
 
@@ -151,7 +153,8 @@ type alias LiteralData =
     }
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 type alias Iri =
     Node
         { isBlankNode : No
@@ -163,7 +166,8 @@ type alias Iri =
         }
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 type alias BlankNode =
     Node
         { isBlankNode : Yes
@@ -175,7 +179,8 @@ type alias BlankNode =
         }
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 type alias Literal a =
     Node
         { isLiteral : a
@@ -188,7 +193,8 @@ type alias Literal a =
         }
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 type alias BlankNodeOrIri =
     Node
         { isBlankNode : No
@@ -200,7 +206,8 @@ type alias BlankNodeOrIri =
         }
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 type alias AnyLiteral =
     Node
         { isBlankNode : No
@@ -212,7 +219,8 @@ type alias AnyLiteral =
         }
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 type alias BlankNodeOrIriOrAnyLiteral =
     Node
         { isBlankNode : No
@@ -224,27 +232,32 @@ type alias BlankNodeOrIriOrAnyLiteral =
         }
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 type alias IsIri compatible =
     Node { compatible | isIri : Yes }
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 type alias IsBlankNode compatible =
     Node { compatible | isBlankNode : Yes }
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 type alias IsBlankNodeOrIri compatible =
     Node { compatible | isBlankNodeOrIri : Yes }
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 type alias IsAnyLiteral compatible =
     Node { compatible | isAnyLiteral : Yes }
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 type alias IsBlankNodeOrIriOrAnyLiteral compatible =
     Node compatible
 
@@ -262,19 +275,22 @@ type alias NTriple =
 -- CREATE
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 iri : String -> Iri
 iri value =
     Node (Iri value)
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 blankNode : String -> BlankNode
 blankNode value =
     Node (BlankNode value)
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 literal : Iri -> String -> Literal a
 literal datatype value =
     Node
@@ -286,7 +302,8 @@ literal datatype value =
         )
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 string : String -> Literal String
 string value =
     Node
@@ -298,7 +315,8 @@ string value =
         )
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 langString : String -> String -> Literal a
 langString languageTag value =
     Node
@@ -310,7 +328,8 @@ langString languageTag value =
         )
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 int : Int -> Literal Int
 int value =
     Node
@@ -322,7 +341,8 @@ int value =
         )
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 float : Float -> Literal Float
 float value =
     Node
@@ -334,7 +354,8 @@ float value =
         )
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 decimal : Decimal -> Literal Decimal
 decimal value =
     Node
@@ -346,7 +367,8 @@ decimal value =
         )
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 date : Posix -> Literal Posix
 date value =
     Node
@@ -358,7 +380,8 @@ date value =
         )
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 dateTime : Posix -> Literal Posix
 dateTime value =
     Node
@@ -370,7 +393,8 @@ dateTime value =
         )
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 bool : Bool -> Literal Bool
 bool value =
     Node
@@ -391,7 +415,8 @@ bool value =
 -- TRANSFORM
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 toIri : Node compatible -> Maybe Iri
 toIri (Node node) =
     case node of
@@ -405,7 +430,8 @@ toIri (Node node) =
             Nothing
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 toBlankNode : Node compatible -> Maybe BlankNode
 toBlankNode (Node node) =
     case node of
@@ -419,7 +445,8 @@ toBlankNode (Node node) =
             Nothing
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 toBlankNodeOrIri : Node compatible -> Maybe BlankNodeOrIri
 toBlankNodeOrIri (Node node) =
     case node of
@@ -433,7 +460,8 @@ toBlankNodeOrIri (Node node) =
             Nothing
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 toAnyLiteral : Node compatible -> Maybe AnyLiteral
 toAnyLiteral (Node node) =
     case node of
@@ -447,7 +475,8 @@ toAnyLiteral (Node node) =
             Just (Node node)
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 toBlankNodeOrIriOrAnyLiteral : Node compatible -> Maybe BlankNodeOrIriOrAnyLiteral
 toBlankNodeOrIriOrAnyLiteral (Node node) =
     case node of
@@ -461,43 +490,50 @@ toBlankNodeOrIriOrAnyLiteral (Node node) =
             Nothing
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 asIri : IsIri compatible -> Iri
 asIri (Node node) =
     Node node
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 asBlankNode : IsIri compatible -> BlankNode
 asBlankNode (Node node) =
     Node node
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 asLiteral : IsIri compatible -> Literal a
 asLiteral (Node node) =
     Node node
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 asBlankNodeOrIri : IsBlankNodeOrIri compatible -> BlankNodeOrIri
 asBlankNodeOrIri (Node node) =
     Node node
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 asBlankNodeOrIriOrAnyLiteral : Node compatible -> BlankNodeOrIriOrAnyLiteral
 asBlankNodeOrIriOrAnyLiteral (Node node) =
     Node node
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 asAnyLiteral : Node compatible -> AnyLiteral
 asAnyLiteral (Node node) =
     Node node
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 toUrl : Iri -> String
 toUrl (Node node) =
     case node of
@@ -511,7 +547,8 @@ toUrl (Node node) =
             ""
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 toValue : AnyLiteral -> String
 toValue (Node node) =
     case node of
@@ -525,7 +562,8 @@ toValue (Node node) =
             value
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 toString : Node compatible -> Maybe String
 toString (Node node) =
     case node of
@@ -543,7 +581,8 @@ toString (Node node) =
                 Nothing
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 toLangString : Node compatible -> Maybe ( String, String )
 toLangString (Node node) =
     case node of
@@ -561,7 +600,8 @@ toLangString (Node node) =
                 Nothing
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 toInt : Node compatible -> Maybe Int
 toInt (Node node) =
     case node of
@@ -582,7 +622,8 @@ toInt (Node node) =
                 Nothing
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 toFloat : Node compatible -> Maybe Float
 toFloat (Node node) =
     case node of
@@ -600,7 +641,8 @@ toFloat (Node node) =
                 Nothing
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 toDecimal : Node compatible -> Maybe Decimal
 toDecimal (Node node) =
     case node of
@@ -618,7 +660,8 @@ toDecimal (Node node) =
                 Nothing
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 toDate : Node compatible -> Maybe Posix
 toDate (Node node) =
     case node of
@@ -638,7 +681,8 @@ toDate (Node node) =
                 Nothing
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 toDateTime : Node compatible -> Maybe Posix
 toDateTime (Node node) =
     case node of
@@ -658,7 +702,8 @@ toDateTime (Node node) =
                 Nothing
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 toBool : Node compatible -> Maybe Bool
 toBool (Node node) =
     case node of
@@ -684,7 +729,8 @@ toBool (Node node) =
                 Nothing
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 appendPath : String -> IsIri compatible -> Iri
 appendPath segment (Node node) =
     case node of
@@ -722,7 +768,8 @@ appendPath segment (Node node) =
             Node node
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 dropFragment : IsIri compatible -> Iri
 dropFragment (Node node) =
     case node of
@@ -744,7 +791,8 @@ dropFragment (Node node) =
             Node node
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 setFragment : String -> IsIri compatible -> Iri
 setFragment fragment (Node node) =
     case node of
@@ -813,6 +861,8 @@ serializeNodeHelp node =
                 |> String.concat
 
 
+{-| TODO Add documentation
+-}
 type alias SerializeConfig =
     { base : Maybe String
     , prefixes : List ( String, String )

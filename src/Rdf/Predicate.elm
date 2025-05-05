@@ -16,13 +16,15 @@ import Rdf exposing (Iri)
 import Rdf.PropertyPath as PropertyPath exposing (PropertyPath)
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 type Predicate
     = Predicate Iri
     | Inverse Iri
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 toIri : Predicate -> Iri
 toIri constructablePath =
     case constructablePath of

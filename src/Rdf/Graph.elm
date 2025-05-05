@@ -171,36 +171,50 @@ singleton subject predicate object =
         ]
 
 
+{-| TODO Add documentation
+-}
 setBase : String -> Graph -> Graph
 setBase base (Graph data) =
     Graph { data | base = Just base }
 
 
+{-| TODO Add documentation
+-}
 getBase : Graph -> Maybe String
 getBase (Graph data) =
     data.base
 
 
+{-| TODO Add documentation
+-}
 clearBase : Graph -> Graph
 clearBase (Graph data) =
     Graph { data | base = Nothing }
 
 
+{-| TODO Add documentation
+-}
 addPrefix : String -> String -> Graph -> Graph
 addPrefix prefix value (Graph data) =
     Graph { data | prefixes = Dict.insert prefix value data.prefixes }
 
 
+{-| TODO Add documentation
+-}
 addPrefixes : Dict String String -> Graph -> Graph
 addPrefixes prefixes (Graph data) =
     Graph { data | prefixes = Dict.union prefixes data.prefixes }
 
 
+{-| TODO Add documentation
+-}
 clearPrefixes : Graph -> Graph
 clearPrefixes (Graph data) =
     Graph { data | prefixes = Dict.empty }
 
 
+{-| TODO Add documentation
+-}
 getPrefixes : Graph -> Dict String String
 getPrefixes (Graph data) =
     data.prefixes
@@ -673,6 +687,8 @@ parse raw =
             )
 
 
+{-| TODO Add documentation
+-}
 parseSafe : Seed -> String -> Result Error ( Graph, Seed )
 parseSafe seed raw =
     raw

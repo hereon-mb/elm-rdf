@@ -11,6 +11,7 @@ when inside the directory containing this file.
 
 -}
 
+import Docs.NoMissing exposing (exposedModules, onlyExposed)
 import Docs.ReviewAtDocs
 import Docs.ReviewLinksAndSections
 import Docs.UpToDateReadmeLinks
@@ -38,7 +39,12 @@ import Simplify
 config : List Rule
 config =
     [ Docs.ReviewLinksAndSections.rule
+    , Docs.UpToDateReadmeLinks.rule
     , Docs.ReviewAtDocs.rule
+    , Docs.NoMissing.rule
+        { document = onlyExposed
+        , from = exposedModules
+        }
     , Docs.UpToDateReadmeLinks.rule
     , NoConfusingPrefixOperator.rule
     , NoDebug.Log.rule

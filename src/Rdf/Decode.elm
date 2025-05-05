@@ -343,7 +343,8 @@ indent lines =
         |> String.join "\n"
 
 
-{-| -}
+{-| TODO Add documentation
+-}
 type NodeType
     = BlankNode
     | IriNode
@@ -437,6 +438,8 @@ blankNodeOrIri =
         ]
 
 
+{-| TODO Add documentation
+-}
 blankNodeOrIriOrAnyLiteral : Decoder BlankNodeOrIriOrAnyLiteral
 blankNodeOrIriOrAnyLiteral =
     oneOf
