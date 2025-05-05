@@ -3,7 +3,7 @@ kessler,stuff,ci,perpetual,material,MIT,git+https://github.com/privatenumber/ci.
 kessler,stuff,elm,perpetual,material,BSD-3-Clause,git+https://github.com/elm/compiler.git,0.19.1,0.19.1-6,^0.19.1-6,Evan Czaplicki evan@elm-lang.org https://github.com/evancz
 kessler,stuff,elm-doc-preview,perpetual,material,BSD-3-Clause,git+https://github.com/dmy/elm-doc-preview.git,5.0.5,5.0.5,^5.0.5,Rémi Lefèvre <rlefevre@gmail.com>
 kessler,stuff,elm-format,perpetual,material,BSD-3-Clause,git+https://github.com/avh4/elm-format.git,0.8.7,0.8.7,^0.8.7,Aaron VonderHaar
-kessler,stuff,elm-review,perpetual,material,BSD-3-Clause,git+https://github.com/jfmengels/node-elm-review.git,2.12.0,2.12.0,^2.12.0,Jeroen Engels
+kessler,stuff,elm-review,perpetual,material,BSD-3-Clause,git+https://github.com/jfmengels/node-elm-review.git,2.13.2,2.12.0,^2.12.0,Jeroen Engels
 kessler,stuff,elm-test,perpetual,material,BSD-3-Clause,git+https://github.com/rtfeldman/node-test-runner.git,0.19.1,0.19.1-revision12,^0.19.1-revision12,Richard Feldman
 kessler,stuff,elm-verify-examples,perpetual,material,BSD-3-Clause,https://registry.npmjs.org/elm-verify-examples/-/elm-verify-examples-6.0.3.tgz,6.0.3,6.0.3,^6.0.3,schtoeffel
-kessler,stuff,license-report,perpetual,material,MIT,git+https://github.com/kessler/license-report.git,6.7.0,6.5.0,^6.5.0,Yaniv Kessler
+kessler,stuff,license-report,perpetual,material,MIT,git+https://github.com/kessler/license-report.git,6.7.2,6.5.0,^6.5.0,Yaniv Kessler
