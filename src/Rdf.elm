@@ -1,18 +1,19 @@
 module Rdf exposing
     ( Triple
-    , Term, Yes, No
-    , Iri, BlankNode, Literal
-    , BlankNodeOrIri, AnyLiteral, BlankNodeOrIriOrAnyLiteral
-    , asIri, asBlankNode, asLiteral
-    , asBlankNodeOrIri, asAnyLiteral, asBlankNodeOrIriOrAnyLiteral
-    , IsIri, IsBlankNode
-    , IsBlankNodeOrIri, IsAnyLiteral, IsBlankNodeOrIriOrAnyLiteral
+    , Term
+    , Iri, IsIri, asIri
+    , BlankNode, IsBlankNode, asBlankNode
+    , Literal, asLiteral
+    , AnyLiteral, IsAnyLiteral, asAnyLiteral
+    , BlankNodeOrIri, IsBlankNodeOrIri, asBlankNodeOrIri
+    , BlankNodeOrIriOrAnyLiteral, IsBlankNodeOrIriOrAnyLiteral, asBlankNodeOrIriOrAnyLiteral
+    , Yes, No
     , iri, blankNode
     , literal
-    , string, langString
-    , int, float, decimal
+    , string, bool, decimal, int
+    , float
     , date, dateTime
-    , bool
+    , langString
     , toIri, toBlankNode
     , toBlankNodeOrIri, toAnyLiteral, toBlankNodeOrIriOrAnyLiteral
     , toUrl
@@ -42,25 +43,29 @@ a introduction on its data model.
 
 # RDF Terms
 
-@docs Term, Yes, No
 
-@docs Iri, BlankNode, Literal
-@docs BlankNodeOrIri, AnyLiteral, BlankNodeOrIriOrAnyLiteral
-@docs asIri, asBlankNode, asLiteral
-@docs asBlankNodeOrIri, asAnyLiteral, asBlankNodeOrIriOrAnyLiteral
+## Types
 
-@docs IsIri, IsBlankNode
-@docs IsBlankNodeOrIri, IsAnyLiteral, IsBlankNodeOrIriOrAnyLiteral
+@docs Term
+
+@docs Iri, IsIri, asIri
+@docs BlankNode, IsBlankNode, asBlankNode
+@docs Literal, asLiteral
+@docs AnyLiteral, IsAnyLiteral, asAnyLiteral
+@docs BlankNodeOrIri, IsBlankNodeOrIri, asBlankNodeOrIri
+@docs BlankNodeOrIriOrAnyLiteral, IsBlankNodeOrIriOrAnyLiteral, asBlankNodeOrIriOrAnyLiteral
+
+@docs Yes, No
 
 
 ## Create
 
 @docs iri, blankNode
 @docs literal
-@docs string, langString
-@docs int, float, decimal
+@docs string, bool, decimal, int
+@docs float
 @docs date, dateTime
-@docs bool
+@docs langString
 
 
 ## Transform
@@ -118,7 +123,25 @@ import Time exposing (Posix)
 
 
 {-| This type represents an [RDF
-Triple](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-rdf-triple).
+triple](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-rdf-triple).
+It consists of
+
+  - a subject, which must be an
+    [IRI](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-iri) or
+    a [blank
+    node](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-blank-node),
+  - a predicate, which must be an
+    [IRI](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-iri),
+  - an object, which can be any RDF term, i.e. an
+    [IRI](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-iri),
+    a [blank
+    node](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-blank-node),
+    or
+    a [literal](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-literal).
+
+An RDF triple describes a directed labelled node within an RDF graph, pointing
+from the subject to the object and the label being the predicate.
+
 -}
 type alias Triple =
     { subject : BlankNodeOrIri
@@ -134,24 +157,63 @@ which can be an
 a [literal](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-literal),
 or a [blank
 node](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-blank-node).
+
+The `compatible` type variable is used to define separate types for the kinds
+of RDF terms, but make it possible to use instances of the different variants
+without the need for additional transformations.
+
+For each term variant and all their combinations, we define two type aliases,
+one with a type variable and one without, e.g. `IsIri compatible` and `Iri`.
+
+  - The first one will only be used for **arguments** of functions,
+  - the second only for **returned values**.
+
+Doing this makes the following code work, as the `insert` function uses the
+general `Is... compatible` types.
+
+    import Rdf.Graph as Graph exposing (Graph)
+
+    alice : Iri
+    alice =
+        iri "http://example.org/alice"
+
+    knows : Iri
+    knows =
+        iri "http://example.org/#knows"
+
+    someone : BlankNode
+    someone =
+        blankNode "someone"
+
+    graph : Graph
+    graph =
+        Graph.insert alice knows someone Graph.empty
+
 -}
 type alias Term compatible =
     Internal.Term compatible
 
 
-{-| TODO Add documentation
+{-| You can ignore this type, it is only used for implementing the different
+`Term` variants.
 -}
 type Yes
     = Yes Never
 
 
-{-| TODO Add documentation
+{-| You can ignore this type, it is only used for implementing the different
+`Term` variants.
 -}
 type No
     = No Never
 
 
-{-| TODO Add documentation
+{-| An RDF term which can only be an
+[IRI](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-iri). This
+type will only be used as the return type of functions and if the values need
+to be stored in the model. Take a look at
+[Term](Rdf#Term) for a general explanation of
+the idea behind this.
 -}
 type alias Iri =
     Term
@@ -160,8 +222,28 @@ type alias Iri =
         , isAnyLiteral : No
         , isBlankNodeOrIri : Yes
         , isBlankNodeOrAnyLiteral : No
-        , isIriOrAnyLiteral : Yes
+        , isIriOrAnyLiteral :
+            Yes
         }
+
+
+{-| This type will only be used as the argument of functions and ensures that
+only [IRI's](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-iri)
+are passed. Take a look at [Term](Rdf#Term)
+for a general explanation of the idea behind this.
+-}
+type alias IsIri compatible =
+    Term { compatible | isIri : Yes }
+
+
+{-| When writing your own helper functions, it might be necessary that you have
+to convert the argument type into the return value type. Take a look at
+[Term](Rdf#Term) for a general explanation of
+the idea behind this.
+-}
+asIri : IsIri compatible -> Iri
+asIri (Term variant) =
+    Term variant
 
 
 {-| TODO Add documentation
@@ -232,12 +314,6 @@ type alias BlankNodeOrIriOrAnyLiteral =
 
 {-| TODO Add documentation
 -}
-type alias IsIri compatible =
-    Term { compatible | isIri : Yes }
-
-
-{-| TODO Add documentation
--}
 type alias IsBlankNode compatible =
     Term { compatible | isBlankNode : Yes }
 
@@ -264,21 +340,58 @@ type alias IsBlankNodeOrIriOrAnyLiteral compatible =
 -- CREATE
 
 
-{-| TODO Add documentation
+{-| Create an
+[IRI](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-iri)
+(Internal Resource Identifier) by providing its string representation, e.g.
+
+    alice : Iri
+    alice =
+        iri "http://example.org/alice"
+
 -}
 iri : String -> Iri
 iri value =
     Term (Iri value)
 
 
-{-| TODO Add documentation
+{-| Create a [blank
+node](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-blank-node)
+by providing a blank node identifier, e.g.
+
+    unnamed : BlankNode
+    unnamed =
+        blankNode "unnamed"
+
+**Warning**: When you are using this function directly, you have to ensure
+yourself, that you don't run into naming conflicts. TODO Add a public function
+to `Rdf.Graph` for minting blank nodes.
+
 -}
 blankNode : String -> BlankNode
 blankNode value =
     Term (BlankNode value)
 
 
-{-| TODO Add documentation
+{-| Create
+a [literal](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-literal)
+by providing its [datatype
+IRI](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-datatype-iri)
+and its [lexical
+form](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-lexical-form),
+e.g.
+
+    pi : Literal a
+    pi =
+        literal xsdDecimal "3.14"
+
+    xsdDecimal : Iri
+    xsdDecimal =
+        iri "http://www.w3.org/2001/XMLSchema#decimal"
+
+There are a few helper functions for creating literals of the most common
+datatypes which are part of [built-in
+datatypes](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#xsd-datatypes).
+
 -}
 literal : Iri -> String -> Literal a
 literal datatype value =
@@ -291,7 +404,15 @@ literal datatype value =
         )
 
 
-{-| TODO Add documentation
+{-| Create
+a [literal](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-literal)
+with datatype [xsd:string](https://www.w3.org/TR/xmlschema11-2/#string).
+
+    string "Alice Wonderland"
+    --> literal
+    -->   (iri "http://www.w3.org/2001/XMLSchema#string")
+    -->   "Alice Wonderland"
+
 -}
 string : String -> Literal String
 string value =
@@ -304,85 +425,15 @@ string value =
         )
 
 
-{-| TODO Add documentation
--}
-langString : String -> String -> Literal a
-langString languageTag value =
-    Term
-        (Literal
-            { value = value
-            , datatype = urlRdfLangString
-            , languageTag = Just languageTag
-            }
-        )
+{-| Create
+a [literal](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-literal)
+with datatype [xsd:boolean](https://www.w3.org/TR/xmlschema11-2/#boolean).
 
+    bool True
+    --> literal
+    -->   (iri "http://www.w3.org/2001/XMLSchema#boolean")
+    -->   "true"
 
-{-| TODO Add documentation
--}
-int : Int -> Literal Int
-int value =
-    Term
-        (Literal
-            { value = String.fromInt value
-            , datatype = urlXsdInteger
-            , languageTag = Nothing
-            }
-        )
-
-
-{-| TODO Add documentation
--}
-float : Float -> Literal Float
-float value =
-    Term
-        (Literal
-            { value = String.fromFloat value
-            , datatype = urlXsdDouble
-            , languageTag = Nothing
-            }
-        )
-
-
-{-| TODO Add documentation
--}
-decimal : Decimal -> Literal Decimal
-decimal value =
-    Term
-        (Literal
-            { value = Decimal.toString value
-            , datatype = urlXsdDecimal
-            , languageTag = Nothing
-            }
-        )
-
-
-{-| TODO Add documentation
--}
-date : Posix -> Literal Posix
-date value =
-    Term
-        (Literal
-            { value = String.left (4 + 1 + 2 + 1 + 2) (Iso8601.fromTime value)
-            , datatype = urlXsdDate
-            , languageTag = Nothing
-            }
-        )
-
-
-{-| TODO Add documentation
--}
-dateTime : Posix -> Literal Posix
-dateTime value =
-    Term
-        (Literal
-            { value = Iso8601.fromTime value
-            , datatype = urlXsdDateTime
-            , languageTag = Nothing
-            }
-        )
-
-
-{-| TODO Add documentation
 -}
 bool : Bool -> Literal Bool
 bool value =
@@ -396,6 +447,150 @@ bool value =
                     "false"
             , datatype = urlXsdBoolean
             , languageTag = Nothing
+            }
+        )
+
+
+{-| Create
+a [literal](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-literal)
+with datatype [xsd:decimal](https://www.w3.org/TR/xmlschema11-2/#decimal). Here
+we are using the
+[Decimal](https://package.elm-lang.org/packages/torreyatcitty/the-best-decimal/latest/Decimal#Decimal)
+type from the
+[torreyatcitty/the-best-decimal](https://package.elm-lang.org/packages/torreyatcitty/the-best-decimal/latest/)
+package.
+
+    import Decimal exposing (Decimal)
+
+    pi : Decimal
+    pi =
+        3.14
+            |> Decimal.fromFloat
+            |> Maybe.withDefault (Decimal.fromInt 0)
+
+    decimal pi
+    --> literal
+    -->   (iri "http://www.w3.org/2001/XMLSchema#decimal")
+    -->   "3.14"
+
+-}
+decimal : Decimal -> Literal Decimal
+decimal value =
+    Term
+        (Literal
+            { value = Decimal.toString value
+            , datatype = urlXsdDecimal
+            , languageTag = Nothing
+            }
+        )
+
+
+{-| Create
+a [literal](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-literal)
+with datatype [xsd:decimal](https://www.w3.org/TR/xmlschema11-2/#integer).
+
+    int 42
+    --> literal
+    -->   (iri "http://www.w3.org/2001/XMLSchema#integer")
+    -->   "42"
+
+-}
+int : Int -> Literal Int
+int value =
+    Term
+        (Literal
+            { value = String.fromInt value
+            , datatype = urlXsdInteger
+            , languageTag = Nothing
+            }
+        )
+
+
+{-| Create
+a [literal](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-literal)
+with datatype [xsd:decimal](https://www.w3.org/TR/xmlschema11-2/#double).
+
+    float 3.14
+    --> literal
+    -->   (iri "http://www.w3.org/2001/XMLSchema#double")
+    -->   "3.14"
+
+-}
+float : Float -> Literal Float
+float value =
+    Term
+        (Literal
+            { value = String.fromFloat value
+            , datatype = urlXsdDouble
+            , languageTag = Nothing
+            }
+        )
+
+
+{-| Create
+a [literal](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-literal)
+with datatype [xsd:decimal](https://www.w3.org/TR/xmlschema11-2/#date).
+
+    import Time
+
+    date (Time.millisToPosix 0)
+    --> literal
+    -->   (iri "http://www.w3.org/2001/XMLSchema#date")
+    -->   "1970-01-01"
+
+-}
+date : Posix -> Literal Posix
+date value =
+    Term
+        (Literal
+            { value = String.left (4 + 1 + 2 + 1 + 2) (Iso8601.fromTime value)
+            , datatype = urlXsdDate
+            , languageTag = Nothing
+            }
+        )
+
+
+{-| Create
+a [literal](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-literal)
+with datatype [xsd:decimal](https://www.w3.org/TR/xmlschema11-2/#dateTime).
+
+    import Time
+
+    dateTime (Time.millisToPosix 0)
+    --> literal
+    -->   (iri "http://www.w3.org/2001/XMLSchema#dateTime")
+    -->   "1970-01-01T00:00:00.000Z"
+
+-}
+dateTime : Posix -> Literal Posix
+dateTime value =
+    Term
+        (Literal
+            { value = Iso8601.fromTime value
+            , datatype = urlXsdDateTime
+            , languageTag = Nothing
+            }
+        )
+
+
+{-| Create
+a [literal](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-literal)
+with datatype `http://www.w3.org/1999/02/22-rdf-syntax-ns#langString`. The
+first argument must be language tag as defined by
+[BCP47](https://www.rfc-editor.org/info/bcp47), the second argument is the
+actual string.
+
+    serializeNode (langString "en" "RDF is great!")
+    --> "\"RDF is great!\"@en"
+
+-}
+langString : String -> String -> Literal a
+langString languageTag value =
+    Term
+        (Literal
+            { value = value
+            , datatype = urlRdfLangString
+            , languageTag = Just languageTag
             }
         )
 
@@ -477,13 +672,6 @@ toBlankNodeOrIriOrAnyLiteral (Term variant) =
 
         Literal _ ->
             Nothing
-
-
-{-| TODO Add documentation
--}
-asIri : IsIri compatible -> Iri
-asIri (Term variant) =
-    Term variant
 
 
 {-| TODO Add documentation
