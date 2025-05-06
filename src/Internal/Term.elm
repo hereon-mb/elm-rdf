@@ -1,12 +1,12 @@
-module Internal.Node exposing
-    ( Node(..)
+module Internal.Term exposing
+    ( Term(..)
     , Variant(..), DataLiteral
     , serializeVariant
     )
 
 {-|
 
-@docs Node
+@docs Term
 @docs Variant, DataLiteral
 
 @docs serializeVariant
@@ -14,8 +14,8 @@ module Internal.Node exposing
 -}
 
 
-type Node compatible
-    = Node Variant
+type Term compatible
+    = Term Variant
 
 
 type Variant
@@ -33,14 +33,14 @@ type alias DataLiteral =
     }
 
 
-serialize : Node compatible -> String
-serialize (Node node) =
-    serializeVariant node
+serialize : Term compatible -> String
+serialize (Term variant) =
+    serializeVariant variant
 
 
 serializeVariant : Variant -> String
-serializeVariant node =
-    case node of
+serializeVariant variant =
+    case variant of
         BlankNode value ->
             "_:" ++ value
 
@@ -64,7 +64,7 @@ serializeVariant node =
             , "\""
             , case data.languageTag of
                 Nothing ->
-                    "^^" ++ serialize (Node (Iri data.datatype))
+                    "^^" ++ serialize (Term (Iri data.datatype))
 
                 Just languageTag ->
                     "@" ++ languageTag

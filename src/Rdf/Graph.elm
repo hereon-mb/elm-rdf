@@ -45,7 +45,7 @@ module Rdf.Graph exposing
 
 import Dict exposing (Dict)
 import Internal.Graph as Internal exposing (Data, Graph(..))
-import Internal.Node exposing (Node(..), Variant(..))
+import Internal.Term exposing (Term(..), Variant(..))
 import Internal.Turtle as Turtle
 import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode exposing (Value)
@@ -149,7 +149,7 @@ emptyGraph =
 
 {-| TODO Add documentation
 -}
-singleton : IsBlankNodeOrIri compatible1 -> IsIri compatible2 -> Node compatible3 -> Graph
+singleton : IsBlankNodeOrIri compatible1 -> IsIri compatible2 -> Term compatible3 -> Graph
 singleton subject predicate object =
     fromNTriples
         [ { subject = asBlankNodeOrIri subject
@@ -248,7 +248,7 @@ seedGenerator =
 
 {-| TODO Add documentation
 -}
-insert : IsBlankNodeOrIri compatible1 -> IsIri compatible2 -> Node compatible3 -> Graph -> Graph
+insert : IsBlankNodeOrIri compatible1 -> IsIri compatible2 -> Term compatible3 -> Graph -> Graph
 insert subject predicate object (Graph graph) =
     let
         keySubject : String
@@ -302,7 +302,7 @@ insert subject predicate object (Graph graph) =
 
 {-| TODO Add documentation
 -}
-insertAt : IsBlankNodeOrIri compatible1 -> PropertyPath -> Node compatible2 -> Graph -> Seed -> ( Graph, Seed )
+insertAt : IsBlankNodeOrIri compatible1 -> PropertyPath -> Term compatible2 -> Graph -> Seed -> ( Graph, Seed )
 insertAt subject path object graph seed =
     case path of
         PredicatePath predicate ->
@@ -334,7 +334,7 @@ insertAt subject path object graph seed =
             ( graph, seed )
 
 
-insertAtNext : List PropertyPath -> Node compatible2 -> IsBlankNodeOrIri compatible1 -> Graph -> Seed -> ( Graph, Seed )
+insertAtNext : List PropertyPath -> Term compatible2 -> IsBlankNodeOrIri compatible1 -> Graph -> Seed -> ( Graph, Seed )
 insertAtNext propertyPaths object idFocusNodeNext graphNext seedNext =
     case propertyPaths of
         [] ->
@@ -379,7 +379,7 @@ generateBlankNode (Seed seed) =
         ( uuid, seedUpdated ) =
             UUID.step seed
     in
-    ( Node (BlankNode (UUID.toString uuid))
+    ( Term (BlankNode (UUID.toString uuid))
     , Seed seedUpdated
     )
 

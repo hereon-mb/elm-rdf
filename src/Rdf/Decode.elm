@@ -99,7 +99,7 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 import Basics.Extra exposing (flip)
 import Dict exposing (Dict)
 import Internal.Graph exposing (Graph(..))
-import Internal.Node exposing (DataLiteral, Node(..), Variant(..))
+import Internal.Term exposing (DataLiteral, Term(..), Variant(..))
 import List.Extra as List
 import List.NonEmpty as NonEmpty exposing (NonEmpty)
 import Maybe.Extra as Maybe
@@ -711,13 +711,13 @@ iri =
                     case nodes of
                         [ node ] ->
                             case node of
-                                Node (BlankNode _) ->
+                                Term (BlankNode _) ->
                                     Err (ExpectedIri node)
 
-                                Node ((Iri _) as variant) ->
-                                    Ok (Node variant)
+                                Term ((Iri _) as variant) ->
+                                    Ok (Term variant)
 
-                                Node (Literal _) ->
+                                Term (Literal _) ->
                                     Err (ExpectedIri node)
 
                         _ ->
@@ -777,13 +777,13 @@ list (Decoder f) =
                 >> Result.andThen
                     (\node ->
                         case node of
-                            Node ((BlankNode _) as variant) ->
-                                Ok (Node variant)
+                            Term ((BlankNode _) as variant) ->
+                                Ok (Term variant)
 
-                            Node (Iri _) ->
+                            Term (Iri _) ->
                                 Err (ExpectedBlankNode node)
 
-                            Node (Literal _) ->
+                            Term (Literal _) ->
                                 Err (ExpectedBlankNode node)
                     )
                 >> Result.andThen
@@ -848,7 +848,7 @@ langString =
     literalData (Rdf.rdf "langString")
         |> andThen
             (\({ value, languageTag } as node) ->
-                Maybe.unwrap (error (MissingLangString (Node (Literal node))))
+                Maybe.unwrap (error (MissingLangString (Term (Literal node))))
                     (succeed << flip Tuple.pair value)
                     languageTag
             )
@@ -894,13 +894,13 @@ literalData datatype =
                     case nodes of
                         [ node ] ->
                             case node of
-                                Node (BlankNode _) ->
+                                Term (BlankNode _) ->
                                     Err (ExpectedAnyLiteral node)
 
-                                Node (Iri _) ->
+                                Term (Iri _) ->
                                     Err (ExpectedAnyLiteral node)
 
-                                Node (Literal literalData_) ->
+                                Term (Literal literalData_) ->
                                     if literalData_.datatype /= Rdf.toUrl datatype then
                                         Err (ExpectedLiteralDatatype datatype (Rdf.iri literalData_.datatype))
 
@@ -924,14 +924,14 @@ anyLiteral =
                     case nodes of
                         [ node ] ->
                             case node of
-                                Node (BlankNode _) ->
+                                Term (BlankNode _) ->
                                     Err (ExpectedAnyLiteral node)
 
-                                Node (Iri _) ->
+                                Term (Iri _) ->
                                     Err (ExpectedAnyLiteral node)
 
-                                Node ((Literal _) as variant) ->
-                                    Ok (Node variant)
+                                Term ((Literal _) as variant) ->
+                                    Ok (Term variant)
 
                         _ ->
                             Err (TooManyNodes nodes)
@@ -951,13 +951,13 @@ property path (Decoder f) =
                         (List.map
                             (\node ->
                                 case node of
-                                    Node ((BlankNode _) as variant) ->
-                                        Ok (Node variant)
+                                    Term ((BlankNode _) as variant) ->
+                                        Ok (Term variant)
 
-                                    Node ((Iri _) as variant) ->
-                                        Ok (Node variant)
+                                    Term ((Iri _) as variant) ->
+                                        Ok (Term variant)
 
-                                    Node (Literal _) ->
+                                    Term (Literal _) ->
                                         Err (ExpectedBlankNodeOrIri node)
                             )
                             nodes
@@ -1000,13 +1000,13 @@ noProperty path =
                         (List.map
                             (\node ->
                                 case node of
-                                    Node ((BlankNode _) as variant) ->
-                                        Ok (Node variant)
+                                    Term ((BlankNode _) as variant) ->
+                                        Ok (Term variant)
 
-                                    Node ((Iri _) as variant) ->
-                                        Ok (Node variant)
+                                    Term ((Iri _) as variant) ->
+                                        Ok (Term variant)
 
-                                    Node (Literal _) ->
+                                    Term (Literal _) ->
                                         Err (ExpectedAnyLiteral node)
                             )
                             nodes
@@ -1050,13 +1050,13 @@ anyPredicate (Decoder f) =
                         (List.map
                             (\node ->
                                 case node of
-                                    Node ((BlankNode _) as variant) ->
-                                        Ok (Node variant)
+                                    Term ((BlankNode _) as variant) ->
+                                        Ok (Term variant)
 
-                                    Node ((Iri _) as variant) ->
-                                        Ok (Node variant)
+                                    Term ((Iri _) as variant) ->
+                                        Ok (Term variant)
 
-                                    Node (Literal _) ->
+                                    Term (Literal _) ->
                                         Err (ExpectedBlankNodeOrIri node)
                             )
                             nodes
@@ -1554,8 +1554,8 @@ followPropertyPath data propertyPath nodeFocus =
                         |> List.concatMap (followPropertyPath data next)
 
                 asBlankNodeOrIriCompatible : Rdf.BlankNodeOrIri -> Rdf.IsBlankNodeOrIri compatible
-                asBlankNodeOrIriCompatible (Node node) =
-                    Node node
+                asBlankNodeOrIriCompatible (Term node) =
+                    Term node
             in
             rest
                 |> List.foldl step nodesAtFirst

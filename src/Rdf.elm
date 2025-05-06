@@ -1,5 +1,5 @@
 module Rdf exposing
-    ( Node, Yes, No
+    ( Term, Yes, No
     , Iri, BlankNode, Literal
     , BlankNodeOrIri, AnyLiteral, BlankNodeOrIriOrAnyLiteral
     , asIri, asBlankNode, asLiteral
@@ -35,9 +35,9 @@ module Rdf exposing
 {-|
 
 
-# Node
+# RDF Terms
 
-@docs Node, Yes, No
+@docs Term, Yes, No
 
 @docs Iri, BlankNode, Literal
 @docs BlankNodeOrIri, AnyLiteral, BlankNodeOrIriOrAnyLiteral
@@ -98,10 +98,10 @@ module Rdf exposing
 
 import Decimal exposing (Decimal)
 import Dict exposing (Dict)
-import Internal.Node as Internal
+import Internal.Term as Internal
     exposing
         ( DataLiteral
-        , Node(..)
+        , Term(..)
         , Variant(..)
         )
 import Iso8601
@@ -114,10 +114,16 @@ import String.Extra as String
 import Time exposing (Posix)
 
 
-{-| TODO Add documentation
+{-| This type represents an [RDF
+Term](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-rdf-triple),
+which can be an
+[IRI](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-iri),
+a [literal](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-literal),
+or a [blank
+node](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-blank-node).
 -}
-type alias Node compatible =
-    Internal.Node compatible
+type alias Term compatible =
+    Internal.Term compatible
 
 
 {-| TODO Add documentation
@@ -135,7 +141,7 @@ type No
 {-| TODO Add documentation
 -}
 type alias Iri =
-    Node
+    Term
         { isBlankNode : No
         , isIri : Yes
         , isAnyLiteral : No
@@ -148,7 +154,7 @@ type alias Iri =
 {-| TODO Add documentation
 -}
 type alias BlankNode =
-    Node
+    Term
         { isBlankNode : Yes
         , isIri : No
         , isAnyLiteral : No
@@ -161,7 +167,7 @@ type alias BlankNode =
 {-| TODO Add documentation
 -}
 type alias Literal a =
-    Node
+    Term
         { isLiteral : a
         , isBlankNode : No
         , isIri : No
@@ -175,7 +181,7 @@ type alias Literal a =
 {-| TODO Add documentation
 -}
 type alias BlankNodeOrIri =
-    Node
+    Term
         { isBlankNode : No
         , isIri : No
         , isAnyLiteral : No
@@ -188,7 +194,7 @@ type alias BlankNodeOrIri =
 {-| TODO Add documentation
 -}
 type alias AnyLiteral =
-    Node
+    Term
         { isBlankNode : No
         , isIri : No
         , isAnyLiteral : Yes
@@ -201,7 +207,7 @@ type alias AnyLiteral =
 {-| TODO Add documentation
 -}
 type alias BlankNodeOrIriOrAnyLiteral =
-    Node
+    Term
         { isBlankNode : No
         , isIri : No
         , isAnyLiteral : No
@@ -214,31 +220,31 @@ type alias BlankNodeOrIriOrAnyLiteral =
 {-| TODO Add documentation
 -}
 type alias IsIri compatible =
-    Node { compatible | isIri : Yes }
+    Term { compatible | isIri : Yes }
 
 
 {-| TODO Add documentation
 -}
 type alias IsBlankNode compatible =
-    Node { compatible | isBlankNode : Yes }
+    Term { compatible | isBlankNode : Yes }
 
 
 {-| TODO Add documentation
 -}
 type alias IsBlankNodeOrIri compatible =
-    Node { compatible | isBlankNodeOrIri : Yes }
+    Term { compatible | isBlankNodeOrIri : Yes }
 
 
 {-| TODO Add documentation
 -}
 type alias IsAnyLiteral compatible =
-    Node { compatible | isAnyLiteral : Yes }
+    Term { compatible | isAnyLiteral : Yes }
 
 
 {-| TODO Add documentation
 -}
 type alias IsBlankNodeOrIriOrAnyLiteral compatible =
-    Node compatible
+    Term compatible
 
 
 {-| TODO Add documentation
@@ -258,21 +264,21 @@ type alias NTriple =
 -}
 iri : String -> Iri
 iri value =
-    Node (Iri value)
+    Term (Iri value)
 
 
 {-| TODO Add documentation
 -}
 blankNode : String -> BlankNode
 blankNode value =
-    Node (BlankNode value)
+    Term (BlankNode value)
 
 
 {-| TODO Add documentation
 -}
 literal : Iri -> String -> Literal a
 literal datatype value =
-    Node
+    Term
         (Literal
             { value = value
             , datatype = toUrl datatype
@@ -285,7 +291,7 @@ literal datatype value =
 -}
 string : String -> Literal String
 string value =
-    Node
+    Term
         (Literal
             { value = value
             , datatype = urlXsdString
@@ -298,7 +304,7 @@ string value =
 -}
 langString : String -> String -> Literal a
 langString languageTag value =
-    Node
+    Term
         (Literal
             { value = value
             , datatype = urlRdfLangString
@@ -311,7 +317,7 @@ langString languageTag value =
 -}
 int : Int -> Literal Int
 int value =
-    Node
+    Term
         (Literal
             { value = String.fromInt value
             , datatype = urlXsdInteger
@@ -324,7 +330,7 @@ int value =
 -}
 float : Float -> Literal Float
 float value =
-    Node
+    Term
         (Literal
             { value = String.fromFloat value
             , datatype = urlXsdDouble
@@ -337,7 +343,7 @@ float value =
 -}
 decimal : Decimal -> Literal Decimal
 decimal value =
-    Node
+    Term
         (Literal
             { value = Decimal.toString value
             , datatype = urlXsdDecimal
@@ -350,7 +356,7 @@ decimal value =
 -}
 date : Posix -> Literal Posix
 date value =
-    Node
+    Term
         (Literal
             { value = String.left (4 + 1 + 2 + 1 + 2) (Iso8601.fromTime value)
             , datatype = urlXsdDate
@@ -363,7 +369,7 @@ date value =
 -}
 dateTime : Posix -> Literal Posix
 dateTime value =
-    Node
+    Term
         (Literal
             { value = Iso8601.fromTime value
             , datatype = urlXsdDateTime
@@ -376,7 +382,7 @@ dateTime value =
 -}
 bool : Bool -> Literal Bool
 bool value =
-    Node
+    Term
         (Literal
             { value =
                 if value then
@@ -396,14 +402,14 @@ bool value =
 
 {-| TODO Add documentation
 -}
-toIri : Node compatible -> Maybe Iri
-toIri (Node node) =
+toIri : Term compatible -> Maybe Iri
+toIri (Term node) =
     case node of
         BlankNode _ ->
             Nothing
 
         Iri _ ->
-            Just (Node node)
+            Just (Term node)
 
         Literal _ ->
             Nothing
@@ -411,11 +417,11 @@ toIri (Node node) =
 
 {-| TODO Add documentation
 -}
-toBlankNode : Node compatible -> Maybe BlankNode
-toBlankNode (Node node) =
-    case node of
+toBlankNode : Term compatible -> Maybe BlankNode
+toBlankNode (Term variant) =
+    case variant of
         BlankNode _ ->
-            Just (Node node)
+            Just (Term variant)
 
         Iri _ ->
             Nothing
@@ -426,14 +432,14 @@ toBlankNode (Node node) =
 
 {-| TODO Add documentation
 -}
-toBlankNodeOrIri : Node compatible -> Maybe BlankNodeOrIri
-toBlankNodeOrIri (Node node) =
-    case node of
+toBlankNodeOrIri : Term compatible -> Maybe BlankNodeOrIri
+toBlankNodeOrIri (Term variant) =
+    case variant of
         BlankNode _ ->
-            Just (Node node)
+            Just (Term variant)
 
         Iri _ ->
-            Just (Node node)
+            Just (Term variant)
 
         Literal _ ->
             Nothing
@@ -441,9 +447,9 @@ toBlankNodeOrIri (Node node) =
 
 {-| TODO Add documentation
 -}
-toAnyLiteral : Node compatible -> Maybe AnyLiteral
-toAnyLiteral (Node node) =
-    case node of
+toAnyLiteral : Term compatible -> Maybe AnyLiteral
+toAnyLiteral (Term variant) =
+    case variant of
         BlankNode _ ->
             Nothing
 
@@ -451,19 +457,19 @@ toAnyLiteral (Node node) =
             Nothing
 
         Literal _ ->
-            Just (Node node)
+            Just (Term variant)
 
 
 {-| TODO Add documentation
 -}
-toBlankNodeOrIriOrAnyLiteral : Node compatible -> Maybe BlankNodeOrIriOrAnyLiteral
-toBlankNodeOrIriOrAnyLiteral (Node node) =
-    case node of
+toBlankNodeOrIriOrAnyLiteral : Term compatible -> Maybe BlankNodeOrIriOrAnyLiteral
+toBlankNodeOrIriOrAnyLiteral (Term variant) =
+    case variant of
         BlankNode _ ->
-            Just (Node node)
+            Just (Term variant)
 
         Iri _ ->
-            Just (Node node)
+            Just (Term variant)
 
         Literal _ ->
             Nothing
@@ -472,50 +478,50 @@ toBlankNodeOrIriOrAnyLiteral (Node node) =
 {-| TODO Add documentation
 -}
 asIri : IsIri compatible -> Iri
-asIri (Node node) =
-    Node node
+asIri (Term variant) =
+    Term variant
 
 
 {-| TODO Add documentation
 -}
 asBlankNode : IsBlankNode compatible -> BlankNode
-asBlankNode (Node node) =
-    Node node
+asBlankNode (Term variant) =
+    Term variant
 
 
 {-| TODO Add documentation
 -}
 asLiteral : IsAnyLiteral compatible -> Literal a
-asLiteral (Node node) =
-    Node node
+asLiteral (Term variant) =
+    Term variant
 
 
 {-| TODO Add documentation
 -}
 asBlankNodeOrIri : IsBlankNodeOrIri compatible -> BlankNodeOrIri
-asBlankNodeOrIri (Node node) =
-    Node node
+asBlankNodeOrIri (Term variant) =
+    Term variant
 
 
 {-| TODO Add documentation
 -}
 asBlankNodeOrIriOrAnyLiteral : IsBlankNodeOrIriOrAnyLiteral compatible -> BlankNodeOrIriOrAnyLiteral
-asBlankNodeOrIriOrAnyLiteral (Node node) =
-    Node node
+asBlankNodeOrIriOrAnyLiteral (Term variant) =
+    Term variant
 
 
 {-| TODO Add documentation
 -}
 asAnyLiteral : IsAnyLiteral compatible -> AnyLiteral
-asAnyLiteral (Node node) =
-    Node node
+asAnyLiteral (Term variant) =
+    Term variant
 
 
 {-| TODO Add documentation
 -}
 toUrl : Iri -> String
-toUrl (Node node) =
-    case node of
+toUrl (Term variant) =
+    case variant of
         BlankNode _ ->
             ""
 
@@ -529,8 +535,8 @@ toUrl (Node node) =
 {-| TODO Add documentation
 -}
 toValue : AnyLiteral -> String
-toValue (Node node) =
-    case node of
+toValue (Term variant) =
+    case variant of
         BlankNode _ ->
             ""
 
@@ -543,9 +549,9 @@ toValue (Node node) =
 
 {-| TODO Add documentation
 -}
-toString : Node compatible -> Maybe String
-toString (Node node) =
-    case node of
+toString : Term compatible -> Maybe String
+toString (Term variant) =
+    case variant of
         BlankNode _ ->
             Nothing
 
@@ -562,9 +568,9 @@ toString (Node node) =
 
 {-| TODO Add documentation
 -}
-toLangString : Node compatible -> Maybe ( String, String )
-toLangString (Node node) =
-    case node of
+toLangString : Term compatible -> Maybe ( String, String )
+toLangString (Term variant) =
+    case variant of
         BlankNode _ ->
             Nothing
 
@@ -581,9 +587,9 @@ toLangString (Node node) =
 
 {-| TODO Add documentation
 -}
-toInt : Node compatible -> Maybe Int
-toInt (Node node) =
-    case node of
+toInt : Term compatible -> Maybe Int
+toInt (Term variant) =
+    case variant of
         BlankNode _ ->
             Nothing
 
@@ -603,9 +609,9 @@ toInt (Node node) =
 
 {-| TODO Add documentation
 -}
-toFloat : Node compatible -> Maybe Float
-toFloat (Node node) =
-    case node of
+toFloat : Term compatible -> Maybe Float
+toFloat (Term variant) =
+    case variant of
         BlankNode _ ->
             Nothing
 
@@ -622,9 +628,9 @@ toFloat (Node node) =
 
 {-| TODO Add documentation
 -}
-toDecimal : Node compatible -> Maybe Decimal
-toDecimal (Node node) =
-    case node of
+toDecimal : Term compatible -> Maybe Decimal
+toDecimal (Term variant) =
+    case variant of
         BlankNode _ ->
             Nothing
 
@@ -641,9 +647,9 @@ toDecimal (Node node) =
 
 {-| TODO Add documentation
 -}
-toDate : Node compatible -> Maybe Posix
-toDate (Node node) =
-    case node of
+toDate : Term compatible -> Maybe Posix
+toDate (Term variant) =
+    case variant of
         BlankNode _ ->
             Nothing
 
@@ -662,9 +668,9 @@ toDate (Node node) =
 
 {-| TODO Add documentation
 -}
-toDateTime : Node compatible -> Maybe Posix
-toDateTime (Node node) =
-    case node of
+toDateTime : Term compatible -> Maybe Posix
+toDateTime (Term variant) =
+    case variant of
         BlankNode _ ->
             Nothing
 
@@ -683,9 +689,9 @@ toDateTime (Node node) =
 
 {-| TODO Add documentation
 -}
-toBool : Node compatible -> Maybe Bool
-toBool (Node node) =
-    case node of
+toBool : Term compatible -> Maybe Bool
+toBool (Term variant) =
+    case variant of
         BlankNode _ ->
             Nothing
 
@@ -711,86 +717,86 @@ toBool (Node node) =
 {-| TODO Add documentation
 -}
 appendPath : String -> IsIri compatible -> Iri
-appendPath segment (Node node) =
-    case node of
+appendPath segment (Term variant) =
+    case variant of
         BlankNode _ ->
-            Node node
+            Term variant
 
         Iri url ->
             case String.split "?" url of
                 [ _ ] ->
                     case String.split "#" url of
                         [ _ ] ->
-                            Node (Iri (url ++ segment))
+                            Term (Iri (url ++ segment))
 
                         [ beforeFragment, fragment ] ->
-                            Node (Iri (beforeFragment ++ segment ++ "#" ++ fragment))
+                            Term (Iri (beforeFragment ++ segment ++ "#" ++ fragment))
 
                         _ ->
-                            Node (Iri (url ++ segment))
+                            Term (Iri (url ++ segment))
 
                 [ beforeQuery, rest ] ->
                     case String.split "#" rest of
                         [ _ ] ->
-                            Node (Iri (beforeQuery ++ segment ++ "?" ++ rest))
+                            Term (Iri (beforeQuery ++ segment ++ "?" ++ rest))
 
                         [ query, fragment ] ->
-                            Node (Iri (beforeQuery ++ segment ++ "?" ++ query ++ "#" ++ fragment))
+                            Term (Iri (beforeQuery ++ segment ++ "?" ++ query ++ "#" ++ fragment))
 
                         _ ->
-                            Node (Iri (url ++ segment))
+                            Term (Iri (url ++ segment))
 
                 _ ->
-                    Node (Iri (url ++ segment))
+                    Term (Iri (url ++ segment))
 
         Literal _ ->
-            Node node
+            Term variant
 
 
 {-| TODO Add documentation
 -}
 dropFragment : IsIri compatible -> Iri
-dropFragment (Node node) =
-    case node of
+dropFragment (Term variant) =
+    case variant of
         BlankNode _ ->
-            Node node
+            Term variant
 
         Iri url ->
             case String.split "#" url of
                 [ _ ] ->
-                    Node node
+                    Term variant
 
                 [ beforeFragment, _ ] ->
-                    Node (Iri beforeFragment)
+                    Term (Iri beforeFragment)
 
                 _ ->
-                    Node node
+                    Term variant
 
         Literal _ ->
-            Node node
+            Term variant
 
 
 {-| TODO Add documentation
 -}
 setFragment : String -> IsIri compatible -> Iri
-setFragment fragment (Node node) =
-    case node of
+setFragment fragment (Term variant) =
+    case variant of
         BlankNode _ ->
-            Node node
+            Term variant
 
         Iri url ->
             case String.split "#" url of
                 [ _ ] ->
-                    Node (Iri (url ++ "#" ++ fragment))
+                    Term (Iri (url ++ "#" ++ fragment))
 
                 [ beforeFragment, _ ] ->
-                    Node (Iri (beforeFragment ++ "#" ++ fragment))
+                    Term (Iri (beforeFragment ++ "#" ++ fragment))
 
                 _ ->
-                    Node node
+                    Term variant
 
         Literal _ ->
-            Node node
+            Term variant
 
 
 
@@ -799,8 +805,8 @@ setFragment fragment (Node node) =
 
 {-| TODO Add documentation
 -}
-serializeNode : Node compatible -> String
-serializeNode (Node variant) =
+serializeNode : Term compatible -> String
+serializeNode (Term variant) =
     Internal.serializeVariant variant
 
 
@@ -814,16 +820,16 @@ type alias SerializeConfig =
 
 {-| TODO Add documentation
 -}
-serializeNodeTurtle : SerializeConfig -> Node compatible -> String
-serializeNodeTurtle config (Node node) =
-    serializeNodeTurtleHelp config node
+serializeNodeTurtle : SerializeConfig -> Term compatible -> String
+serializeNodeTurtle config (Term variant) =
+    serializeNodeTurtleHelp config variant
 
 
 {-| TODO Add documentation
 -}
 serializeNodeTurtleHelp : SerializeConfig -> Variant -> String
-serializeNodeTurtleHelp config node =
-    case node of
+serializeNodeTurtleHelp config variant =
+    case variant of
         BlankNode value ->
             "_:" ++ value
 
@@ -1011,13 +1017,13 @@ subjectDecoder =
     , iriDecoder
     ]
         |> Decode.oneOf
-        |> Decode.map Node
+        |> Decode.map Term
 
 
 predicateDecoder : Decoder Iri
 predicateDecoder =
     iriDecoder
-        |> Decode.map Node
+        |> Decode.map Term
 
 
 objectDecoder : Decoder BlankNodeOrIriOrAnyLiteral
@@ -1027,7 +1033,7 @@ objectDecoder =
     , iriDecoder
     ]
         |> Decode.oneOf
-        |> Decode.map Node
+        |> Decode.map Term
 
 
 blankNodeDecoder : Decoder Variant
@@ -1109,8 +1115,8 @@ encodeNTriple nTriple =
 
 
 encodeSubject : BlankNodeOrIri -> Value
-encodeSubject (Node node) =
-    case node of
+encodeSubject (Term variant) =
+    case variant of
         BlankNode name ->
             encodeBlankNode name
 
@@ -1122,8 +1128,8 @@ encodeSubject (Node node) =
 
 
 encodePredicate : Iri -> Value
-encodePredicate (Node node) =
-    case node of
+encodePredicate (Term variant) =
+    case variant of
         BlankNode _ ->
             Encode.null
 
@@ -1135,8 +1141,8 @@ encodePredicate (Node node) =
 
 
 encodeObject : BlankNodeOrIriOrAnyLiteral -> Value
-encodeObject (Node node) =
-    case node of
+encodeObject (Term variant) =
+    case variant of
         BlankNode name ->
             encodeBlankNode name
 
