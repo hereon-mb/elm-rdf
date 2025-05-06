@@ -1,5 +1,5 @@
 module Rdf.Graph exposing
-    ( Graph(..), GraphData
+    ( Graph
     , union
     , isEmpty
     , emptyGraph, singleton
@@ -15,7 +15,7 @@ module Rdf.Graph exposing
 
 {-|
 
-@docs Graph, GraphData
+@docs Graph
 @docs union
 
 @docs isEmpty
@@ -44,6 +44,7 @@ module Rdf.Graph exposing
 -}
 
 import Dict exposing (Dict)
+import Internal.Graph as Internal exposing (Data, Graph(..))
 import Internal.Node exposing (Node(..), Variant(..))
 import Internal.Turtle as Turtle
 import Json.Decode as Decode exposing (Decoder)
@@ -79,23 +80,10 @@ import Tuple.Extra as Tuple
 import UUID
 
 
-{-| FIXME internals exposed for benchmarks
+{-| FIXME Add documention
 -}
-type Graph
-    = Graph GraphData
-
-
-{-| TODO Add documentation
--}
-type alias GraphData =
-    { base : Maybe String
-    , prefixes : Dict String String
-    , nTriples : List NTriple
-    , subjects : List BlankNodeOrIri
-    , objects : List BlankNodeOrIriOrAnyLiteral
-    , bySubjectByPredicate : Dict String (Dict String (List NTriple))
-    , byPredicateBySubject : Dict String (Dict String (List NTriple))
-    }
+type alias Graph =
+    Internal.Graph
 
 
 {-| FIXME Input graphs are expected to be disjoint on blank nodes. Otherwise, behavior is undefined.
@@ -103,7 +91,10 @@ type alias GraphData =
 union : Graph -> Graph -> Graph
 union (Graph g) (Graph h) =
     let
-        merge : Dict String (Dict String (List NTriple)) -> Dict String (Dict String (List NTriple)) -> Dict String (Dict String (List NTriple))
+        merge :
+            Dict String (Dict String (List NTriple))
+            -> Dict String (Dict String (List NTriple))
+            -> Dict String (Dict String (List NTriple))
         merge dictLeft dictRight =
             Dict.merge
                 Dict.insert
@@ -370,7 +361,7 @@ getBlankNodeOrIriObject subject predicate (Graph graph) =
             Nothing
 
 
-followPropertyPath : GraphData -> Iri -> IsBlankNodeOrIri compatible -> List BlankNodeOrIriOrAnyLiteral
+followPropertyPath : Data -> Iri -> IsBlankNodeOrIri compatible -> List BlankNodeOrIriOrAnyLiteral
 followPropertyPath data predicate subject =
     data.bySubjectByPredicate
         |> Dict.get (serializeNode subject)

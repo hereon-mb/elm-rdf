@@ -98,6 +98,7 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 
 import Basics.Extra exposing (flip)
 import Dict exposing (Dict)
+import Internal.Graph exposing (Graph(..))
 import Internal.Node exposing (DataLiteral, Node(..), Variant(..))
 import List.Extra as List
 import List.NonEmpty as NonEmpty exposing (NonEmpty)
@@ -111,7 +112,6 @@ import Rdf
         , IsBlankNodeOrIriOrAnyLiteral
         , IsIri
         )
-import Rdf.Graph exposing (Graph(..))
 import Rdf.Namespaces as Rdf exposing (rdf)
 import Rdf.PropertyPath as Rdf exposing (PropertyPath)
 import Result.Extra as Result
