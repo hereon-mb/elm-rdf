@@ -11,7 +11,7 @@ module Rdf exposing
     , iri, blankNode
     , literal
     , string, bool, decimal, integer
-    , double
+    , double, float
     , date, dateTime
     , langString
     , toIri, toBlankNode
@@ -63,7 +63,7 @@ a introduction on its data model.
 @docs iri, blankNode
 @docs literal
 @docs string, bool, decimal, integer
-@docs double
+@docs double, float
 @docs date, dateTime
 @docs langString
 
@@ -522,6 +522,27 @@ double value =
         (Literal
             { value = String.fromFloat value
             , datatype = urlXsdDouble
+            , languageTag = Nothing
+            }
+        )
+
+
+{-| Create
+a [literal](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-literal)
+with datatype [xsd:decimal](https://www.w3.org/TR/xmlschema11-2/#float).
+
+    float 3.14
+    --> literal
+    -->   (iri "http://www.w3.org/2001/XMLSchema#float")
+    -->   "3.14"
+
+-}
+float : Float -> Literal Float
+float value =
+    Term
+        (Literal
+            { value = String.fromFloat value
+            , datatype = urlXsdFloat
             , languageTag = Nothing
             }
         )
@@ -1401,6 +1422,11 @@ urlXsdInteger =
 urlXsdDouble : String
 urlXsdDouble =
     "http://www.w3.org/2001/XMLSchema#double"
+
+
+urlXsdFloat : String
+urlXsdFloat =
+    "http://www.w3.org/2001/XMLSchema#float"
 
 
 urlXsdDecimal : String
