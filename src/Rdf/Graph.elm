@@ -6,7 +6,7 @@ module Rdf.Graph exposing
     , decoder, encode
     , parse, parseSafe, Error(..), errorToString
     , serialize, serializeTurtle
-    , fromNTriples
+    , fromTriples
     , Seed, initialSeed, seedGenerator
     , insert, insertAt, generateBlankNode
     , setBase, clearBase, addPrefix, addPrefixes, clearPrefixes
@@ -27,7 +27,7 @@ module Rdf.Graph exposing
 @docs decoder, encode
 @docs parse, parseSafe, Error, errorToString
 @docs serialize, serializeTurtle
-@docs fromNTriples
+@docs fromTriples
 
 
 ## Update
@@ -61,17 +61,17 @@ import Rdf
         , Iri
         , IsBlankNodeOrIri
         , IsIri
-        , NTriple
         , SerializeConfig
+        , Triple
         , asBlankNodeOrIri
         , asBlankNodeOrIriOrAnyLiteral
         , asIri
-        , encodeNTriple
-        , nTripleDecoder
-        , serializeNTriple
+        , encodeTriple
         , serializeNode
         , serializeNodeTurtle
+        , serializeTriple
         , toBlankNodeOrIri
+        , tripleDecoder
         )
 import Rdf.Namespaces exposing (rdf, xsd)
 import Rdf.PropertyPath exposing (PropertyPath(..))
@@ -92,9 +92,9 @@ union : Graph -> Graph -> Graph
 union (Graph g) (Graph h) =
     let
         merge :
-            Dict String (Dict String (List NTriple))
-            -> Dict String (Dict String (List NTriple))
-            -> Dict String (Dict String (List NTriple))
+            Dict String (Dict String (List Triple))
+            -> Dict String (Dict String (List Triple))
+            -> Dict String (Dict String (List Triple))
         merge dictLeft dictRight =
             Dict.merge
                 Dict.insert
@@ -118,7 +118,7 @@ union (Graph g) (Graph h) =
     in
     Graph
         { g
-            | nTriples = g.nTriples ++ h.nTriples
+            | triples = g.triples ++ h.triples
             , subjects = g.subjects ++ h.subjects
             , objects = g.objects ++ h.objects
             , bySubjectByPredicate = merge g.bySubjectByPredicate h.bySubjectByPredicate
@@ -139,7 +139,7 @@ emptyGraph =
     Graph
         { base = Nothing
         , prefixes = Dict.empty
-        , nTriples = []
+        , triples = []
         , subjects = []
         , objects = []
         , bySubjectByPredicate = Dict.empty
@@ -151,7 +151,7 @@ emptyGraph =
 -}
 singleton : IsBlankNodeOrIri compatible1 -> IsIri compatible2 -> Term compatible3 -> Graph
 singleton subject predicate object =
-    fromNTriples
+    fromTriples
         [ { subject = asBlankNodeOrIri subject
           , predicate = asIri predicate
           , object = asBlankNodeOrIriOrAnyLiteral object
@@ -212,7 +212,7 @@ getPrefixes (Graph data) =
 -}
 isEmpty : Graph -> Bool
 isEmpty (Graph data) =
-    List.isEmpty data.nTriples
+    List.isEmpty data.triples
 
 
 {-| TODO Add documentation
@@ -259,7 +259,7 @@ insert subject predicate object (Graph graph) =
         keyPredicate =
             serializeNode predicate
 
-        triple : NTriple
+        triple : Triple
         triple =
             { subject = asBlankNodeOrIri subject
             , predicate = asIri predicate
@@ -268,7 +268,7 @@ insert subject predicate object (Graph graph) =
     in
     Graph
         { graph
-            | nTriples = triple :: graph.nTriples
+            | triples = triple :: graph.triples
             , subjects = asBlankNodeOrIri subject :: graph.subjects
             , objects = asBlankNodeOrIriOrAnyLiteral object :: graph.objects
             , bySubjectByPredicate =
@@ -392,7 +392,7 @@ serialize (Graph data) =
         |> Dict.values
         |> List.concatMap Dict.values
         |> List.concat
-        |> List.map serializeNTriple
+        |> List.map serializeTriple
         |> String.join "\n"
 
 
@@ -436,7 +436,7 @@ serializeTurtle (Graph data) =
                         ( inlined, notInlined )
                 )
                 ( Set.empty, Set.empty )
-                data.nTriples
+                data.triples
     in
     String.concat
         [ case data.base of
@@ -463,7 +463,7 @@ serializeTurtle (Graph data) =
             |> List.filterMap
                 (\predicateObjectsDict ->
                     let
-                        predicateObjectsList : List (List NTriple)
+                        predicateObjectsList : List (List Triple)
                         predicateObjectsList =
                             Dict.values predicateObjectsDict
                     in
@@ -488,9 +488,9 @@ serializeTurtle (Graph data) =
 
 serializePredicateObjects :
     SerializeConfig
-    -> Dict String (Dict String (List NTriple))
+    -> Dict String (Dict String (List Triple))
     -> Set String
-    -> List (List NTriple)
+    -> List (List Triple)
     -> String
 serializePredicateObjects config bySubjectByPredicate inlinedSubjects predicateObjects =
     predicateObjects
@@ -603,9 +603,9 @@ indent text =
 
 serializePredicateObjectWith :
     SerializeConfig
-    -> Dict String (Dict String (List NTriple))
+    -> Dict String (Dict String (List Triple))
     -> Set String
-    -> NTriple
+    -> Triple
     -> String
 serializePredicateObjectWith config bySubjectByPredicate inlinedSubjects { predicate, object } =
     let
@@ -639,8 +639,8 @@ serializePredicateObjectWith config bySubjectByPredicate inlinedSubjects { predi
 -}
 decoder : Decoder Graph
 decoder =
-    Decode.list nTripleDecoder
-        |> Decode.map fromNTriples
+    Decode.list tripleDecoder
+        |> Decode.map fromTriples
 
 
 {-| TODO Add documentation
@@ -651,7 +651,7 @@ encode (Graph data) =
         |> Dict.values
         |> List.concatMap Dict.values
         |> List.concat
-        |> Encode.list encodeNTriple
+        |> Encode.list encodeTriple
 
 
 {-| Get all RDF Triples from a turtle text file.
@@ -661,12 +661,12 @@ parse raw =
     raw
         |> Turtle.parse
         |> Result.mapError ErrorParser
-        |> Result.andThen (collectNTriples initialSeed)
+        |> Result.andThen (collectTriples initialSeed)
         |> Result.map
             (\state ->
                 List.foldl (Tuple.apply addPrefix)
-                    (state.nTriples
-                        |> fromNTriples
+                    (state.triples
+                        |> fromTriples
                         |> (case state.base of
                                 Nothing ->
                                     identity
@@ -686,12 +686,12 @@ parseSafe seed raw =
     raw
         |> Turtle.parse
         |> Result.mapError ErrorParser
-        |> Result.andThen (collectNTriples seed)
+        |> Result.andThen (collectTriples seed)
         |> Result.map
             (\state ->
                 ( List.foldl (Tuple.apply addPrefix)
-                    (state.nTriples
-                        |> fromNTriples
+                    (state.triples
+                        |> fromTriples
                         |> (case state.base of
                                 Nothing ->
                                     identity
@@ -828,7 +828,7 @@ deadEndToCode lines { row } =
 type alias State =
     { base : Maybe String
     , prefixes : Dict String String
-    , nTriples : List NTriple
+    , triples : List Triple
     , subjects : List BlankNodeOrIri
     , predicates : List Iri
     , seed : Seed
@@ -840,7 +840,7 @@ stateInitial : Seed -> State
 stateInitial seed =
     { base = Nothing
     , prefixes = Dict.empty
-    , nTriples = []
+    , triples = []
     , subjects = []
     , predicates = []
     , seed = seed
@@ -848,14 +848,14 @@ stateInitial seed =
     }
 
 
-collectNTriples : Seed -> List Turtle.Statement -> Result Error State
-collectNTriples seed statements =
+collectTriples : Seed -> List Turtle.Statement -> Result Error State
+collectTriples seed statements =
     statements
-        |> List.foldl (\statement -> Result.andThen (collectNTriplesStep statement)) (Ok (stateInitial seed))
+        |> List.foldl (\statement -> Result.andThen (collectTriplesStep statement)) (Ok (stateInitial seed))
 
 
-collectNTriplesStep : Turtle.Statement -> State -> Result Error State
-collectNTriplesStep statement state =
+collectTriplesStep : Turtle.Statement -> State -> Result Error State
+collectTriplesStep statement state =
     case statement of
         Turtle.DirectivePrefixId prefix value ->
             Ok { state | prefixes = Dict.insert prefix value state.prefixes }
@@ -1082,11 +1082,11 @@ collectObject object state =
 
 addTriple : BlankNodeOrIriOrAnyLiteral -> State -> Result Error State
 addTriple object state =
-    Result.map3 NTriple
+    Result.map3 Triple
         (Result.fromMaybe MissingSubject (List.head state.subjects))
         (Result.fromMaybe MissingPredicate (List.head state.predicates))
         (Ok object)
-        |> Result.map (\nTriple -> { state | nTriples = nTriple :: state.nTriples })
+        |> Result.map (\triple -> { state | triples = triple :: state.triples })
 
 
 addCollection : BlankNode -> List Turtle.Object -> State -> Result Error State
@@ -1187,22 +1187,22 @@ dropPredicate state =
 
 {-| TODO Add documentation
 -}
-fromNTriples : List NTriple -> Graph
-fromNTriples nTriples =
+fromTriples : List Triple -> Graph
+fromTriples triples =
     Graph
         { base = Nothing
         , prefixes = Dict.empty
-        , nTriples = nTriples
-        , subjects = List.map .subject nTriples
-        , objects = List.map .object nTriples
+        , triples = triples
+        , subjects = List.map .subject triples
+        , objects = List.map .object triples
         , bySubjectByPredicate =
-            nTriples
+            triples
                 |> List.map annotateWithIriSubject
                 |> groupByTupleFirst
                 |> List.map
-                    (\( ( iriSubject, nTripleFirst ), rest ) ->
+                    (\( ( iriSubject, tripleFirst ), rest ) ->
                         ( iriSubject
-                        , (nTripleFirst :: List.map Tuple.second rest)
+                        , (tripleFirst :: List.map Tuple.second rest)
                             |> List.map annotateWithIriPredicate
                             |> groupByTupleFirst
                             |> dictFromGroups
@@ -1210,13 +1210,13 @@ fromNTriples nTriples =
                     )
                 |> Dict.fromList
         , byPredicateBySubject =
-            nTriples
+            triples
                 |> List.map annotateWithIriPredicate
                 |> groupByTupleFirst
                 |> List.map
-                    (\( ( iriPredicate, nTripleFirst ), rest ) ->
+                    (\( ( iriPredicate, tripleFirst ), rest ) ->
                         ( iriPredicate
-                        , (nTripleFirst :: List.map Tuple.second rest)
+                        , (tripleFirst :: List.map Tuple.second rest)
                             |> List.map annotateWithIriSubject
                             |> groupByTupleFirst
                             |> dictFromGroups
@@ -1226,14 +1226,14 @@ fromNTriples nTriples =
         }
 
 
-annotateWithIriSubject : NTriple -> ( String, NTriple )
-annotateWithIriSubject nTriple =
-    ( serializeNode nTriple.subject, nTriple )
+annotateWithIriSubject : Triple -> ( String, Triple )
+annotateWithIriSubject triple =
+    ( serializeNode triple.subject, triple )
 
 
-annotateWithIriPredicate : NTriple -> ( String, NTriple )
-annotateWithIriPredicate nTriple =
-    ( serializeNode nTriple.predicate, nTriple )
+annotateWithIriPredicate : Triple -> ( String, Triple )
+annotateWithIriPredicate triple =
+    ( serializeNode triple.predicate, triple )
 
 
 groupByTupleFirst : List ( comparable, a ) -> List ( ( comparable, a ), List ( comparable, a ) )

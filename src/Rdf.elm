@@ -1,12 +1,12 @@
 module Rdf exposing
-    ( Term, Yes, No
+    ( Triple
+    , Term, Yes, No
     , Iri, BlankNode, Literal
     , BlankNodeOrIri, AnyLiteral, BlankNodeOrIriOrAnyLiteral
     , asIri, asBlankNode, asLiteral
     , asBlankNodeOrIri, asAnyLiteral, asBlankNodeOrIriOrAnyLiteral
     , IsIri, IsBlankNode
     , IsBlankNodeOrIri, IsAnyLiteral, IsBlankNodeOrIriOrAnyLiteral
-    , NTriple
     , iri, blankNode
     , literal
     , string, langString
@@ -22,9 +22,9 @@ module Rdf exposing
     , toDate, toDateTime
     , toBool
     , appendPath, dropFragment, setFragment
-    , serializeNode, serializeNodeTurtle, SerializeConfig, serializeNTriple
-    , encodeNTriple
-    , nTripleDecoder
+    , serializeNode, serializeNodeTurtle, SerializeConfig, serializeTriple
+    , encodeTriple
+    , tripleDecoder
     , StringOrLangString(..)
     , localize, nonLocalized
     , stringOrLangStringFrom, stringOrLangStringFromList
@@ -32,7 +32,12 @@ module Rdf exposing
     , stringOrLangStringInfo
     )
 
-{-|
+{-| This module defines the types and helper functions to work with the basic
+buildings blocks of the RDF ecosystem. If you are new to RDF, you should take
+a look at the [RDF 1.1 Primer](https://www.w3.org/TR/rdf11-primer/) for
+a introduction on its data model.
+
+@docs Triple
 
 
 # RDF Terms
@@ -46,8 +51,6 @@ module Rdf exposing
 
 @docs IsIri, IsBlankNode
 @docs IsBlankNodeOrIri, IsAnyLiteral, IsBlankNodeOrIriOrAnyLiteral
-
-@docs NTriple
 
 
 ## Create
@@ -77,13 +80,13 @@ module Rdf exposing
 
 ## Serialize
 
-@docs serializeNode, serializeNodeTurtle, SerializeConfig, serializeNTriple
+@docs serializeNode, serializeNodeTurtle, SerializeConfig, serializeTriple
 
 
 ## Json
 
-@docs encodeNTriple
-@docs nTripleDecoder
+@docs encodeTriple
+@docs tripleDecoder
 
 
 ## StringOrLangString
@@ -112,6 +115,16 @@ import List.Extra as List
 import Maybe.Extra as Maybe
 import String.Extra as String
 import Time exposing (Posix)
+
+
+{-| This type represents an [RDF
+Triple](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-rdf-triple).
+-}
+type alias Triple =
+    { subject : BlankNodeOrIri
+    , predicate : Iri
+    , object : BlankNodeOrIriOrAnyLiteral
+    }
 
 
 {-| This type represents an [RDF
@@ -245,15 +258,6 @@ type alias IsAnyLiteral compatible =
 -}
 type alias IsBlankNodeOrIriOrAnyLiteral compatible =
     Term compatible
-
-
-{-| TODO Add documentation
--}
-type alias NTriple =
-    { subject : BlankNodeOrIri
-    , predicate : Iri
-    , object : BlankNodeOrIriOrAnyLiteral
-    }
 
 
 
@@ -908,8 +912,8 @@ serializeNodeTurtleHelp config variant =
 
 {-| TODO Add documentation
 -}
-serializeNTriple : NTriple -> String
-serializeNTriple { subject, predicate, object } =
+serializeTriple : Triple -> String
+serializeTriple { subject, predicate, object } =
     [ serializeNode subject
     , serializeNode predicate
     , serializeNode object
@@ -1003,9 +1007,9 @@ mergeStringOrLangStrings stringOrLangStrings =
 
 {-| TODO Add documentation
 -}
-nTripleDecoder : Decoder NTriple
-nTripleDecoder =
-    Decode.succeed NTriple
+tripleDecoder : Decoder Triple
+tripleDecoder =
+    Decode.succeed Triple
         |> Decode.required "subject" subjectDecoder
         |> Decode.required "predicate" predicateDecoder
         |> Decode.required "object" objectDecoder
@@ -1105,11 +1109,11 @@ literalDecoder =
 
 {-| TODO Add documentation
 -}
-encodeNTriple : NTriple -> Value
-encodeNTriple nTriple =
-    [ ( "subject", encodeSubject nTriple.subject )
-    , ( "predicate", encodePredicate nTriple.predicate )
-    , ( "object", encodeObject nTriple.object )
+encodeTriple : Triple -> Value
+encodeTriple triple =
+    [ ( "subject", encodeSubject triple.subject )
+    , ( "predicate", encodePredicate triple.predicate )
+    , ( "object", encodeObject triple.object )
     ]
         |> Encode.object
 

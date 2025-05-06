@@ -321,14 +321,14 @@ parse =
         ]
 
 
-testParse : List ( String, List Rdf.NTriple ) -> Test
+testParse : List ( String, List Rdf.Triple ) -> Test
 testParse tests =
     tests
         |> List.map (\( raw, parsed ) -> testParseCase raw parsed)
         |> describe "parse"
 
 
-testParseCase : String -> List Rdf.NTriple -> Test
+testParseCase : String -> List Rdf.Triple -> Test
 testParseCase raw expected =
     let
         description : String
@@ -344,7 +344,7 @@ testParseCase raw expected =
             raw
                 |> Rdf.Graph.parse
                 |> Result.map (Rdf.Graph.clearBase >> Rdf.Graph.clearPrefixes)
-                |> Expect.equal (Ok (Rdf.Graph.fromNTriples expected))
+                |> Expect.equal (Ok (Rdf.Graph.fromTriples expected))
 
 
 appendPath : Test

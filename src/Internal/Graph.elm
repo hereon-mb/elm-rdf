@@ -21,9 +21,9 @@ type Graph
 type alias Data =
     { base : Maybe String
     , prefixes : Dict String String
-    , nTriples : List Rdf.NTriple
+    , triples : List Rdf.Triple
     , subjects : List Rdf.BlankNodeOrIri
     , objects : List Rdf.BlankNodeOrIriOrAnyLiteral
-    , bySubjectByPredicate : Dict String (Dict String (List Rdf.NTriple))
-    , byPredicateBySubject : Dict String (Dict String (List Rdf.NTriple))
+    , bySubjectByPredicate : Dict String (Dict String (List Rdf.Triple))
+    , byPredicateBySubject : Dict String (Dict String (List Rdf.Triple))
     }

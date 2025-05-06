@@ -1445,7 +1445,7 @@ combine =
 hasTripleWithSubject : IsBlankNodeOrIri compatible -> Graph -> Bool
 hasTripleWithSubject nodeFocusCompatible (Graph data) =
     let
-        subjectMatches : Rdf.NTriple -> Bool
+        subjectMatches : Rdf.Triple -> Bool
         subjectMatches triple =
             triple.subject == nodeFocus
 
@@ -1453,7 +1453,7 @@ hasTripleWithSubject nodeFocusCompatible (Graph data) =
         nodeFocus =
             Rdf.asBlankNodeOrIri nodeFocusCompatible
     in
-    data.nTriples
+    data.triples
         |> List.filter subjectMatches
         |> List.isEmpty
         |> not
@@ -1462,7 +1462,7 @@ hasTripleWithSubject nodeFocusCompatible (Graph data) =
 hasTripleWithObject : IsBlankNodeOrIriOrAnyLiteral compatible -> Graph -> Bool
 hasTripleWithObject nodeFocusCompatible (Graph data) =
     let
-        objectMatches : Rdf.NTriple -> Bool
+        objectMatches : Rdf.Triple -> Bool
         objectMatches triple =
             triple.object == nodeFocus
 
@@ -1470,7 +1470,7 @@ hasTripleWithObject nodeFocusCompatible (Graph data) =
         nodeFocus =
             Rdf.asBlankNodeOrIriOrAnyLiteral nodeFocusCompatible
     in
-    data.nTriples
+    data.triples
         |> List.filter objectMatches
         |> List.isEmpty
         |> not
@@ -1478,7 +1478,7 @@ hasTripleWithObject nodeFocusCompatible (Graph data) =
 
 getSubjects : Graph -> List BlankNodeOrIri
 getSubjects (Graph data) =
-    data.nTriples
+    data.triples
         |> List.map .subject
         -- FIXME Make sure, subjects are already unique when stored.
         |> List.unique
@@ -1493,8 +1493,8 @@ getObjectsAt nodeFocus path (Graph data) =
 
 type alias GraphData rest =
     { rest
-        | bySubjectByPredicate : Dict String (Dict String (List Rdf.NTriple))
-        , byPredicateBySubject : Dict String (Dict String (List Rdf.NTriple))
+        | bySubjectByPredicate : Dict String (Dict String (List Rdf.Triple))
+        , byPredicateBySubject : Dict String (Dict String (List Rdf.Triple))
     }
 
 
