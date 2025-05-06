@@ -10,8 +10,8 @@ module Rdf exposing
     , Yes, No
     , iri, blankNode
     , literal
-    , string, bool, decimal, int
-    , float
+    , string, bool, decimal, integer
+    , double
     , date, dateTime
     , langString
     , toIri, toBlankNode
@@ -62,8 +62,8 @@ a introduction on its data model.
 
 @docs iri, blankNode
 @docs literal
-@docs string, bool, decimal, int
-@docs float
+@docs string, bool, decimal, integer
+@docs double
 @docs date, dateTime
 @docs langString
 
@@ -489,14 +489,14 @@ decimal value =
 a [literal](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-literal)
 with datatype [xsd:decimal](https://www.w3.org/TR/xmlschema11-2/#integer).
 
-    int 42
+    integer 42
     --> literal
     -->   (iri "http://www.w3.org/2001/XMLSchema#integer")
     -->   "42"
 
 -}
-int : Int -> Literal Int
-int value =
+integer : Int -> Literal Int
+integer value =
     Term
         (Literal
             { value = String.fromInt value
@@ -510,14 +510,14 @@ int value =
 a [literal](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-literal)
 with datatype [xsd:decimal](https://www.w3.org/TR/xmlschema11-2/#double).
 
-    float 3.14
+    double 3.14
     --> literal
     -->   (iri "http://www.w3.org/2001/XMLSchema#double")
     -->   "3.14"
 
 -}
-float : Float -> Literal Float
-float value =
+double : Float -> Literal Float
+double value =
     Term
         (Literal
             { value = String.fromFloat value

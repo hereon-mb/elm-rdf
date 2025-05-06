@@ -26,7 +26,7 @@ bunchLeaf =
 
                 valueValue : Rdf.Literal Int
                 valueValue =
-                    Rdf.int 1
+                    Rdf.integer 1
 
                 hasNested : Rdf.PropertyPath
                 hasNested =

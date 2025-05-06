@@ -266,7 +266,7 @@ parse =
               }
             , { subject = Rdf.asBlankNodeOrIri (Rdf.blankNode "06aa2bfa-af53-42c5-aa42-a0b964471911")
               , predicate = rdf "first"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.int 2)
+              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.integer 2)
               }
             , { subject = Rdf.asBlankNodeOrIri (Rdf.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
               , predicate = rdf "rest"
@@ -274,7 +274,7 @@ parse =
               }
             , { subject = Rdf.asBlankNodeOrIri (Rdf.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
               , predicate = rdf "first"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.int 1)
+              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.integer 1)
               }
             , { subject = Rdf.asBlankNodeOrIri (Rdf.iri "http://example.org/alice")
               , predicate = Rdf.iri "http://example.org/knows"
@@ -302,7 +302,7 @@ parse =
               }
             , { subject = Rdf.asBlankNodeOrIri (Rdf.blankNode "06aa2bfa-af53-42c5-aa42-a0b964471911")
               , predicate = rdf "first"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.int 2)
+              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.integer 2)
               }
             , { subject = Rdf.asBlankNodeOrIri (Rdf.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
               , predicate = rdf "rest"
@@ -310,7 +310,7 @@ parse =
               }
             , { subject = Rdf.asBlankNodeOrIri (Rdf.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
               , predicate = rdf "first"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.int 1)
+              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.integer 1)
               }
             , { subject = Rdf.asBlankNodeOrIri (Rdf.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
               , predicate = Rdf.iri "http://example.org/knows"

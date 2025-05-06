@@ -1065,7 +1065,7 @@ collectObject object state =
                 |> Result.andThen (\url -> addTriple (asBlankNodeOrIriOrAnyLiteral (Rdf.literal (Rdf.iri url) value)) state)
 
         Turtle.ObjectLiteral (Turtle.LiteralInteger value) ->
-            addTriple (asBlankNodeOrIriOrAnyLiteral (Rdf.int value)) state
+            addTriple (asBlankNodeOrIriOrAnyLiteral (Rdf.integer value)) state
 
         Turtle.ObjectLiteral (Turtle.LiteralDecimal value) ->
             addTriple (asBlankNodeOrIriOrAnyLiteral (Rdf.literal (xsd "decimal") value)) state
