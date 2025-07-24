@@ -392,6 +392,7 @@ serialize (Graph data) =
         |> Dict.values
         |> List.concatMap Dict.values
         |> List.concat
+        |> List.unique
         |> List.map serializeTriple
         |> String.join "\n"
 
@@ -509,11 +510,12 @@ serializePredicateObjects config bySubjectByPredicate inlinedSubjects predicateO
                     )
             )
         |> List.map
-            (List.map
-                (serializePredicateObjectWith config
-                    bySubjectByPredicate
-                    inlinedSubjects
-                )
+            (List.unique
+                >> List.map
+                    (serializePredicateObjectWith config
+                        bySubjectByPredicate
+                        inlinedSubjects
+                    )
                 >> String.join " ;\n"
             )
         |> String.join " ;\n"
