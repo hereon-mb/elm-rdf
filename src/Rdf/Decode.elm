@@ -26,7 +26,7 @@ module Rdf.Decode exposing
     , succeed, fail, failWith
     , andThen
     , oneOf
-    , many
+    , many, indexedMany
     , lazy
     )
 
@@ -91,7 +91,7 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 @docs succeed, fail, failWith
 @docs andThen
 @docs oneOf
-@docs many
+@docs many, indexedMany
 @docs lazy
 
 -}
@@ -140,6 +140,33 @@ many (Decoder f) =
             Result.andThen
                 (\nodes ->
                     Result.combine (List.map (f graph << Ok << List.singleton) nodes)
+                )
+        )
+
+
+{-| FIXME We also want a indexedManySafe which always succeeds by filtering out
+the elements for which the provided decoder fails, and which re-uses an index
+if the element failed decoding.
+-}
+indexedMany : (Int -> Decoder a) -> Decoder (List a)
+indexedMany toDecoder =
+    Decoder
+        (\graph ->
+            Result.andThen
+                (\nodes ->
+                    Result.combine
+                        (List.indexedMap
+                            (\index ->
+                                let
+                                    (Decoder f) =
+                                        toDecoder index
+                                in
+                                List.singleton
+                                    >> Ok
+                                    >> f graph
+                            )
+                            nodes
+                        )
                 )
         )
 
