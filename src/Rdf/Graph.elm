@@ -889,7 +889,7 @@ collectTriplesStep statement state =
         Turtle.Triples (Turtle.TriplesBlankNodePropertyList predicateObjectListSubject predicateObjectList) ->
             let
                 ( node, seed ) =
-                    mintBlankNode state.seed
+                    generateBlankNode state.seed
             in
             (predicateObjectListSubject ++ predicateObjectList)
                 |> List.foldl
@@ -927,7 +927,7 @@ collectTriplesSubject subject predicateObjectList state =
                 Nothing ->
                     let
                         ( node, seed ) =
-                            mintBlankNode state.seed
+                            generateBlankNode state.seed
                     in
                     predicateObjectList
                         |> List.foldl
@@ -952,7 +952,7 @@ collectTriplesSubject subject predicateObjectList state =
         Turtle.SubjectBlankNode Turtle.Anon ->
             let
                 ( node, seed ) =
-                    mintBlankNode state.seed
+                    generateBlankNode state.seed
             in
             predicateObjectList
                 |> List.foldl (\predicateObject -> Result.andThen (collectPredicateObjectList predicateObject))
@@ -974,7 +974,7 @@ collectTriplesSubject subject predicateObjectList state =
             else
                 let
                     ( node, seed ) =
-                        mintBlankNode state.seed
+                        generateBlankNode state.seed
                 in
                 predicateObjectList
                     |> List.foldl (\predicateObject -> Result.andThen (collectPredicateObjectList predicateObject))
@@ -986,13 +986,6 @@ collectTriplesSubject subject predicateObjectList state =
                         )
                     |> Result.andThen (addCollection node objects)
                     |> Result.map dropSubject
-
-
-mintBlankNode : Seed -> ( BlankNode, Seed )
-mintBlankNode (Seed seed) =
-    UUID.step seed
-        |> Tuple.mapFirst (UUID.toString >> Rdf.blankNode)
-        |> Tuple.mapSecond Seed
 
 
 collectPredicateObjectList : Turtle.PredicateObjectList -> State -> Result Error State
@@ -1030,7 +1023,7 @@ collectObject object state =
                 Nothing ->
                     let
                         ( node, seed ) =
-                            mintBlankNode state.seed
+                            generateBlankNode state.seed
                     in
                     addTriple (asBlankNodeOrIriOrAnyLiteral node)
                         { state
@@ -1044,7 +1037,7 @@ collectObject object state =
         Turtle.ObjectBlankNode Turtle.Anon ->
             let
                 ( node, seed ) =
-                    mintBlankNode state.seed
+                    generateBlankNode state.seed
             in
             addTriple (asBlankNodeOrIriOrAnyLiteral node) { state | seed = seed }
 
@@ -1055,7 +1048,7 @@ collectObject object state =
             else
                 let
                     ( nodeFirst, seedFirst ) =
-                        mintBlankNode state.seed
+                        generateBlankNode state.seed
                 in
                 { state | seed = seedFirst }
                     |> addTriple (asBlankNodeOrIriOrAnyLiteral nodeFirst)
@@ -1064,7 +1057,7 @@ collectObject object state =
         Turtle.ObjectBlankNodePropertyList predicateObjects ->
             let
                 ( node, seed ) =
-                    mintBlankNode state.seed
+                    generateBlankNode state.seed
             in
             predicateObjects
                 |> List.foldl (Result.andThen << collectPredicateObjectList)
@@ -1128,7 +1121,7 @@ addCollection nodeFirst objects state =
                                 (\( nodePrevious, stateNext ) ->
                                     let
                                         ( nodeNext, seedNext ) =
-                                            mintBlankNode stateNext.seed
+                                            generateBlankNode stateNext.seed
                                     in
                                     { stateNext
                                         | subjects = asBlankNodeOrIri nodePrevious :: stateNext.subjects
@@ -1380,7 +1373,7 @@ remintBlankNode label step =
         Nothing ->
             let
                 ( node, seedAfterMint ) =
-                    mintBlankNode step.seed
+                    generateBlankNode step.seed
             in
             ( { step
                 | seed = seedAfterMint
