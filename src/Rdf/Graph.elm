@@ -10,6 +10,7 @@ module Rdf.Graph exposing
     , Seed, initialSeed, seedGenerator
     , insert, insertAt, generateBlankNode
     , setBase, clearBase, addPrefix, addPrefixes, clearPrefixes
+    , mintBlankNodes
     , getBase, getPrefixes
     )
 
@@ -35,6 +36,7 @@ module Rdf.Graph exposing
 @docs Seed, initialSeed, seedGenerator
 @docs insert, insertAt, generateBlankNode
 @docs setBase, clearBase, addPrefix, addPrefixes, clearPrefixes
+@docs mintBlankNodes
 
 
 ## Info
@@ -1384,3 +1386,49 @@ remintBlankNode label step =
 
         Just node ->
             ( step, node )
+
+
+{-| TODO Add documentation
+-}
+mintBlankNodes : Seed -> Graph -> ( Graph, Seed )
+mintBlankNodes seed (Graph data) =
+    let
+        ( triplesUpdated, seedUpdated ) =
+            renameBlankNodes seed data.triples
+    in
+    ( Graph
+        { data
+            | triples = triplesUpdated
+            , subjects = List.map .subject triplesUpdated
+            , objects = List.map .object triplesUpdated
+            , bySubjectByPredicate =
+                triplesUpdated
+                    |> List.map annotateWithIriSubject
+                    |> groupByTupleFirst
+                    |> List.map
+                        (\( ( iriSubject, tripleFirst ), rest ) ->
+                            ( iriSubject
+                            , (tripleFirst :: List.map Tuple.second rest)
+                                |> List.map annotateWithIriPredicate
+                                |> groupByTupleFirst
+                                |> dictFromGroups
+                            )
+                        )
+                    |> Dict.fromList
+            , byPredicateBySubject =
+                triplesUpdated
+                    |> List.map annotateWithIriPredicate
+                    |> groupByTupleFirst
+                    |> List.map
+                        (\( ( iriPredicate, tripleFirst ), rest ) ->
+                            ( iriPredicate
+                            , (tripleFirst :: List.map Tuple.second rest)
+                                |> List.map annotateWithIriSubject
+                                |> groupByTupleFirst
+                                |> dictFromGroups
+                            )
+                        )
+                    |> Dict.fromList
+        }
+    , seedUpdated
+    )
