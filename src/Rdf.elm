@@ -22,7 +22,7 @@ module Rdf exposing
     , toInt, toFloat, toDecimal
     , toDate, toDateTime
     , toBool
-    , appendPath, dropFragment, setFragment
+    , appendPath, setQueryParam, dropFragment, setFragment
     , serializeNode, serializeNodeTurtle, SerializeConfig, serializeTriple
     , encodeTriple
     , tripleDecoder
@@ -80,7 +80,7 @@ a introduction on its data model.
 @docs toDate, toDateTime
 @docs toBool
 
-@docs appendPath, dropFragment, setFragment
+@docs appendPath, setQueryParam, dropFragment, setFragment
 
 
 ## Serialize
@@ -1010,6 +1010,108 @@ setFragment fragment (Term variant) =
 
         Literal _ ->
             Term variant
+
+
+{-| TODO Add documentation
+-}
+setQueryParam : String -> String -> IsIri compatible -> Iri
+setQueryParam name value (Term variant) =
+    case variant of
+        BlankNode _ ->
+            Term variant
+
+        Iri url ->
+            case String.split "?" url of
+                [ beforeQuery ] ->
+                    let
+                        queryString : String
+                        queryString =
+                            Dict.singleton name value
+                                |> serializeQuery
+                    in
+                    Term
+                        (Iri
+                            (beforeQuery
+                                ++ "?"
+                                ++ queryString
+                            )
+                        )
+
+                [ beforeQuery, rest ] ->
+                    case String.split "#" rest of
+                        [ queryString ] ->
+                            -- FIXME
+                            let
+                                queryStringUpdated : String
+                                queryStringUpdated =
+                                    queryString
+                                        |> parseQuery
+                                        |> Dict.insert name value
+                                        |> serializeQuery
+                            in
+                            Term
+                                (Iri
+                                    (beforeQuery
+                                        ++ "?"
+                                        ++ queryStringUpdated
+                                    )
+                                )
+
+                        [ _, fragment ] ->
+                            let
+                                queryStringUpdated : String
+                                queryStringUpdated =
+                                    rest
+                                        |> parseQuery
+                                        |> Dict.insert name value
+                                        |> serializeQuery
+                            in
+                            Term
+                                (Iri
+                                    (beforeQuery
+                                        ++ "?"
+                                        ++ queryStringUpdated
+                                        ++ "#"
+                                        ++ fragment
+                                    )
+                                )
+
+                        _ ->
+                            Term variant
+
+                _ ->
+                    Term variant
+
+        Literal _ ->
+            Term variant
+
+
+parseQuery : String -> Dict String String
+parseQuery queryString =
+    queryString
+        |> String.split "&"
+        |> List.map (String.split "=")
+        |> List.filterMap
+            (\param ->
+                case param of
+                    [ name ] ->
+                        Just ( name, name )
+
+                    [ name, value ] ->
+                        Just ( name, value )
+
+                    _ ->
+                        Nothing
+            )
+        |> Dict.fromList
+
+
+serializeQuery : Dict String String -> String
+serializeQuery query =
+    query
+        |> Dict.toList
+        |> List.map (\( name, value ) -> name ++ "=" ++ value)
+        |> String.join "&"
 
 
 
