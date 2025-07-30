@@ -3,7 +3,7 @@ module Rdf.Graph exposing
     , union
     , isEmpty
     , emptyGraph, singleton
-    , decoder, encode
+    , decoder, decoderSafe, encode
     , parse, parseSafe, Error(..), errorToString
     , serialize, serializeTurtle
     , fromTriples
@@ -24,7 +24,7 @@ module Rdf.Graph exposing
 ## Create
 
 @docs emptyGraph, singleton
-@docs decoder, encode
+@docs decoder, decoderSafe, encode
 @docs parse, parseSafe, Error, errorToString
 @docs serialize, serializeTurtle
 @docs fromTriples
@@ -647,6 +647,14 @@ decoder =
 
 {-| TODO Add documentation
 -}
+decoderSafe : Seed -> Decoder ( Graph, Seed )
+decoderSafe seed =
+    Decode.list tripleDecoder
+        |> Decode.map (fromTriplesSafe seed)
+
+
+{-| TODO Add documentation
+-}
 encode : Graph -> Value
 encode (Graph data) =
     data.bySubjectByPredicate
@@ -852,8 +860,12 @@ stateInitial seed =
 
 collectTriples : Seed -> List Turtle.Statement -> Result Error State
 collectTriples seed statements =
-    statements
-        |> List.foldl (\statement -> Result.andThen (collectTriplesStep statement)) (Ok (stateInitial seed))
+    List.foldl
+        (\statement ->
+            Result.andThen (collectTriplesStep statement)
+        )
+        (Ok (stateInitial seed))
+        statements
 
 
 collectTriplesStep : Turtle.Statement -> State -> Result Error State
@@ -880,7 +892,10 @@ collectTriplesStep statement state =
                     mintBlankNode state.seed
             in
             (predicateObjectListSubject ++ predicateObjectList)
-                |> List.foldl (\predicateObject -> Result.andThen (collectPredicateObjectList predicateObject))
+                |> List.foldl
+                    (\predicateObject ->
+                        Result.andThen (collectPredicateObjectList predicateObject)
+                    )
                     (Ok
                         { state
                             | subjects = asBlankNodeOrIri node :: state.subjects
@@ -900,7 +915,10 @@ collectTriplesSubject subject predicateObjectList state =
 
                 Ok url ->
                     predicateObjectList
-                        |> List.foldl (\predicateObject -> Result.andThen (collectPredicateObjectList predicateObject))
+                        |> List.foldl
+                            (\predicateObject ->
+                                Result.andThen (collectPredicateObjectList predicateObject)
+                            )
                             (Ok { state | subjects = asBlankNodeOrIri (Rdf.iri url) :: state.subjects })
                         |> Result.map dropSubject
 
@@ -912,7 +930,10 @@ collectTriplesSubject subject predicateObjectList state =
                             mintBlankNode state.seed
                     in
                     predicateObjectList
-                        |> List.foldl (\predicateObject -> Result.andThen (collectPredicateObjectList predicateObject))
+                        |> List.foldl
+                            (\predicateObject ->
+                                Result.andThen (collectPredicateObjectList predicateObject)
+                            )
                             (Ok
                                 { state
                                     | subjects = asBlankNodeOrIri node :: state.subjects
@@ -1253,3 +1274,120 @@ dictFromGroups =
             )
         )
         >> Dict.fromList
+
+
+{-| TODO Add documentation
+-}
+fromTriplesSafe : Seed -> List Triple -> ( Graph, Seed )
+fromTriplesSafe seed triples =
+    triples
+        |> renameBlankNodes seed
+        |> Tuple.mapFirst fromTriples
+
+
+type alias Step =
+    { seed : Seed
+    , blankNodes : Dict String BlankNode
+    , triples : List Triple
+    }
+
+
+stepInitial : Seed -> Step
+stepInitial seed =
+    { seed = seed
+    , blankNodes = Dict.empty
+    , triples = []
+    }
+
+
+renameBlankNodes : Seed -> List Triple -> ( List Triple, Seed )
+renameBlankNodes seed triples =
+    let
+        stepFinal : Step
+        stepFinal =
+            renameBlankNodesHelp triples (stepInitial seed)
+    in
+    ( stepFinal.triples
+    , stepFinal.seed
+    )
+
+
+renameBlankNodesHelp : List Triple -> Step -> Step
+renameBlankNodesHelp triples step =
+    case triples of
+        [] ->
+            step
+
+        triple :: rest ->
+            case triple.subject of
+                Term (BlankNode labelSubject) ->
+                    let
+                        ( stepAfterSubject, nodeSubject ) =
+                            remintBlankNode labelSubject step
+                    in
+                    case triple.object of
+                        Term (BlankNode labelObject) ->
+                            let
+                                ( stepAfterObject, nodeObject ) =
+                                    remintBlankNode labelObject stepAfterSubject
+                            in
+                            renameBlankNodesHelp rest
+                                { stepAfterObject
+                                    | triples =
+                                        { subject = Rdf.asBlankNodeOrIri nodeSubject
+                                        , predicate = triple.predicate
+                                        , object = Rdf.asBlankNodeOrIriOrAnyLiteral nodeObject
+                                        }
+                                            :: stepAfterObject.triples
+                                }
+
+                        _ ->
+                            renameBlankNodesHelp rest
+                                { stepAfterSubject
+                                    | triples =
+                                        { subject = Rdf.asBlankNodeOrIri nodeSubject
+                                        , predicate = triple.predicate
+                                        , object = triple.object
+                                        }
+                                            :: stepAfterSubject.triples
+                                }
+
+                _ ->
+                    case triple.object of
+                        Term (BlankNode labelObject) ->
+                            let
+                                ( stepAfterObject, nodeObject ) =
+                                    remintBlankNode labelObject step
+                            in
+                            renameBlankNodesHelp rest
+                                { stepAfterObject
+                                    | triples =
+                                        { subject = triple.subject
+                                        , predicate = triple.predicate
+                                        , object = Rdf.asBlankNodeOrIriOrAnyLiteral nodeObject
+                                        }
+                                            :: stepAfterObject.triples
+                                }
+
+                        _ ->
+                            renameBlankNodesHelp rest
+                                { step | triples = triple :: step.triples }
+
+
+remintBlankNode : String -> Step -> ( Step, BlankNode )
+remintBlankNode label step =
+    case Dict.get label step.blankNodes of
+        Nothing ->
+            let
+                ( node, seedAfterMint ) =
+                    mintBlankNode step.seed
+            in
+            ( { step
+                | seed = seedAfterMint
+                , blankNodes = Dict.insert label node step.blankNodes
+              }
+            , node
+            )
+
+        Just node ->
+            ( step, node )
