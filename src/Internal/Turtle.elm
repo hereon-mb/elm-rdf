@@ -441,8 +441,12 @@ blankNode : Parser BlankNode
 blankNode =
     Parser.oneOf
         [ Parser.map BlankNodeLabel blankNodeLabel
-        , Parser.succeed Anon
-            |. Parser.symbol "[]"
+        , Parser.backtrackable
+            (Parser.succeed Anon
+                |. Parser.symbol "["
+                |. whitespaceOrComment
+                |. Parser.symbol "]"
+            )
         ]
 
 

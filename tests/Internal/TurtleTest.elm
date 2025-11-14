@@ -640,6 +640,17 @@ parse =
                 )
             ]
           )
+        , ( "[] example:knows [ ] ."
+          , [ Turtle.Triples
+                (Turtle.TriplesSubject
+                    (Turtle.SubjectBlankNode Turtle.Anon)
+                    [ { objects = [ Turtle.ObjectBlankNode Turtle.Anon ]
+                      , verb = Turtle.Predicate (Turtle.PrefixedName "example" "knows")
+                      }
+                    ]
+                )
+            ]
+          )
         ]
 
 
