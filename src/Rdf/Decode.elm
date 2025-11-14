@@ -12,6 +12,7 @@ module Rdf.Decode exposing
     , blankNode
     , predicate, property, anyPredicate
     , noProperty
+    , predicates
     , list, nonEmpty
     , at
     , decode
@@ -61,6 +62,7 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 @docs blankNode
 @docs predicate, property, anyPredicate
 @docs noProperty
+@docs predicates
 @docs list, nonEmpty
 @docs at
 
@@ -1114,6 +1116,49 @@ anyPredicate (Decoder f) =
         )
 
 
+{-| TODO
+-}
+predicates : Decoder (List Iri)
+predicates =
+    Decoder
+        (\graph ->
+            Result.andThen
+                (\nodes ->
+                    Result.combine
+                        (List.map
+                            (\node ->
+                                case node of
+                                    Term ((BlankNode _) as variant) ->
+                                        Ok (Term variant)
+
+                                    Term ((Iri _) as variant) ->
+                                        Ok (Term variant)
+
+                                    Term (Literal _) ->
+                                        Err (ExpectedBlankNodeOrIri node)
+                            )
+                            nodes
+                        )
+                )
+                >> Result.andThen
+                    (\focusNodes ->
+                        Result.map List.concat <|
+                            Result.combine
+                                (List.map
+                                    (\focusNode ->
+                                        case getPredicates focusNode graph of
+                                            [] ->
+                                                Err (NoProperty focusNode)
+
+                                            nodeChilds_ ->
+                                                Ok nodeChilds_
+                                    )
+                                    focusNodes
+                                )
+                    )
+        )
+
+
 {-| A decoder which always succeeds with the given value.
 -}
 succeed : a -> Decoder a
@@ -1601,6 +1646,23 @@ getObjects nodeFocus (Graph data) =
         |> List.map .object
         -- FIXME Make sure, objects are already unique when stored.
         |> List.unique
+
+
+getPredicates : IsBlankNodeOrIri compatible -> Graph -> List Iri
+getPredicates nodeFocus (Graph data) =
+    let
+        toIri key =
+            key
+                |> String.dropLeft 1
+                |> String.dropRight 1
+                |> Iri
+                |> Term
+    in
+    data.bySubjectByPredicate
+        |> Dict.get (Rdf.serializeNode nodeFocus)
+        |> Maybe.withDefault Dict.empty
+        |> Dict.keys
+        |> List.map toIri
 
 
 objectToList : Graph -> BlankNodeOrIri -> Maybe (List BlankNodeOrIriOrAnyLiteral)
