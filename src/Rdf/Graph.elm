@@ -77,6 +77,7 @@ import Rdf
         )
 import Rdf.Namespaces exposing (rdf, xsd)
 import Rdf.PropertyPath exposing (PropertyPath(..))
+import Regex exposing (Regex)
 import Set exposing (Set)
 import Tuple.Extra as Tuple
 import UUID
@@ -1165,8 +1166,7 @@ resolveIri : State -> Turtle.Iri -> Result Error String
 resolveIri state iri =
     case iri of
         Turtle.IriRef url ->
-            -- FIXME Check correctly if the url is relative
-            if String.startsWith "http" url then
+            if Regex.contains regexScheme url then
                 Ok url
 
             else
@@ -1181,6 +1181,16 @@ resolveIri state iri =
             Dict.get prefix state.prefixes
                 |> Maybe.map (\url -> url ++ name)
                 |> Result.fromMaybe (CouldNotResolvePrefixedName prefix name)
+
+
+regexScheme : Regex
+regexScheme =
+    "^[a-z][a-z0-9+-.]*:"
+        |> Regex.fromStringWith
+            { caseInsensitive = True
+            , multiline = False
+            }
+        |> Maybe.withDefault Regex.never
 
 
 dropSubject : State -> State
