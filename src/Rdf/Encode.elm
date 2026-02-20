@@ -156,7 +156,8 @@ blankNode propertyEs =
             (\seed ->
                 let
                     ( subject, seedUpdated ) =
-                        Tuple.mapFirst Rdf.asBlankNodeOrIri (Rdf.generateBlankNode seed)
+                        Tuple.mapFirst Rdf.asBlankNodeOrIri
+                            (Rdf.generateBlankNode seed)
                 in
                 nodeHelp propertyEs subject seedUpdated
             )
@@ -237,7 +238,9 @@ nodeHelp propertyEs subject seed =
 
 {-| TODO
 -}
-bunch : List ( PropertyPath, IsGraphOrLiteralEncoder object ) -> List PropertyEncoder
+bunch :
+    List ( PropertyPath, IsGraphOrLiteralEncoder object )
+    -> List PropertyEncoder
 bunch =
     List.filterMap
         (\( propertyPath, encoder ) ->
@@ -325,35 +328,20 @@ predicate p (Encoder encoder) =
                     let
                         ( objectNew, ( graphObject, seedUpdated ) ) =
                             f seed
-
-                        ( graphProperty, seedFinal ) =
-                            case
-                                objectNew
-                                    |> Rdf.asBlankNodeOrIriOrAnyLiteral
-                                    |> object
-                                    |> forgetCompatible
-                                    |> predicate p
-                            of
-                                Encoder propertyE ->
-                                    case propertyE of
-                                        PropertyEncoder g ->
-                                            g seedUpdated subject
-
-                                        GraphEncoder _ ->
-                                            ( Rdf.emptyGraph, seedUpdated )
-
-                                        LiteralEncoder _ ->
-                                            ( Rdf.emptyGraph, seedUpdated )
                     in
-                    ( Rdf.union graphObject graphProperty
-                    , seedFinal
+                    ( Rdf.insert
+                        subject
+                        (Rdf.asIri p)
+                        (Rdf.asBlankNodeOrIriOrAnyLiteral objectNew)
+                        graphObject
+                    , seedUpdated
                     )
-
-                LiteralEncoder f ->
-                    f seed subject (Rdf.asIri p)
 
                 PropertyEncoder _ ->
                     ( Rdf.emptyGraph, seed )
+
+                LiteralEncoder f ->
+                    f seed subject (Rdf.asIri p)
     in
     Encoder (PropertyEncoder encoderNew)
 
@@ -361,7 +349,7 @@ predicate p (Encoder encoder) =
 {-| TODO
 -}
 inverse : Predicate -> IsGraphOrLiteralEncoder object -> PropertyEncoder
-inverse predicate_ (Encoder encoder) =
+inverse p (Encoder encoder) =
     let
         encoderNew : Seed -> Term compatible -> ( Graph, Seed )
         encoderNew seed subject =
@@ -370,28 +358,13 @@ inverse predicate_ (Encoder encoder) =
                     let
                         ( objectNew, ( graphObject, seedUpdated ) ) =
                             f seed
-
-                        ( graphProperty, seedUpdatedUpdated ) =
-                            case
-                                subject
-                                    |> Rdf.asBlankNodeOrIriOrAnyLiteral
-                                    |> object
-                                    |> forgetCompatible
-                                    |> predicate predicate_
-                            of
-                                Encoder propertyE ->
-                                    case propertyE of
-                                        PropertyEncoder g ->
-                                            g seedUpdated objectNew
-
-                                        GraphEncoder _ ->
-                                            ( Rdf.emptyGraph, seedUpdated )
-
-                                        LiteralEncoder _ ->
-                                            ( Rdf.emptyGraph, seedUpdated )
                     in
-                    ( Rdf.union graphObject graphProperty
-                    , seedUpdatedUpdated
+                    ( Rdf.insert
+                        objectNew
+                        (Rdf.asIri p)
+                        (Rdf.asBlankNodeOrIriOrAnyLiteral subject)
+                        graphObject
+                    , seedUpdated
                     )
 
                 LiteralEncoder _ ->
