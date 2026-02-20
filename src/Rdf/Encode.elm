@@ -14,6 +14,7 @@ module Rdf.Encode exposing
     , literal
     , object
     , from
+    , fromBlankNode
     )
 
 {-| A domain-specific language for encoding `Graph`s.
@@ -173,6 +174,23 @@ from subject propertyEs =
         (GraphEncoder
             (\seed ->
                 nodeHelp propertyEs subject seed
+            )
+        )
+
+
+{-| TODO
+-}
+fromBlankNode : List PropertyEncoder -> PropertyEncoder
+fromBlankNode propertyEs =
+    Encoder
+        (GraphEncoder
+            (\seed ->
+                let
+                    ( subject, seedUpdated ) =
+                        Tuple.mapFirst Rdf.asBlankNodeOrIri
+                            (Rdf.generateBlankNode seed)
+                in
+                nodeHelp propertyEs subject seedUpdated
             )
         )
 
