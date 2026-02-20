@@ -49,7 +49,7 @@ from =
     describe "from"
         [ describe "with predicate"
             [ test "nested once inside node" <|
-                \test ->
+                \_ ->
                     Encode.node (Rdf.asBlankNodeOrIri (base "root"))
                         [ Encode.from (Rdf.asBlankNodeOrIri (base "other"))
                             [ Encode.predicate (base "hasValue")
@@ -69,7 +69,7 @@ fromBlankNode =
     describe "fromBlankNode"
         [ describe "with predicate"
             [ test "nested once inside node" <|
-                \test ->
+                \_ ->
                     Encode.node (Rdf.asBlankNodeOrIri (base "root"))
                         [ Encode.fromBlankNode
                             [ Encode.predicate (base "hasValue")
@@ -81,7 +81,7 @@ fromBlankNode =
                             [] <http://example.org/hasValue> 1 .
                             """
             , test "nested twice inside node" <|
-                \test ->
+                \_ ->
                     Encode.node (Rdf.asBlankNodeOrIri (base "root"))
                         [ Encode.fromBlankNode
                             [ Encode.predicate (base "hasValue")
@@ -100,7 +100,7 @@ fromBlankNode =
             ]
         , describe "with two predicates"
             [ test "nested once inside node" <|
-                \test ->
+                \_ ->
                     Encode.node (Rdf.asBlankNodeOrIri (base "root"))
                         [ Encode.fromBlankNode
                             [ Encode.predicate (base "hasValueA")
