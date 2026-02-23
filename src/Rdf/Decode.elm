@@ -29,6 +29,7 @@ module Rdf.Decode exposing
     , oneOf
     , many, indexedMany
     , lazy
+    , logFailure
     )
 
 {-| The `DefaultValue` API is a parser combinator for functions `Node -> a` that supports querying.
@@ -260,8 +261,11 @@ type Error
     | UnknownProperty BlankNodeOrIri PropertyPath
     | PropertyPresent BlankNodeOrIri PropertyPath
     | NoProperty BlankNodeOrIri
+    | AtPropertyPath PropertyPath Error
     | UnexpectedEmptyList
     | CustomError String
+    | Failure String
+    | FailureAt String (List BlankNodeOrIriOrAnyLiteral)
     | Batch (List Error)
     | TooManyNodes (List Rdf.BlankNodeOrIriOrAnyLiteral)
     | MissingLangString Rdf.AnyLiteral
@@ -330,11 +334,26 @@ errorToString error_ =
         NoProperty nodeFocus ->
             "No property found at " ++ Rdf.serializeNode nodeFocus ++ "."
 
+        AtPropertyPath path errorNested ->
+            "Problem with the value at "
+                ++ Rdf.serializePropertyPath path
+                ++ ":\n\n    "
+                ++ errorToString errorNested
+
         UnexpectedEmptyList ->
             "Expected a non-empty list, but found an empty list."
 
         CustomError s ->
             s
+
+        Failure msg ->
+            msg
+
+        FailureAt msg nodes ->
+            "Problem with the given value at "
+                ++ String.join ", " (List.map Rdf.serializeNode nodes)
+                ++ ": "
+                ++ msg
 
         Batch errors ->
             "Decoding failed in one of the following ways:\n"
@@ -972,47 +991,39 @@ anyLiteral =
 -}
 property : PropertyPath -> Decoder a -> Decoder a
 property path (Decoder f) =
+    let
+        expectBlankNodeOrIri node =
+            case node of
+                Term ((BlankNode _) as variant) ->
+                    Ok (Term variant)
+
+                Term ((Iri _) as variant) ->
+                    Ok (Term variant)
+
+                Term (Literal _) ->
+                    Err (ExpectedBlankNodeOrIri node)
+    in
     Decoder
         (\graph ->
+            let
+                get focusNode =
+                    case getObjectsAt focusNode path graph of
+                        [] ->
+                            Err (UnknownProperty focusNode path)
+
+                        nodeChilds_ ->
+                            Ok nodeChilds_
+            in
             Result.andThen
-                (\nodes ->
-                    Result.combine
-                        (List.map
-                            (\node ->
-                                case node of
-                                    Term ((BlankNode _) as variant) ->
-                                        Ok (Term variant)
-
-                                    Term ((Iri _) as variant) ->
-                                        Ok (Term variant)
-
-                                    Term (Literal _) ->
-                                        Err (ExpectedBlankNodeOrIri node)
-                            )
-                            nodes
-                        )
+                (List.map expectBlankNodeOrIri
+                    >> Result.combine
                 )
                 >> Result.andThen
-                    (\focusNodes ->
-                        let
-                            nodeChilds : Result Error (List Rdf.BlankNodeOrIriOrAnyLiteral)
-                            nodeChilds =
-                                Result.map List.concat <|
-                                    Result.combine
-                                        (List.map
-                                            (\focusNode ->
-                                                case getObjectsAt focusNode path graph of
-                                                    [] ->
-                                                        Err (UnknownProperty focusNode path)
-
-                                                    nodeChilds_ ->
-                                                        Ok nodeChilds_
-                                            )
-                                            focusNodes
-                                        )
-                        in
-                        nodeChilds
-                            |> f graph
+                    (List.map get
+                        >> Result.combine
+                        >> Result.mapError (AtPropertyPath path)
+                        >> Result.map List.concat
+                        >> f graph
                     )
         )
 
@@ -1170,7 +1181,14 @@ succeed x =
 -}
 fail : String -> Decoder a
 fail msg =
-    failWith (always msg)
+    Decoder <|
+        \_ resultNodes ->
+            case resultNodes of
+                Err _ ->
+                    Err (Failure msg)
+
+                Ok nodes ->
+                    Err (FailureAt msg nodes)
 
 
 {-| A decoder which always fails with the given message.
@@ -1508,6 +1526,17 @@ lazy f =
 combine : List (Decoder a) -> Decoder (List a)
 combine =
     List.foldr (map2 (::)) (succeed [])
+
+
+logFailure : (String -> Error -> Error) -> String -> Decoder a -> Decoder a
+logFailure log msg (Decoder f) =
+    Decoder <|
+        \graph nodes ->
+            f graph
+                (nodes
+                    |> Result.mapError (log msg)
+                )
+                |> Result.mapError (log msg)
 
 
 
