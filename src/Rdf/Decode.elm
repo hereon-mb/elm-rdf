@@ -1653,16 +1653,57 @@ followPropertyPath data propertyPath nodeFocus =
                         |> List.filterMap Rdf.toBlankNodeOrIri
                         |> List.map asBlankNodeOrIriCompatible
                         |> List.concatMap (followPropertyPath data next)
-
-                asBlankNodeOrIriCompatible : Rdf.BlankNodeOrIri -> Rdf.IsBlankNodeOrIri compatible
-                asBlankNodeOrIriCompatible (Term node) =
-                    Term node
             in
             rest
                 |> List.foldl step nodesAtFirst
 
+        Rdf.ZeroOrMorePath propertyPathNested ->
+            let
+                focusNodes =
+                    followPropertyPath data propertyPathNested nodeFocus
+                        |> List.filter ((/=) (Rdf.asBlankNodeOrIriOrAnyLiteral nodeFocus))
+            in
+            if List.isEmpty focusNodes then
+                [ Rdf.asBlankNodeOrIriOrAnyLiteral nodeFocus ]
+
+            else
+                Rdf.asBlankNodeOrIriOrAnyLiteral nodeFocus
+                    :: (focusNodes
+                            |> List.filterMap Rdf.toBlankNodeOrIri
+                            |> List.map asBlankNodeOrIriCompatible
+                            |> List.concatMap
+                                (followPropertyPath data propertyPath)
+                       )
+
+        Rdf.OneOrMorePath propertyPathNested ->
+            let
+                focusNodes =
+                    followPropertyPath data propertyPathNested nodeFocus
+                        |> List.filter ((/=) (Rdf.asBlankNodeOrIriOrAnyLiteral nodeFocus))
+            in
+            if List.isEmpty focusNodes then
+                []
+
+            else
+                focusNodes
+                    |> List.filterMap Rdf.toBlankNodeOrIri
+                    |> List.map asBlankNodeOrIriCompatible
+                    |> List.concatMap
+                        (followPropertyPath data propertyPath)
+
+        Rdf.ZeroOrOnePath propertyPathNested ->
+            Rdf.asBlankNodeOrIriOrAnyLiteral nodeFocus
+                :: (followPropertyPath data propertyPathNested nodeFocus
+                        |> List.filter ((/=) (Rdf.asBlankNodeOrIriOrAnyLiteral nodeFocus))
+                   )
+
         _ ->
             []
+
+
+asBlankNodeOrIriCompatible : Rdf.BlankNodeOrIri -> Rdf.IsBlankNodeOrIri compatible
+asBlankNodeOrIriCompatible (Term node) =
+    Term node
 
 
 getObjects : IsBlankNodeOrIri compatible -> Graph -> List BlankNodeOrIriOrAnyLiteral
