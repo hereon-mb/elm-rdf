@@ -673,6 +673,17 @@ stringSubstitute revChunks =
                 |. Parser.token "u{"
                 |= unicode
                 |. Parser.token "}"
+            , Parser.succeed String.fromChar
+                |. Parser.token "u"
+                |= (Parser.getChompedString
+                        (Parser.succeed (\_ _ _ _ -> ())
+                            |. Parser.chompIf Char.isHexDigit
+                            |. Parser.chompIf Char.isHexDigit
+                            |. Parser.chompIf Char.isHexDigit
+                            |. Parser.chompIf Char.isHexDigit
+                        )
+                        |> Parser.andThen codeToChar
+                   )
             ]
 
 
@@ -696,8 +707,8 @@ codeToChar str =
         length =
             String.length str
     in
-    if 4 <= length && length <= 6 then
-        Parser.problem "code point must have between 4 and 6 digits"
+    if length < 4 && length > 6 then
+        Parser.problem ("code point must have between 4 and 6 digits: " ++ str)
 
     else
         let
