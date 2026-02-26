@@ -13,8 +13,7 @@ module Rdf.Encode exposing
     , iri
     , literal
     , object
-    , from
-    , fromBlankNode
+    , from, fromBlankNode
     )
 
 {-| A domain-specific language for encoding `Graph`s.
@@ -89,7 +88,7 @@ typing `Node`s.
 
 ## Experimental
 
-@docs from
+@docs from, fromBlankNode
 
 -}
 

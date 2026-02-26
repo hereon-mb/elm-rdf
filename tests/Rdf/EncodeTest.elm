@@ -194,6 +194,7 @@ valueConstant =
 expectGraph : String -> GraphEncoder -> Expectation
 expectGraph raw encoder =
     let
+        prefix : String
         prefix =
             """
             @base <""" ++ Rdf.toUrl (base "") ++ """> .

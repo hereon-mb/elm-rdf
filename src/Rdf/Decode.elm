@@ -16,7 +16,7 @@ module Rdf.Decode exposing
     , list, nonEmpty
     , at
     , decode
-    , Error, errorToString
+    , Problem(..), Error, errorToString
     , map
     , map2
     , combine
@@ -30,7 +30,7 @@ module Rdf.Decode exposing
     , many, indexedMany
     , lazy
     , inContext
-    , Problem(..), logFailure
+    , logFailure
     )
 
 {-| The `DefaultValue` API is a parser combinator for functions `Node -> a` that supports querying.
@@ -72,7 +72,7 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 # Running Decoders
 
 @docs decode
-@docs Error, errorToString
+@docs Problem, Error, errorToString
 
 
 # Transforming Values
@@ -99,9 +99,10 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 @docs lazy
 
 
-# Improving error messages
+# Improving error messages and debugging
 
 @docs inContext
+@docs logFailure
 
 -}
 
@@ -274,6 +275,8 @@ decode (Decoder f) graph =
         )
 
 
+{-| TODO add documentation
+-}
 type alias Error =
     { error : Problem
     , contextStack : List String
@@ -1105,6 +1108,10 @@ anyLiteral =
 property : PropertyPath -> Decoder a -> Decoder a
 property path (Decoder f) =
     let
+        expectBlankNodeOrIri :
+            State
+            -> BlankNodeOrIriOrAnyLiteral
+            -> Result Error BlankNodeOrIri
         expectBlankNodeOrIri state node =
             case node of
                 Term ((BlankNode _) as variant) ->
@@ -1122,6 +1129,7 @@ property path (Decoder f) =
     Decoder
         (\state ->
             let
+                get : BlankNodeOrIri -> Result Error (List BlankNodeOrIriOrAnyLiteral)
                 get focusNode =
                     case getObjectsAt focusNode path state.graph of
                         [] ->
@@ -1681,6 +1689,8 @@ lazy f =
     andThen f (succeed ())
 
 
+{-| TODO Add documentation
+-}
 inContext : String -> Decoder a -> Decoder a
 inContext context (Decoder f) =
     Decoder <|
@@ -1695,6 +1705,8 @@ combine =
     List.foldr (map2 (::)) (succeed [])
 
 
+{-| TODO Add documentation
+-}
 logFailure : (String -> Error -> Error) -> String -> Decoder a -> Decoder a
 logFailure log msg (Decoder f) =
     Decoder <|
@@ -1826,6 +1838,7 @@ followPropertyPath data propertyPath nodeFocus =
 
         Rdf.ZeroOrMorePath propertyPathNested ->
             let
+                focusNodes : List BlankNodeOrIriOrAnyLiteral
                 focusNodes =
                     followPropertyPath data propertyPathNested nodeFocus
                         |> List.filter ((/=) (Rdf.asBlankNodeOrIriOrAnyLiteral nodeFocus))
@@ -1844,6 +1857,7 @@ followPropertyPath data propertyPath nodeFocus =
 
         Rdf.OneOrMorePath propertyPathNested ->
             let
+                focusNodes : List BlankNodeOrIriOrAnyLiteral
                 focusNodes =
                     followPropertyPath data propertyPathNested nodeFocus
                         |> List.filter ((/=) (Rdf.asBlankNodeOrIriOrAnyLiteral nodeFocus))
@@ -1888,6 +1902,7 @@ getObjects nodeFocus (Graph data) =
 getPredicates : IsBlankNodeOrIri compatible -> Graph -> List Iri
 getPredicates nodeFocus (Graph data) =
     let
+        toIri : String -> Iri
         toIri key =
             key
                 |> String.dropLeft 1
