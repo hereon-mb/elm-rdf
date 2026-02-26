@@ -1,6 +1,9 @@
-{ pkgs ? (import (import ./nix/sources.nix).nixpkgs { })
+{ pkgs ? import sources.nixpkgs { }
+, sources ? import ./npins
 }:
+
 with pkgs;
+
 mkShell {
   packages = [
     elmPackages.elm
