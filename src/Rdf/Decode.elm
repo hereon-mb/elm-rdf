@@ -16,7 +16,7 @@ module Rdf.Decode exposing
     , list, nonEmpty
     , at
     , decode
-    , Error(..), errorToString
+    , Error, errorToString
     , map
     , map2
     , combine
@@ -29,7 +29,8 @@ module Rdf.Decode exposing
     , oneOf
     , many, indexedMany
     , lazy
-    , logFailure
+    , inContext
+    , Problem(..), logFailure
     )
 
 {-| The `DefaultValue` API is a parser combinator for functions `Node -> a` that supports querying.
@@ -96,6 +97,11 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 @docs oneOf
 @docs many, indexedMany
 @docs lazy
+
+
+# Improving error messages
+
+@docs inContext
 
 -}
 
@@ -177,7 +183,17 @@ indexedMany toDecoder =
 {-| A way to specify what kind of thing you want to decode into.
 -}
 type Decoder a
-    = Decoder (Graph -> Result Error (List BlankNodeOrIriOrAnyLiteral) -> Result Error a)
+    = Decoder
+        (State
+         -> Result Error (List BlankNodeOrIriOrAnyLiteral)
+         -> Result Error a
+        )
+
+
+type alias State =
+    { graph : Graph
+    , context : List String
+    }
 
 
 {-| TODO Add documentation
@@ -192,7 +208,7 @@ at nodes (Decoder f) =
 object : Decoder BlankNodeOrIriOrAnyLiteral
 object =
     Decoder
-        (\_ ->
+        (\state ->
             Result.andThen
                 (\nodes ->
                     case nodes of
@@ -200,7 +216,10 @@ object =
                             Ok node
 
                         _ ->
-                            Err (TooManyNodes nodes)
+                            Err
+                                { error = TooManyNodes nodes
+                                , contextStack = state.context
+                                }
                 )
         )
 
@@ -210,15 +229,18 @@ object =
 from : IsBlankNodeOrIri compatible -> Decoder a -> Decoder a
 from nodeFocus (Decoder f) =
     Decoder
-        (\graph _ ->
+        (\state _ ->
             if
-                hasTripleWithSubject nodeFocus graph
-                    || hasTripleWithObject nodeFocus graph
+                hasTripleWithSubject nodeFocus state.graph
+                    || hasTripleWithObject nodeFocus state.graph
             then
-                f graph (Ok [ Rdf.asBlankNodeOrIriOrAnyLiteral nodeFocus ])
+                f state (Ok [ Rdf.asBlankNodeOrIriOrAnyLiteral nodeFocus ])
 
             else
-                Err (NodeDoesNotExist (Rdf.asBlankNodeOrIri nodeFocus))
+                Err
+                    { error = NodeDoesNotExist (Rdf.asBlankNodeOrIri nodeFocus)
+                    , contextStack = state.context
+                    }
         )
 
 
@@ -227,12 +249,12 @@ from nodeFocus (Decoder f) =
 fromSubject : Decoder a -> Decoder a
 fromSubject (Decoder f) =
     Decoder
-        (\graph _ ->
-            graph
+        (\state _ ->
+            state.graph
                 |> getSubjects
                 |> List.map Rdf.asBlankNodeOrIriOrAnyLiteral
                 |> Ok
-                |> f graph
+                |> f state
         )
 
 
@@ -241,13 +263,27 @@ fromSubject (Decoder f) =
 -}
 decode : Decoder a -> Graph -> Result Error a
 decode (Decoder f) graph =
-    f graph (Err NoFocusNode)
+    f
+        { graph = graph
+        , context = []
+        }
+        (Err
+            { error = NoFocusNode
+            , contextStack = []
+            }
+        )
+
+
+type alias Error =
+    { error : Problem
+    , contextStack : List String
+    }
 
 
 {-| When the decoding fails, we get on of these. Use
 [`errorToString`](#errorToString) to turn this into a human-friendly form.
 -}
-type Error
+type Problem
     = InvalidDate BlankNodeOrIriOrAnyLiteral
     | InvalidDateTime BlankNodeOrIriOrAnyLiteral
     | ExpectedBlankNode BlankNodeOrIriOrAnyLiteral
@@ -281,8 +317,19 @@ type Error
 
 -}
 errorToString : Error -> String
-errorToString error_ =
-    case error_ of
+errorToString { error, contextStack } =
+    String.join "\n"
+        [ problemToString error
+        , ""
+        , "Context:"
+        , ""
+        , indent (String.join "\n" contextStack)
+        ]
+
+
+problemToString : Problem -> String
+problemToString problem =
+    case problem of
         InvalidDate _ ->
             "Not a date"
 
@@ -350,15 +397,18 @@ errorToString error_ =
             msg
 
         FailureAt msg nodes ->
-            "Problem with the given value at "
-                ++ String.join ", " (List.map Rdf.serializeNode nodes)
-                ++ ": "
-                ++ msg
+            String.join "\n"
+                [ "Problem with the given value at"
+                , ""
+                , indent (String.join ",\n" (List.map Rdf.serializeNode nodes))
+                , ""
+                , msg
+                ]
 
         Batch errors ->
-            "Decoding failed in one of the following ways:\n"
+            "Decoding failed in one of the following ways:\n\n"
                 ++ indent
-                    (String.join "\n"
+                    (String.join "\n\n"
                         (List.map
                             (\errorNested ->
                                 "- " ++ errorToString errorNested
@@ -406,7 +456,7 @@ indent lines =
 blankNode : Decoder a -> Decoder a
 blankNode (Decoder f) =
     Decoder
-        (\graph ->
+        (\state ->
             Result.andThen
                 (\nodes ->
                     case nodes of
@@ -414,13 +464,19 @@ blankNode (Decoder f) =
                             case Rdf.toBlankNode node of
                                 Just nodeNext ->
                                     Ok [ Rdf.asBlankNodeOrIriOrAnyLiteral nodeNext ]
-                                        |> f graph
+                                        |> f state
 
                                 Nothing ->
-                                    Err (ExpectedBlankNode node)
+                                    Err
+                                        { error = ExpectedBlankNode node
+                                        , contextStack = state.context
+                                        }
 
                         _ ->
-                            Err (TooManyNodes nodes)
+                            Err
+                                { error = TooManyNodes nodes
+                                , contextStack = state.context
+                                }
                 )
         )
 
@@ -430,7 +486,7 @@ blankNode (Decoder f) =
 subject : Decoder Rdf.BlankNodeOrIriOrAnyLiteral
 subject =
     Decoder
-        (\_ ->
+        (\state ->
             Result.andThen
                 (\nodes ->
                     case nodes of
@@ -438,7 +494,10 @@ subject =
                             Ok node
 
                         _ ->
-                            Err (TooManyNodes nodes)
+                            Err
+                                { error = TooManyNodes nodes
+                                , contextStack = state.context
+                                }
                 )
         )
 
@@ -479,7 +538,7 @@ blankNodeOrIri =
                     |> andThen
                         (\node ->
                             Maybe.unwrap
-                                (error (ExpectedBlankNode node))
+                                (err (ExpectedBlankNode node))
                                 succeed
                                 (Rdf.toBlankNode node)
                         )
@@ -500,7 +559,7 @@ blankNodeOrIriOrAnyLiteral =
                     |> andThen
                         (\node ->
                             Maybe.unwrap
-                                (error (ExpectedBlankNode node))
+                                (err (ExpectedBlankNode node))
                                 succeed
                                 (Rdf.toBlankNode node)
                         )
@@ -547,7 +606,7 @@ bool =
                         succeed False
 
                     _ ->
-                        error (ExpectedBool stringLiteral)
+                        err (ExpectedBool stringLiteral)
             )
 
 
@@ -585,7 +644,7 @@ int =
             (\intLiteral ->
                 case String.toInt intLiteral of
                     Nothing ->
-                        error (ExpectedInt intLiteral)
+                        err (ExpectedInt intLiteral)
 
                     Just intValue ->
                         succeed intValue
@@ -623,7 +682,7 @@ float =
             (\floatLiteral ->
                 case String.toFloat floatLiteral of
                     Nothing ->
-                        error (ExpectedFloat floatLiteral)
+                        err (ExpectedFloat floatLiteral)
 
                     Just floatValue ->
                         succeed floatValue
@@ -669,16 +728,22 @@ number =
 date : Decoder Time.Posix
 date =
     Decoder
-        (\_ ->
+        (\state ->
             Result.andThen
                 (\nodes ->
                     case nodes of
                         [ node ] ->
                             Rdf.toDate node
-                                |> Result.fromMaybe (InvalidDate node)
+                                |> Result.fromMaybe
+                                    { error = InvalidDate node
+                                    , contextStack = state.context
+                                    }
 
                         _ ->
-                            Err (TooManyNodes nodes)
+                            Err
+                                { error = TooManyNodes nodes
+                                , contextStack = state.context
+                                }
                 )
         )
 
@@ -712,16 +777,22 @@ date =
 dateTime : Decoder Time.Posix
 dateTime =
     Decoder
-        (\_ ->
+        (\state ->
             Result.andThen
                 (\nodes ->
                     case nodes of
                         [ node ] ->
                             Rdf.toDateTime node
-                                |> Result.fromMaybe (InvalidDateTime node)
+                                |> Result.fromMaybe
+                                    { error = InvalidDateTime node
+                                    , contextStack = state.context
+                                    }
 
                         _ ->
-                            Err (TooManyNodes nodes)
+                            Err
+                                { error = TooManyNodes nodes
+                                , contextStack = state.context
+                                }
                 )
         )
 
@@ -753,23 +824,32 @@ dateTime =
 iri : Decoder Iri
 iri =
     Decoder
-        (\_ ->
+        (\state ->
             Result.andThen
                 (\nodes ->
                     case nodes of
                         [ node ] ->
                             case node of
                                 Term (BlankNode _) ->
-                                    Err (ExpectedIri node)
+                                    Err
+                                        { error = ExpectedIri node
+                                        , contextStack = state.context
+                                        }
 
                                 Term ((Iri _) as variant) ->
                                     Ok (Term variant)
 
                                 Term (Literal _) ->
-                                    Err (ExpectedIri node)
+                                    Err
+                                        { error = ExpectedIri node
+                                        , contextStack = state.context
+                                        }
 
                         _ ->
-                            Err (TooManyNodes nodes)
+                            Err
+                                { error = TooManyNodes nodes
+                                , contextStack = state.context
+                                }
                 )
         )
 
@@ -812,7 +892,7 @@ iri =
 list : Decoder a -> Decoder (List a)
 list (Decoder f) =
     Decoder
-        (\graph ->
+        (\state ->
             Result.andThen
                 (\nodes ->
                     case nodes of
@@ -820,7 +900,10 @@ list (Decoder f) =
                             Ok node
 
                         _ ->
-                            Err (TooManyNodes nodes)
+                            Err
+                                { error = TooManyNodes nodes
+                                , contextStack = state.context
+                                }
                 )
                 >> Result.andThen
                     (\node ->
@@ -829,20 +912,26 @@ list (Decoder f) =
                                 Ok (Term variant)
 
                             Term (Iri _) ->
-                                Err (ExpectedBlankNode node)
+                                Err
+                                    { error = ExpectedBlankNode node
+                                    , contextStack = state.context
+                                    }
 
                             Term (Literal _) ->
-                                Err (ExpectedBlankNode node)
+                                Err
+                                    { error = ExpectedBlankNode node
+                                    , contextStack = state.context
+                                    }
                     )
                 >> Result.andThen
                     (\focusNode ->
                         focusNode
-                            |> objectToList graph
+                            |> objectToList state.graph
                             |> Maybe.withDefault []
                             |> List.map
                                 (\nodeChild ->
                                     Ok [ nodeChild ]
-                                        |> f graph
+                                        |> f state
                                 )
                             |> Result.combine
                     )
@@ -856,7 +945,7 @@ nonEmpty =
     list
         >> andThen
             (NonEmpty.fromList
-                >> Maybe.unwrap (error UnexpectedEmptyList) succeed
+                >> Maybe.unwrap (err UnexpectedEmptyList) succeed
             )
 
 
@@ -896,7 +985,7 @@ langString =
     literalData (Rdf.rdf "langString")
         |> andThen
             (\({ value, languageTag } as node) ->
-                Maybe.unwrap (error (MissingLangString (Term (Literal node))))
+                Maybe.unwrap (err (MissingLangString (Term (Literal node))))
                     (succeed << flip Tuple.pair value)
                     languageTag
             )
@@ -922,7 +1011,7 @@ stringOrLangString =
                         succeed (Rdf.stringOrLangStringFrom (Just string_) langStrings)
 
                     ( strings, _ ) ->
-                        error (TooManyStrings strings)
+                        err (TooManyStrings strings)
             )
 
 
@@ -936,27 +1025,42 @@ literal datatype =
 literalData : Iri -> Decoder DataLiteral
 literalData datatype =
     Decoder
-        (\_ ->
+        (\state ->
             Result.andThen
                 (\nodes ->
                     case nodes of
                         [ node ] ->
                             case node of
                                 Term (BlankNode _) ->
-                                    Err (ExpectedAnyLiteral node)
+                                    Err
+                                        { error = ExpectedAnyLiteral node
+                                        , contextStack = state.context
+                                        }
 
                                 Term (Iri _) ->
-                                    Err (ExpectedAnyLiteral node)
+                                    Err
+                                        { error = ExpectedAnyLiteral node
+                                        , contextStack = state.context
+                                        }
 
                                 Term (Literal literalData_) ->
                                     if literalData_.datatype /= Rdf.toUrl datatype then
-                                        Err (ExpectedLiteralDatatype datatype (Rdf.iri literalData_.datatype))
+                                        Err
+                                            { error =
+                                                ExpectedLiteralDatatype
+                                                    datatype
+                                                    (Rdf.iri literalData_.datatype)
+                                            , contextStack = state.context
+                                            }
 
                                     else
                                         Ok literalData_
 
                         _ ->
-                            Err (TooManyNodes nodes)
+                            Err
+                                { error = TooManyNodes nodes
+                                , contextStack = state.context
+                                }
                 )
         )
 
@@ -966,23 +1070,32 @@ literalData datatype =
 anyLiteral : Decoder Rdf.AnyLiteral
 anyLiteral =
     Decoder
-        (\_ ->
+        (\state ->
             Result.andThen
                 (\nodes ->
                     case nodes of
                         [ node ] ->
                             case node of
                                 Term (BlankNode _) ->
-                                    Err (ExpectedAnyLiteral node)
+                                    Err
+                                        { error = ExpectedAnyLiteral node
+                                        , contextStack = state.context
+                                        }
 
                                 Term (Iri _) ->
-                                    Err (ExpectedAnyLiteral node)
+                                    Err
+                                        { error = ExpectedAnyLiteral node
+                                        , contextStack = state.context
+                                        }
 
                                 Term ((Literal _) as variant) ->
                                     Ok (Term variant)
 
                         _ ->
-                            Err (TooManyNodes nodes)
+                            Err
+                                { error = TooManyNodes nodes
+                                , contextStack = state.context
+                                }
                 )
         )
 
@@ -992,7 +1105,7 @@ anyLiteral =
 property : PropertyPath -> Decoder a -> Decoder a
 property path (Decoder f) =
     let
-        expectBlankNodeOrIri node =
+        expectBlankNodeOrIri state node =
             case node of
                 Term ((BlankNode _) as variant) ->
                     Ok (Term variant)
@@ -1001,29 +1114,40 @@ property path (Decoder f) =
                     Ok (Term variant)
 
                 Term (Literal _) ->
-                    Err (ExpectedBlankNodeOrIri node)
+                    Err
+                        { error = ExpectedBlankNodeOrIri node
+                        , contextStack = state.context
+                        }
     in
     Decoder
-        (\graph ->
+        (\state ->
             let
                 get focusNode =
-                    case getObjectsAt focusNode path graph of
+                    case getObjectsAt focusNode path state.graph of
                         [] ->
-                            Err (UnknownProperty focusNode path)
+                            Err
+                                { error = UnknownProperty focusNode path
+                                , contextStack = state.context
+                                }
 
                         nodeChilds_ ->
                             Ok nodeChilds_
             in
             Result.andThen
-                (List.map expectBlankNodeOrIri
+                (List.map (expectBlankNodeOrIri state)
                     >> Result.combine
                 )
                 >> Result.andThen
                     (List.map get
                         >> Result.combine
-                        >> Result.mapError (AtPropertyPath path)
+                        >> Result.mapError
+                            (\errorNested ->
+                                { error = AtPropertyPath path errorNested
+                                , contextStack = state.context
+                                }
+                            )
                         >> Result.map List.concat
-                        >> f graph
+                        >> f state
                     )
         )
 
@@ -1033,7 +1157,7 @@ property path (Decoder f) =
 noProperty : PropertyPath -> Decoder ()
 noProperty path =
     Decoder
-        (\graph ->
+        (\state ->
             Result.andThen
                 (\nodes ->
                     Result.combine
@@ -1047,7 +1171,10 @@ noProperty path =
                                         Ok (Term variant)
 
                                     Term (Literal _) ->
-                                        Err (ExpectedAnyLiteral node)
+                                        Err
+                                            { error = ExpectedAnyLiteral node
+                                            , contextStack = state.context
+                                            }
                             )
                             nodes
                         )
@@ -1058,12 +1185,15 @@ noProperty path =
                             Result.combine
                                 (List.map
                                     (\focusNode ->
-                                        case getObjectsAt focusNode path graph of
+                                        case getObjectsAt focusNode path state.graph of
                                             [] ->
                                                 Ok ()
 
                                             _ ->
-                                                Err (PropertyPresent focusNode path)
+                                                Err
+                                                    { error = PropertyPresent focusNode path
+                                                    , contextStack = state.context
+                                                    }
                                     )
                                     focusNodes
                                 )
@@ -1083,7 +1213,7 @@ predicate =
 anyPredicate : Decoder a -> Decoder a
 anyPredicate (Decoder f) =
     Decoder
-        (\graph ->
+        (\state ->
             Result.andThen
                 (\nodes ->
                     Result.combine
@@ -1097,7 +1227,10 @@ anyPredicate (Decoder f) =
                                         Ok (Term variant)
 
                                     Term (Literal _) ->
-                                        Err (ExpectedBlankNodeOrIri node)
+                                        Err
+                                            { error = ExpectedBlankNodeOrIri node
+                                            , contextStack = state.context
+                                            }
                             )
                             nodes
                         )
@@ -1111,9 +1244,12 @@ anyPredicate (Decoder f) =
                                     Result.combine
                                         (List.map
                                             (\focusNode ->
-                                                case getObjects focusNode graph of
+                                                case getObjects focusNode state.graph of
                                                     [] ->
-                                                        Err (NoProperty focusNode)
+                                                        Err
+                                                            { error = NoProperty focusNode
+                                                            , contextStack = state.context
+                                                            }
 
                                                     nodeChilds_ ->
                                                         Ok nodeChilds_
@@ -1122,7 +1258,7 @@ anyPredicate (Decoder f) =
                                         )
                         in
                         nodeChilds
-                            |> f graph
+                            |> f state
                     )
         )
 
@@ -1132,7 +1268,7 @@ anyPredicate (Decoder f) =
 predicates : Decoder (List Iri)
 predicates =
     Decoder
-        (\graph ->
+        (\state ->
             Result.andThen
                 (\nodes ->
                     Result.combine
@@ -1146,7 +1282,10 @@ predicates =
                                         Ok (Term variant)
 
                                     Term (Literal _) ->
-                                        Err (ExpectedBlankNodeOrIri node)
+                                        Err
+                                            { error = ExpectedBlankNodeOrIri node
+                                            , contextStack = state.context
+                                            }
                             )
                             nodes
                         )
@@ -1157,9 +1296,12 @@ predicates =
                             Result.combine
                                 (List.map
                                     (\focusNode ->
-                                        case getPredicates focusNode graph of
+                                        case getPredicates focusNode state.graph of
                                             [] ->
-                                                Err (NoProperty focusNode)
+                                                Err
+                                                    { error = NoProperty focusNode
+                                                    , contextStack = state.context
+                                                    }
 
                                             nodeChilds_ ->
                                                 Ok nodeChilds_
@@ -1182,13 +1324,19 @@ succeed x =
 fail : String -> Decoder a
 fail msg =
     Decoder <|
-        \_ resultNodes ->
+        \state resultNodes ->
             case resultNodes of
                 Err _ ->
-                    Err (Failure msg)
+                    Err
+                        { error = Failure msg
+                        , contextStack = state.context
+                        }
 
                 Ok nodes ->
-                    Err (FailureAt msg nodes)
+                    Err
+                        { error = FailureAt msg nodes
+                        , contextStack = state.context
+                        }
 
 
 {-| A decoder which always fails with the given message.
@@ -1196,10 +1344,13 @@ fail msg =
 failWith : (List BlankNodeOrIriOrAnyLiteral -> String) -> Decoder a
 failWith toMsg =
     Decoder
-        (\_ ->
+        (\state ->
             Result.andThen
                 (\nodes ->
-                    Err (CustomError (toMsg nodes))
+                    Err
+                        { error = CustomError (toMsg nodes)
+                        , contextStack = state.context
+                        }
                 )
         )
 
@@ -1242,9 +1393,15 @@ apply (Decoder f) (Decoder g) =
     Decoder (\graph x -> Result.map2 (<|) (f graph x) (g graph x))
 
 
-error : Error -> Decoder a
-error e =
-    Decoder (\_ _ -> Err e)
+err : Problem -> Decoder a
+err e =
+    Decoder
+        (\state _ ->
+            Err
+                { error = e
+                , contextStack = state.context
+                }
+        )
 
 
 {-| TODO
@@ -1252,7 +1409,7 @@ error e =
 oneOf : List (Decoder a) -> Decoder a
 oneOf fs =
     Decoder
-        (\graph node ->
+        (\state node ->
             case
                 List.foldl
                     (\(Decoder f) a ->
@@ -1261,7 +1418,7 @@ oneOf fs =
                                 Ok x
 
                             Err es ->
-                                case f graph node of
+                                case f state node of
                                     Ok x ->
                                         Ok x
 
@@ -1275,7 +1432,10 @@ oneOf fs =
                     Ok x
 
                 Err es ->
-                    Err (Batch (List.reverse es))
+                    Err
+                        { error = Batch (List.reverse es)
+                        , contextStack = state.context
+                        }
         )
 
 
@@ -1521,6 +1681,13 @@ lazy f =
     andThen f (succeed ())
 
 
+inContext : String -> Decoder a -> Decoder a
+inContext context (Decoder f) =
+    Decoder <|
+        \state ->
+            f { state | context = context :: state.context }
+
+
 {-| TODO Add documentation
 -}
 combine : List (Decoder a) -> Decoder (List a)
@@ -1531,8 +1698,8 @@ combine =
 logFailure : (String -> Error -> Error) -> String -> Decoder a -> Decoder a
 logFailure log msg (Decoder f) =
     Decoder <|
-        \graph nodes ->
-            f graph
+        \state nodes ->
+            f state
                 (nodes
                     |> Result.mapError (log msg)
                 )

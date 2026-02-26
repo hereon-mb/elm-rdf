@@ -207,9 +207,14 @@ propertyMissing =
             }
                 |> expectAllError
                     [ Expect.equal
-                        (Decode.UnknownProperty
-                            (Rdf.asBlankNodeOrIri (example "x"))
+                        (Decode.AtPropertyPath
                             (Rdf.PredicatePath (example "hasString"))
+                            { contextStack = []
+                            , error =
+                                Decode.UnknownProperty
+                                    (Rdf.asBlankNodeOrIri (example "x"))
+                                    (Rdf.PredicatePath (example "hasString"))
+                            }
                         )
                     ]
 
@@ -318,12 +323,18 @@ combineOneFails =
                 |> expectAllError
                     [ Expect.equal
                         (Decode.Batch
-                            [ Decode.ExpectedLiteralDatatype
-                                (xsd "integer")
-                                (xsd "string")
-                            , Decode.ExpectedLiteralDatatype
-                                (xsd "int")
-                                (xsd "string")
+                            [ { error =
+                                    Decode.ExpectedLiteralDatatype
+                                        (xsd "integer")
+                                        (xsd "string")
+                              , contextStack = []
+                              }
+                            , { error =
+                                    Decode.ExpectedLiteralDatatype
+                                        (xsd "int")
+                                        (xsd "string")
+                              , contextStack = []
+                              }
                             ]
                         )
                     ]
@@ -354,7 +365,7 @@ expectAll expectations { raw, decoder } =
                     Expect.all expectations value
 
 
-expectAllError : List (Decode.Error -> Expectation) -> { raw : String, decoder : Decoder a } -> Expectation
+expectAllError : List (Decode.Problem -> Expectation) -> { raw : String, decoder : Decoder a } -> Expectation
 expectAllError expectations { raw, decoder } =
     case Graph.parse raw of
         Err error ->
@@ -363,7 +374,7 @@ expectAllError expectations { raw, decoder } =
         Ok graph ->
             case Decode.decode decoder graph of
                 Err error ->
-                    Expect.all expectations error
+                    Expect.all expectations error.error
 
                 Ok _ ->
                     Expect.fail "Could decode the value."
