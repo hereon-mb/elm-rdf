@@ -315,19 +315,23 @@ type Problem
 
 {-| Turn a decoding error into a human friendly string. E.g.
 
-    errorToString (ExpectedBool "42")
+    errorToString { error = ExpectedBool "42", contextStack = [] }
     --> "Expected a boolean, but found 42."
 
 -}
 errorToString : Error -> String
 errorToString { error, contextStack } =
-    String.join "\n"
-        [ problemToString error
-        , ""
-        , "Context:"
-        , ""
-        , indent (String.join "\n" contextStack)
-        ]
+    if List.isEmpty contextStack then
+        problemToString error
+
+    else
+        String.join "\n"
+            [ problemToString error
+            , ""
+            , "Context:"
+            , ""
+            , indent (String.join "\n" contextStack)
+            ]
 
 
 problemToString : Problem -> String
