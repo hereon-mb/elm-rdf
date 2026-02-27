@@ -426,15 +426,48 @@ iriRef : Parser String
 iriRef =
     Parser.succeed identity
         |. Parser.symbol "<"
-        |= url
-        |. Parser.symbol ">"
+        |= Parser.loop [] url
 
 
-url : Parser String
-url =
-    Parser.getChompedString <|
-        Parser.succeed ()
-            |. Parser.chompWhile allowedUrlChar
+url : List String -> Parser (Parser.Step (List String) String)
+url revChunks =
+    Parser.oneOf
+        [ urlSubstitute revChunks
+        , Parser.token ">"
+            |> Parser.map (\_ -> Parser.Done (String.concat (List.reverse revChunks)))
+        , urlChomp revChunks
+        ]
+
+
+urlSubstitute : List String -> Parser (Parser.Step (List String) String)
+urlSubstitute revChunks =
+    Parser.succeed (\chunk -> Parser.Loop (chunk :: revChunks))
+        |. Parser.token "\\"
+        |= Parser.oneOf
+            [ Parser.succeed String.fromChar
+                |. Parser.token "u"
+                |= (Parser.getChompedString
+                        (Parser.succeed (\_ _ _ _ -> ())
+                            |. Parser.chompIf Char.isHexDigit
+                            |. Parser.chompIf Char.isHexDigit
+                            |. Parser.chompIf Char.isHexDigit
+                            |. Parser.chompIf Char.isHexDigit
+                        )
+                        |> Parser.andThen codeToChar
+                   )
+            ]
+
+
+urlChomp : List String -> Parser (Parser.Step (List String) String)
+urlChomp revChunks =
+    Parser.chompWhile isUninterestingForIri
+        |> Parser.getChompedString
+        |> Parser.map (\chunk -> Parser.Loop (chunk :: revChunks))
+
+
+isUninterestingForIri : Char -> Bool
+isUninterestingForIri char =
+    char /= '\\' && char /= '>'
 
 
 blankNode : Parser BlankNode

@@ -114,6 +114,16 @@ parse =
                 )
             ]
           )
+        , ( "<http://example.org/\\u00F6> <http://example.org/#knows> <http://example.org/#bob> ."
+          , [ Turtle.Triples
+                (Turtle.TriplesSubject (Turtle.SubjectIri (Turtle.IriRef "http://example.org/ö"))
+                    [ { verb = Turtle.Predicate (Turtle.IriRef "http://example.org/#knows")
+                      , objects = [ Turtle.ObjectIri (Turtle.IriRef "http://example.org/#bob") ]
+                      }
+                    ]
+                )
+            ]
+          )
 
         -- BLANK NODE
         , ( "_:alice example:knows _:bob ."
