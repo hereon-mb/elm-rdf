@@ -3,34 +3,46 @@ module Rdf exposing
     , Term
     , Iri, IsIri, asIri
     , BlankNode, IsBlankNode, asBlankNode
-    , Literal, asLiteral
-    , AnyLiteral, IsAnyLiteral, asAnyLiteral
+    , Literal, IsLiteral, asLiteral
+    , Var, IsVar, asVar
+    , Path, IsPath, asPath
     , BlankNodeOrIri, IsBlankNodeOrIri, asBlankNodeOrIri
-    , BlankNodeOrIriOrAnyLiteral, IsBlankNodeOrIriOrAnyLiteral, asBlankNodeOrIriOrAnyLiteral
+    , BlankNodeOrIriOrLiteral, IsBlankNodeOrIriOrLiteral, asBlankNodeOrIriOrLiteral
+    , IsIriOrPath
     , Yes, No
-    , iri, blankNode
+    , iri
+    , blankNode
     , literal
-    , string, bool, decimal, integer
+    , varQ, varD
+    , sequence, alternative, inverse, zeroOrMore, oneOrMore, zeroOrOne
+    , string, langString
+    , boolean
+    , decimal
+    , integer, int
     , double, float
     , date, dateTime
-    , langString
-    , toIri, toBlankNode
-    , toBlankNodeOrIri, toAnyLiteral, toBlankNodeOrIriOrAnyLiteral
+    , toIri
+    , toBlankNode
+    , toLiteral
+    , toBlankNodeOrIri, toBlankNodeOrIriOrLiteral
     , toUrl
-    , toValue
+    , lexicalForm
     , toString, toLangString
     , toInt, toFloat, toDecimal
     , toDate, toDateTime
     , toBool
-    , appendPath, setQueryParam, dropFragment, setFragment
-    , serializeNode, serializeNodeTurtle, SerializeConfig, serializeTriple
-    , encodeTriple
-    , tripleDecoder
-    , StringOrLangString(..)
+    , appendPath
+    , dropFragment, setFragment
+    , setQueryParam
+    , StringOrLangString
     , localize, nonLocalized
     , stringOrLangStringFrom, stringOrLangStringFromList
     , mergeStringOrLangStrings
     , stringOrLangStringInfo
+    , serialize, serializeWith, Prologue
+    , serializeTriple
+    , encodeTriple
+    , tripleDecoder
     )
 
 {-| This module defines the types and helper functions to work with the basic
@@ -48,59 +60,116 @@ a introduction on its data model.
 
 @docs Term
 
+
+### Basic
+
 @docs Iri, IsIri, asIri
 @docs BlankNode, IsBlankNode, asBlankNode
-@docs Literal, asLiteral
-@docs AnyLiteral, IsAnyLiteral, asAnyLiteral
+@docs Literal, IsLiteral, asLiteral
+@docs Var, IsVar, asVar
+@docs Path, IsPath, asPath
+
+
+### Combinations
+
 @docs BlankNodeOrIri, IsBlankNodeOrIri, asBlankNodeOrIri
-@docs BlankNodeOrIriOrAnyLiteral, IsBlankNodeOrIriOrAnyLiteral, asBlankNodeOrIriOrAnyLiteral
+@docs BlankNodeOrIriOrLiteral, IsBlankNodeOrIriOrLiteral, asBlankNodeOrIriOrLiteral
+@docs IsIriOrPath
+
+
+### Utility
 
 @docs Yes, No
 
 
 ## Create
 
-@docs iri, blankNode
+This section contains helper functions to create [`Term`](#Term)'s from Elm
+values.
+
+@docs iri
+@docs blankNode
 @docs literal
-@docs string, bool, decimal, integer
+@docs varQ, varD
+@docs sequence, alternative, inverse, zeroOrMore, oneOrMore, zeroOrOne
+
+
+### Specific literals
+
+@docs string, langString
+@docs boolean
+
+
+#### Numerical
+
+@docs decimal
+@docs integer, int
 @docs double, float
+
+
+#### Temporal
+
 @docs date, dateTime
-@docs langString
 
 
-## Transform
+## Conversions
 
-@docs toIri, toBlankNode
-@docs toBlankNodeOrIri, toAnyLiteral, toBlankNodeOrIriOrAnyLiteral
+
+### Specialize
+
+This section contains helper functions to convert any [`Term`](#Term)'s into
+a more specific variant.
+
+@docs toIri
+@docs toBlankNode
+@docs toLiteral
+@docs toBlankNodeOrIri, toBlankNodeOrIriOrLiteral
+
+
+### Elm values
+
+This section contains helper functions to convert specific [`Term`](#Term)'s
+into Elm values.
 
 @docs toUrl
-@docs toValue
+@docs lexicalForm
 @docs toString, toLangString
 @docs toInt, toFloat, toDecimal
 @docs toDate, toDateTime
 @docs toBool
 
-@docs appendPath, setQueryParam, dropFragment, setFragment
+
+### Transform IRI's
+
+A few helper functions to transform [`Iri`](#Iri)'s.
+
+@docs appendPath
+@docs dropFragment, setFragment
+@docs setQueryParam
 
 
-## Serialize
+### StringOrLangString
 
-@docs serializeNode, serializeNodeTurtle, SerializeConfig, serializeTriple
-
-
-## Json
-
-@docs encodeTriple
-@docs tripleDecoder
-
-
-## StringOrLangString
+A few convenience functions for working with literals of type `xsd:string` and
+`xsd:langString`.
 
 @docs StringOrLangString
 @docs localize, nonLocalized
 @docs stringOrLangStringFrom, stringOrLangStringFromList
 @docs mergeStringOrLangStrings
 @docs stringOrLangStringInfo
+
+
+## Serialization
+
+@docs serialize, serializeWith, Prologue
+@docs serializeTriple
+
+
+## Json
+
+@docs encodeTriple
+@docs tripleDecoder
 
 -}
 
@@ -111,6 +180,7 @@ import Internal.Term as Internal
         ( DataLiteral
         , Term(..)
         , Variant(..)
+        , toVariant
         )
 import Iso8601
 import Json.Decode as Decode exposing (Decoder)
@@ -146,21 +216,27 @@ from the subject to the object and the label being the predicate.
 type alias Triple =
     { subject : BlankNodeOrIri
     , predicate : Iri
-    , object : BlankNodeOrIriOrAnyLiteral
+    , object : BlankNodeOrIriOrLiteral
     }
 
 
 {-| This type represents an [RDF
-Term](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-rdf-triple),
-which can be an
+Term](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-rdf-triple)
+(which can be an
 [IRI](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-iri),
 a [literal](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-literal),
 or a [blank
-node](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-blank-node).
+node](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-blank-node)),
+a [query variable](https://www.w3.org/TR/sparql11-query/#sparqlQueryVariables),
+or a [property path](https://www.w3.org/TR/sparql11-query/#propertypaths).
+They are used in different contexts, for example when encoding or decoding RDF
+graphs, or when building different parts of a SPARQL query, like WHERE,
+CONSTRUCT, or SELECT clauses, as well as expressions.
 
-The `compatible` type variable is used to define separate types for the kinds
-of RDF terms, but make it possible to use instances of the different variants
-without the need for additional transformations.
+The `compatible` type variable is used to ensure that certain instances of
+a `Term` can only be used in the right context. For example, subjects in an
+RDF graph can only be IRI's or blank nodes, or, verbs in a WHERE clause can
+only be IRI's, query variables or property paths.
 
 For each term variant and all their combinations, we define two type aliases,
 one with a type variable and one without, e.g. `IsIri compatible` and `Iri`.
@@ -189,6 +265,34 @@ general `Is... compatible` types.
     graph =
         Graph.insert alice knows someone Graph.empty
 
+Here is an overview of all possible terms and in which context they are
+allowed:
+
+```markdown
+| Terms         | Graph | Where | Construct | Select | Expression | Path |
+|               | S P O | S V O | S V O     |        |            |      |
+|---------------|-------|-------|-----------|--------|------------|------|
+| BlankNode     | x   x | x   x | x   x     |        |            |      |
+| Iri           | x x x | x x x | x x x     |        |     x      |  x   |
+| Literal       |     x |     x |     x     |        |     x      |      |
+| Var           |       | x x x | x x x     |   x    |     x      |      |
+| Path          |       |   x   |           |        |            |  x   |
+```
+
+It follows that a term can be compatible or not within the following
+combinations:
+
+  - [`Iri`](#Iri)
+  - [`Var`](#Var)
+  - [`BlankNode`](#BlankNode) or [`Iri`](#Iri)
+  - [`BlankNode`](#BlankNode) or [`Iri`](#Iri) or [`Literal`](#Literal)
+  - [`BlankNode`](#BlankNode) or [`Iri`](#Iri) or [`Literal`](#Literal) or [`Var`](#Var)
+  - [`BlankNode`](#BlankNode) or [`Iri`](#Iri) or [`Var`](#Var)
+  - [`Iri`](#Iri) or [`Literal`](#Literal) or [`Var`](#Var)
+  - [`Iri`](#Iri) or [`Var`](#Var)
+  - [`Iri`](#Iri) or [`Var`](#Var) or [`Path`](#Path)
+  - [`Iri`](#Iri) or [`Path`](#Path)
+
 -}
 type alias Term compatible =
     Internal.Term compatible
@@ -208,6 +312,11 @@ type No
     = No Never
 
 
+
+-- SANDBOX
+-- IRI
+
+
 {-| An RDF term which can only be an
 [IRI](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-iri). This
 type will only be used as the return type of functions and if the values need
@@ -217,20 +326,23 @@ the idea behind this.
 -}
 type alias Iri =
     Term
-        { isBlankNode : No
-        , isIri : Yes
-        , isAnyLiteral : No
+        { isIri : Yes
+        , isVar : No
         , isBlankNodeOrIri : Yes
-        , isBlankNodeOrAnyLiteral : No
-        , isIriOrAnyLiteral :
-            Yes
+        , isBlankNodeOrIriOrLiteral : Yes
+        , isBlankNodeOrIriOrLiteralOrVar : Yes
+        , isBlankNodeOrIriOrVar : Yes
+        , isIriOrLiteralOrVar : Yes
+        , isIriOrVar : Yes
+        , isIriOrVarOrPath : Yes
+        , isIriOrPath : Yes
         }
 
 
 {-| This type will only be used as the argument of functions and ensures that
-only [IRI's](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-iri)
-are passed. Take a look at [Term](Rdf#Term)
-for a general explanation of the idea behind this.
+only [IRI](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-iri)'s
+are passed. Take a look at [Term](Rdf#Term) for a general explanation of the
+idea behind this.
 -}
 type alias IsIri compatible =
     Term { compatible | isIri : Yes }
@@ -246,94 +358,292 @@ asIri (Term variant) =
     Term variant
 
 
-{-| TODO Add documentation
+
+-- BLANK NODE
+
+
+{-| An RDF term which can only be a
+[blank
+node](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-blank-node).
+This type will only be used as the return type of functions and if the values
+need to be stored in the model. Take a look at [Term](Rdf#Term) for a general
+explanation of the idea behind this.
 -}
 type alias BlankNode =
     Term
-        { isBlankNode : Yes
-        , isIri : No
-        , isAnyLiteral : No
+        { isIri : No
+        , isVar : No
         , isBlankNodeOrIri : Yes
-        , isBlankNodeOrAnyLiteral : Yes
-        , isIriOrAnyLiteral : No
+        , isBlankNodeOrIriOrLiteral : Yes
+        , isBlankNodeOrIriOrLiteralOrVar : Yes
+        , isBlankNodeOrIriOrVar : Yes
+        , isIriOrLiteralOrVar : No
+        , isIriOrVar : No
+        , isIriOrVarOrPath : No
+        , isIriOrPath : No
         }
 
 
-{-| TODO Add documentation
--}
-type alias Literal a =
-    Term
-        { isLiteral : a
-        , isBlankNode : No
-        , isIri : No
-        , isAnyLiteral : Yes
-        , isBlankNodeOrIri : No
-        , isBlankNodeOrAnyLiteral : Yes
-        , isIriOrAnyLiteral : Yes
-        }
-
-
-{-| TODO Add documentation
--}
-type alias BlankNodeOrIri =
-    Term
-        { isBlankNode : No
-        , isIri : No
-        , isAnyLiteral : No
-        , isBlankNodeOrIri : Yes
-        , isBlankNodeOrAnyLiteral : No
-        , isIriOrAnyLiteral : No
-        }
-
-
-{-| TODO Add documentation
--}
-type alias AnyLiteral =
-    Term
-        { isBlankNode : No
-        , isIri : No
-        , isAnyLiteral : Yes
-        , isBlankNodeOrIri : No
-        , isBlankNodeOrAnyLiteral : Yes
-        , isIriOrAnyLiteral : Yes
-        }
-
-
-{-| TODO Add documentation
--}
-type alias BlankNodeOrIriOrAnyLiteral =
-    Term
-        { isBlankNode : No
-        , isIri : No
-        , isAnyLiteral : No
-        , isBlankNodeOrIri : No
-        , isBlankNodeOrAnyLiteral : No
-        , isIriOrAnyLiteral : No
-        }
-
-
-{-| TODO Add documentation
+{-| This type will only be used as the argument of functions and ensures that
+only [blank
+node](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-blank-node)'s
+are passed. Take a look at [Term](Rdf#Term) for a general explanation of the
+idea behind this.
 -}
 type alias IsBlankNode compatible =
     Term { compatible | isBlankNode : Yes }
 
 
-{-| TODO Add documentation
+{-| When writing your own helper functions, it might be necessary that you have
+to convert the argument type into the return value type. Take a look at
+[Term](Rdf#Term) for a general explanation of the idea behind this.
+-}
+asBlankNode : IsBlankNode compatible -> BlankNode
+asBlankNode (Term variant) =
+    Term variant
+
+
+
+-- LITERAL
+
+
+{-| An RDF term which can only be a
+[literal](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-literal).
+This type will only be used as the return type of functions and if the values
+need to be stored in the model. Take a look at [Term](Rdf#Term) for a general
+explanation of the idea behind this.
+-}
+type alias Literal =
+    Term
+        { isIri : No
+        , isVar : No
+        , isBlankNodeOrIri : No
+        , isBlankNodeOrIriOrLiteral : Yes
+        , isBlankNodeOrIriOrLiteralOrVar : Yes
+        , isBlankNodeOrIriOrVar : No
+        , isIriOrLiteralOrVar : Yes
+        , isIriOrVar : No
+        , isIriOrVarOrPath : No
+        , isIriOrPath : No
+        }
+
+
+{-| This type will only be used as the argument of functions and ensures that
+only
+[literal](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-literal)'s
+are passed. Take a look at [Term](Rdf#Term) for a general explanation of the
+idea behind this.
+-}
+type alias IsLiteral compatible =
+    Term { compatible | isLiteral : Yes }
+
+
+{-| When writing your own helper functions, it might be necessary that you have
+to convert the argument type into the return value type. Take a look at
+[Term](Rdf#Term) for a general explanation of the idea behind this.
+-}
+asLiteral : IsLiteral compatible -> Literal
+asLiteral (Term variant) =
+    Term variant
+
+
+
+-- VAR
+
+
+{-| An RDF term which can only be a
+[query variable](https://www.w3.org/TR/sparql11-query/#sparqlQueryVariables).
+This type will only be used as the return type of functions and if the values
+need to be stored in the model. Take a look at [Term](Rdf#Term) for a general
+explanation of the idea behind this.
+-}
+type alias Var =
+    Term
+        { isIri : No
+        , isVar : Yes
+        , isBlankNodeOrIri : No
+        , isBlankNodeOrIriOrLiteral : No
+        , isBlankNodeOrIriOrLiteralOrVar : Yes
+        , isBlankNodeOrIriOrVar : Yes
+        , isIriOrLiteralOrVar : Yes
+        , isIriOrVar : Yes
+        , isIriOrVarOrPath : Yes
+        , isIriOrPath : No
+        }
+
+
+{-| This type will only be used as the argument of functions and ensures that
+only [query
+variable](https://www.w3.org/TR/sparql11-query/#sparqlQueryVariables)'s are
+passed. Take a look at [Term](Rdf#Term) for a general explanation of the idea
+behind this.
+-}
+type alias IsVar compatible =
+    Term { compatible | isVar : Yes }
+
+
+{-| When writing your own helper functions, it might be necessary that you have
+to convert the argument type into the return value type. Take a look at
+[Term](Rdf#Term) for a general explanation of the idea behind this.
+-}
+asVar : IsVar compatible -> Var
+asVar (Term variant) =
+    Term variant
+
+
+
+-- PATH
+
+
+{-| An RDF term which can only be a
+[property path](https://www.w3.org/TR/sparql11-query/#propertypaths). This type
+will only be used as the return type of functions and if the values need to be
+stored in the model. Take a look at [Term](Rdf#Term) for a general explanation
+of the idea behind this.
+-}
+type alias Path =
+    Term
+        { isIri : No
+        , isVar : No
+        , isBlankNodeOrIri : No
+        , isBlankNodeOrIriOrLiteral : No
+        , isBlankNodeOrIriOrLiteralOrVar : No
+        , isBlankNodeOrIriOrVar : No
+        , isIriOrLiteralOrVar : No
+        , isIriOrVar : No
+        , isIriOrVarOrPath : Yes
+        , isIriOrPath : Yes
+        }
+
+
+{-| This type will only be used as the argument of functions and ensures that
+only [property path](https://www.w3.org/TR/sparql11-query/#propertypaths)'s are
+passed. Take a look at [Term](Rdf#Term) for a general explanation of the idea
+behind this.
+-}
+type alias IsPath compatible =
+    Term { compatible | isPath : Yes }
+
+
+{-| When writing your own helper functions, it might be necessary that you have
+to convert the argument type into the return value type. Take a look at
+[Term](Rdf#Term) for a general explanation of the idea behind this.
+-}
+asPath : IsPath compatible -> Path
+asPath (Term variant) =
+    Term variant
+
+
+
+-- BLANK NODE OR IRI
+
+
+{-| An RDF term which can only be a
+[blank
+node](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-blank-node)
+or an [IRI](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-iri).
+This type will only be used as the return type of functions and if the values
+need to be stored in the model. Take a look at [Term](Rdf#Term) for a general
+explanation of the idea behind this.
+-}
+type alias BlankNodeOrIri =
+    Term
+        { isIri : No
+        , isVar : No
+        , isBlankNodeOrIri : Yes
+        , isBlankNodeOrIriOrLiteral : Yes
+        , isBlankNodeOrIriOrLiteralOrVar : Yes
+        , isBlankNodeOrIriOrVar : Yes
+        , isIriOrLiteralOrVar : No
+        , isIriOrVar : No
+        , isIriOrVarOrPath : No
+        , isIriOrPath : No
+        }
+
+
+{-| This type will only be used as the argument of functions and ensures that
+only [blank
+node](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-blank-node)'s
+or [IRI](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-iri)'s are
+passed. Take a look at [Term](Rdf#Term) for a general explanation of the idea
+behind this.
 -}
 type alias IsBlankNodeOrIri compatible =
     Term { compatible | isBlankNodeOrIri : Yes }
 
 
-{-| TODO Add documentation
+{-| When writing your own helper functions, it might be necessary that you have
+to convert the argument type into the return value type. Take a look at
+[Term](Rdf#Term) for a general explanation of
+the idea behind this.
 -}
-type alias IsAnyLiteral compatible =
-    Term { compatible | isAnyLiteral : Yes }
+asBlankNodeOrIri : IsBlankNodeOrIri compatible -> BlankNodeOrIri
+asBlankNodeOrIri (Term variant) =
+    Term variant
 
 
-{-| TODO Add documentation
+
+-- BLANK NODE OR IRI OR LITERAL
+
+
+{-| An RDF term which can only be a
+[blank
+node](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-blank-node),
+an [IRI](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-iri), or
+a [literal](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-literal).
+This type will only be used as the return type of functions and if the values
+need to be stored in the model. Take a look at [Term](Rdf#Term) for a general
+explanation of the idea behind this.
 -}
-type alias IsBlankNodeOrIriOrAnyLiteral compatible =
-    Term compatible
+type alias BlankNodeOrIriOrLiteral =
+    Term
+        { isIri : No
+        , isVar : No
+        , isBlankNodeOrIri : No
+        , isBlankNodeOrIriOrLiteral : Yes
+        , isBlankNodeOrIriOrLiteralOrVar : Yes
+        , isBlankNodeOrIriOrVar : No
+        , isIriOrLiteralOrVar : No
+        , isIriOrVar : No
+        , isIriOrVarOrPath : No
+        , isIriOrPath : No
+        }
+
+
+{-| This type will only be used as the argument of functions and ensures that
+only [blank
+node](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-blank-node)'s,
+[IRI](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-iri)'s, or
+[literal](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-literal)'s
+are passed. Take a look at [Term](Rdf#Term) for a general explanation of the
+idea behind this.
+-}
+type alias IsBlankNodeOrIriOrLiteral compatible =
+    Term { compatible | isBlankNodeOrIriOrLiteral : Yes }
+
+
+{-| When writing your own helper functions, it might be necessary that you have
+to convert the argument type into the return value type. Take a look at
+[Term](Rdf#Term) for a general explanation of
+the idea behind this.
+-}
+asBlankNodeOrIriOrLiteral : IsBlankNodeOrIriOrLiteral compatible -> BlankNodeOrIriOrLiteral
+asBlankNodeOrIriOrLiteral (Term variant) =
+    Term variant
+
+
+
+-- IRI OR PATH
+
+
+{-| This type will only be used as the argument of functions and ensures that
+only [IRI](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-iri)'s
+or [property path](https://www.w3.org/TR/sparql11-query/#propertypaths)'s are
+passed. Take a look at [Term](Rdf#Term) for a general explanation of the idea
+behind this.
+-}
+type alias IsIriOrPath compatible =
+    Term { compatible | isIriOrPath : Yes }
 
 
 
@@ -393,7 +703,7 @@ datatypes which are part of [built-in
 datatypes](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#xsd-datatypes).
 
 -}
-literal : Iri -> String -> Literal a
+literal : Iri -> String -> Literal
 literal datatype value =
     Term
         (Literal
@@ -402,6 +712,76 @@ literal datatype value =
             , languageTag = Nothing
             }
         )
+
+
+{-| Create a [query
+variable](https://www.w3.org/TR/sparql11-query/#sparqlQueryVariables) of the
+form `?name`.
+-}
+varQ : String -> Var
+varQ name =
+    Term (VarQ name)
+
+
+{-| Create a [query
+variable](https://www.w3.org/TR/sparql11-query/#sparqlQueryVariables) of the
+form `$name`.
+-}
+varD : String -> Var
+varD name =
+    Term (VarD name)
+
+
+{-| Create a sequence [property
+path](https://www.w3.org/TR/sparql11-query/#propertypaths).
+-}
+sequence : IsIriOrPath compatible1 -> List (IsIriOrPath compatible2) -> Path
+sequence (Term first) rest =
+    Term (Sequence first (List.map toVariant rest))
+
+
+{-| Create an alternative [property
+path](https://www.w3.org/TR/sparql11-query/#propertypaths).
+-}
+alternative : IsIriOrPath compatible1 -> List (IsIriOrPath compatible2) -> Path
+alternative (Term first) rest =
+    Term (Alternative first (List.map toVariant rest))
+
+
+{-| Create an inverse [property
+path](https://www.w3.org/TR/sparql11-query/#propertypaths).
+-}
+inverse : IsIriOrPath compatible1 -> Path
+inverse (Term nested) =
+    Term (Inverse nested)
+
+
+{-| Create a zero or more [property
+path](https://www.w3.org/TR/sparql11-query/#propertypaths).
+-}
+zeroOrMore : IsIriOrPath compatible1 -> Path
+zeroOrMore (Term nested) =
+    Term (ZeroOrMore nested)
+
+
+{-| Create a one or more [property
+path](https://www.w3.org/TR/sparql11-query/#propertypaths).
+-}
+oneOrMore : IsIriOrPath compatible1 -> Path
+oneOrMore (Term nested) =
+    Term (OneOrMore nested)
+
+
+{-| Create a zero or one [property
+path](https://www.w3.org/TR/sparql11-query/#propertypaths).
+-}
+zeroOrOne : IsIriOrPath compatible1 -> Path
+zeroOrOne (Term nested) =
+    Term (ZeroOrOne nested)
+
+
+
+-- CREATE
 
 
 {-| Create
@@ -414,7 +794,7 @@ with datatype [xsd:string](https://www.w3.org/TR/xmlschema11-2/#string).
     -->   "Alice Wonderland"
 
 -}
-string : String -> Literal String
+string : String -> Literal
 string value =
     Term
         (Literal
@@ -427,16 +807,38 @@ string value =
 
 {-| Create
 a [literal](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-literal)
+with datatype `http://www.w3.org/1999/02/22-rdf-syntax-ns#langString`. The
+first argument must be language tag as defined by
+[BCP47](https://www.rfc-editor.org/info/bcp47), the second argument is the
+actual string.
+
+    serialize (langString "en" "RDF is great!")
+    --> "\"RDF is great!\"@en"
+
+-}
+langString : String -> String -> Literal
+langString languageTag value =
+    Term
+        (Literal
+            { value = value
+            , datatype = urlRdfLangString
+            , languageTag = Just languageTag
+            }
+        )
+
+
+{-| Create
+a [literal](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-literal)
 with datatype [xsd:boolean](https://www.w3.org/TR/xmlschema11-2/#boolean).
 
-    bool True
+    boolean True
     --> literal
     -->   (iri "http://www.w3.org/2001/XMLSchema#boolean")
     -->   "true"
 
 -}
-bool : Bool -> Literal Bool
-bool value =
+boolean : Bool -> Literal
+boolean value =
     Term
         (Literal
             { value =
@@ -449,6 +851,10 @@ bool value =
             , languageTag = Nothing
             }
         )
+
+
+
+-- NUMERICAL
 
 
 {-| Create
@@ -474,7 +880,7 @@ package.
     -->   "3.14"
 
 -}
-decimal : Decimal -> Literal Decimal
+decimal : Decimal -> Literal
 decimal value =
     Term
         (Literal
@@ -487,7 +893,7 @@ decimal value =
 
 {-| Create
 a [literal](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-literal)
-with datatype [xsd:decimal](https://www.w3.org/TR/xmlschema11-2/#integer).
+with datatype [xsd:integer](https://www.w3.org/TR/xmlschema11-2/#integer).
 
     integer 42
     --> literal
@@ -495,7 +901,7 @@ with datatype [xsd:decimal](https://www.w3.org/TR/xmlschema11-2/#integer).
     -->   "42"
 
 -}
-integer : Int -> Literal Int
+integer : Int -> Literal
 integer value =
     Term
         (Literal
@@ -507,8 +913,29 @@ integer value =
 
 
 {-| Create
+a [literal](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-int)
+with datatype [xsd:int](https://www.w3.org/TR/xmlschema11-2/#int).
+
+    int 42
+    --> literal
+    -->   (iri "http://www.w3.org/2001/XMLSchema#int")
+    -->   "42"
+
+-}
+int : Int -> Literal
+int value =
+    Term
+        (Literal
+            { value = String.fromInt value
+            , datatype = urlXsdInt
+            , languageTag = Nothing
+            }
+        )
+
+
+{-| Create
 a [literal](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-literal)
-with datatype [xsd:decimal](https://www.w3.org/TR/xmlschema11-2/#double).
+with datatype [xsd:double](https://www.w3.org/TR/xmlschema11-2/#double).
 
     double 3.14
     --> literal
@@ -516,7 +943,7 @@ with datatype [xsd:decimal](https://www.w3.org/TR/xmlschema11-2/#double).
     -->   "3.14"
 
 -}
-double : Float -> Literal Float
+double : Float -> Literal
 double value =
     Term
         (Literal
@@ -529,7 +956,7 @@ double value =
 
 {-| Create
 a [literal](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-literal)
-with datatype [xsd:decimal](https://www.w3.org/TR/xmlschema11-2/#float).
+with datatype [xsd:float](https://www.w3.org/TR/xmlschema11-2/#float).
 
     float 3.14
     --> literal
@@ -537,7 +964,7 @@ with datatype [xsd:decimal](https://www.w3.org/TR/xmlschema11-2/#float).
     -->   "3.14"
 
 -}
-float : Float -> Literal Float
+float : Float -> Literal
 float value =
     Term
         (Literal
@@ -548,9 +975,13 @@ float value =
         )
 
 
+
+-- TEMPORAL
+
+
 {-| Create
 a [literal](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-literal)
-with datatype [xsd:decimal](https://www.w3.org/TR/xmlschema11-2/#date).
+with datatype [xsd:date](https://www.w3.org/TR/xmlschema11-2/#date).
 
     import Time
 
@@ -560,7 +991,7 @@ with datatype [xsd:decimal](https://www.w3.org/TR/xmlschema11-2/#date).
     -->   "1970-01-01"
 
 -}
-date : Posix -> Literal Posix
+date : Posix -> Literal
 date value =
     Term
         (Literal
@@ -573,7 +1004,7 @@ date value =
 
 {-| Create
 a [literal](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-literal)
-with datatype [xsd:decimal](https://www.w3.org/TR/xmlschema11-2/#dateTime).
+with datatype [xsd:dateTime](https://www.w3.org/TR/xmlschema11-2/#dateTime).
 
     import Time
 
@@ -583,7 +1014,7 @@ with datatype [xsd:decimal](https://www.w3.org/TR/xmlschema11-2/#dateTime).
     -->   "1970-01-01T00:00:00.000Z"
 
 -}
-dateTime : Posix -> Literal Posix
+dateTime : Posix -> Literal
 dateTime value =
     Term
         (Literal
@@ -594,48 +1025,23 @@ dateTime value =
         )
 
 
-{-| Create
-a [literal](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-literal)
-with datatype `http://www.w3.org/1999/02/22-rdf-syntax-ns#langString`. The
-first argument must be language tag as defined by
-[BCP47](https://www.rfc-editor.org/info/bcp47), the second argument is the
-actual string.
 
-    serializeNode (langString "en" "RDF is great!")
-    --> "\"RDF is great!\"@en"
-
--}
-langString : String -> String -> Literal a
-langString languageTag value =
-    Term
-        (Literal
-            { value = value
-            , datatype = urlRdfLangString
-            , languageTag = Just languageTag
-            }
-        )
+-- CONVERSION: SPECIALIZE
 
 
-
--- TRANSFORM
-
-
-{-| TODO Add documentation
+{-| Turn any [`Term`](#Term) into an [`Iri`](#Iri) if possible.
 -}
 toIri : Term compatible -> Maybe Iri
 toIri (Term node) =
     case node of
-        BlankNode _ ->
-            Nothing
-
         Iri _ ->
             Just (Term node)
 
-        Literal _ ->
+        _ ->
             Nothing
 
 
-{-| TODO Add documentation
+{-| Turn any [`Term`](#Term) into a [`BlankNode`](#BlankNode) if possible.
 -}
 toBlankNode : Term compatible -> Maybe BlankNode
 toBlankNode (Term variant) =
@@ -643,14 +1049,25 @@ toBlankNode (Term variant) =
         BlankNode _ ->
             Just (Term variant)
 
-        Iri _ ->
+        _ ->
             Nothing
 
+
+{-| Turn any [`Term`](#Term) into a [`Literal`](#Literal) if
+possible.
+-}
+toLiteral : Term compatible -> Maybe Literal
+toLiteral (Term variant) =
+    case variant of
         Literal _ ->
+            Just (Term variant)
+
+        _ ->
             Nothing
 
 
-{-| TODO Add documentation
+{-| Turn any [`Term`](#Term) into a [`BlankNodeOrIri`](#BlankNodeOrIri) if
+possible.
 -}
 toBlankNodeOrIri : Term compatible -> Maybe BlankNodeOrIri
 toBlankNodeOrIri (Term variant) =
@@ -661,29 +1078,15 @@ toBlankNodeOrIri (Term variant) =
         Iri _ ->
             Just (Term variant)
 
-        Literal _ ->
+        _ ->
             Nothing
 
 
-{-| TODO Add documentation
+{-| Turn any [`Term`](#Term) into
+a [`BlankNodeOrIriOrLiteral`](#BlankNodeOrIriOrLiteral) if possible.
 -}
-toAnyLiteral : Term compatible -> Maybe AnyLiteral
-toAnyLiteral (Term variant) =
-    case variant of
-        BlankNode _ ->
-            Nothing
-
-        Iri _ ->
-            Nothing
-
-        Literal _ ->
-            Just (Term variant)
-
-
-{-| TODO Add documentation
--}
-toBlankNodeOrIriOrAnyLiteral : Term compatible -> Maybe BlankNodeOrIriOrAnyLiteral
-toBlankNodeOrIriOrAnyLiteral (Term variant) =
+toBlankNodeOrIriOrLiteral : Term compatible -> Maybe BlankNodeOrIriOrLiteral
+toBlankNodeOrIriOrLiteral (Term variant) =
     case variant of
         BlankNode _ ->
             Just (Term variant)
@@ -691,86 +1094,59 @@ toBlankNodeOrIriOrAnyLiteral (Term variant) =
         Iri _ ->
             Just (Term variant)
 
-        Literal _ ->
+        _ ->
             Nothing
 
 
-{-| TODO Add documentation
--}
-asBlankNode : IsBlankNode compatible -> BlankNode
-asBlankNode (Term variant) =
-    Term variant
+
+-- CONVERSION: ELM VALUES
 
 
-{-| TODO Add documentation
--}
-asLiteral : IsAnyLiteral compatible -> Literal a
-asLiteral (Term variant) =
-    Term variant
+{-| Extract the URL from an [`Iri`](#Iri).
 
+    toUrl (iri "http://example.org")
+    --> "http://example.org"
 
-{-| TODO Add documentation
--}
-asBlankNodeOrIri : IsBlankNodeOrIri compatible -> BlankNodeOrIri
-asBlankNodeOrIri (Term variant) =
-    Term variant
-
-
-{-| TODO Add documentation
--}
-asBlankNodeOrIriOrAnyLiteral : IsBlankNodeOrIriOrAnyLiteral compatible -> BlankNodeOrIriOrAnyLiteral
-asBlankNodeOrIriOrAnyLiteral (Term variant) =
-    Term variant
-
-
-{-| TODO Add documentation
--}
-asAnyLiteral : IsAnyLiteral compatible -> AnyLiteral
-asAnyLiteral (Term variant) =
-    Term variant
-
-
-{-| TODO Add documentation
 -}
 toUrl : Iri -> String
 toUrl (Term variant) =
     case variant of
-        BlankNode _ ->
-            ""
-
         Iri url ->
             url
 
-        Literal _ ->
+        _ ->
             ""
 
 
-{-| TODO Add documentation
+{-| Turn [`Literal`](#Literal) into it's [lexical
+form](https://www.w3.org/TR/rdf11-concepts/#section-Graph-Literal).
+
+    lexicalForm (double 3.14)
+    --> "3.14"
+
+    lexicalForm (string "RDF is great!")
+    --> "RDF is great!"
+
+    lexicalForm (boolean True)
+    --> "true"
+
 -}
-toValue : AnyLiteral -> String
-toValue (Term variant) =
+lexicalForm : Literal -> String
+lexicalForm (Term variant) =
     case variant of
-        BlankNode _ ->
-            ""
-
-        Iri _ ->
-            ""
-
         Literal { value } ->
             value
 
+        _ ->
+            ""
 
-{-| TODO Add documentation
+
+{-| Take any [`Term`](#Term) and extract its String value if it is a literal
+with datatype `xsd:string`.
 -}
 toString : Term compatible -> Maybe String
 toString (Term variant) =
     case variant of
-        BlankNode _ ->
-            Nothing
-
-        Iri _ ->
-            Nothing
-
         Literal data ->
             if data.datatype == urlXsdString then
                 Just data.value
@@ -778,18 +1154,16 @@ toString (Term variant) =
             else
                 Nothing
 
+        _ ->
+            Nothing
 
-{-| TODO Add documentation
+
+{-| Take any [`Term`](#Term) and extract its language tag and String value if
+it is a literal with datatype `xsd:langString`.
 -}
 toLangString : Term compatible -> Maybe ( String, String )
 toLangString (Term variant) =
     case variant of
-        BlankNode _ ->
-            Nothing
-
-        Iri _ ->
-            Nothing
-
         Literal data ->
             if data.datatype == urlRdfLangString then
                 Maybe.map2 Tuple.pair data.languageTag (Just data.value)
@@ -797,18 +1171,16 @@ toLangString (Term variant) =
             else
                 Nothing
 
+        _ ->
+            Nothing
 
-{-| TODO Add documentation
+
+{-| Take any [`Term`](#Term) and extract its Int value if it is a literal
+with datatype `xsd:integer` or `xsd:int`.
 -}
 toInt : Term compatible -> Maybe Int
 toInt (Term variant) =
     case variant of
-        BlankNode _ ->
-            Nothing
-
-        Iri _ ->
-            Nothing
-
         Literal data ->
             if data.datatype == urlXsdInt then
                 String.toInt data.value
@@ -819,37 +1191,36 @@ toInt (Term variant) =
             else
                 Nothing
 
+        _ ->
+            Nothing
 
-{-| TODO Add documentation
+
+{-| Take any [`Term`](#Term) and extract its Float value if it is a literal
+with datatype `xsd:double` or `xsd:float`.
 -}
 toFloat : Term compatible -> Maybe Float
 toFloat (Term variant) =
     case variant of
-        BlankNode _ ->
-            Nothing
-
-        Iri _ ->
-            Nothing
-
         Literal data ->
             if data.datatype == urlXsdDouble then
+                String.toFloat data.value
+
+            else if data.datatype == urlXsdFloat then
                 String.toFloat data.value
 
             else
                 Nothing
 
+        _ ->
+            Nothing
 
-{-| TODO Add documentation
+
+{-| Take any [`Term`](#Term) and extract its Decimal value if it is a literal
+with datatype `xsd:decimal`.
 -}
 toDecimal : Term compatible -> Maybe Decimal
 toDecimal (Term variant) =
     case variant of
-        BlankNode _ ->
-            Nothing
-
-        Iri _ ->
-            Nothing
-
         Literal data ->
             if data.datatype == urlXsdDecimal then
                 Decimal.fromString data.value
@@ -857,18 +1228,16 @@ toDecimal (Term variant) =
             else
                 Nothing
 
+        _ ->
+            Nothing
 
-{-| TODO Add documentation
+
+{-| Take any [`Term`](#Term) and extract its Posix value if it is a literal
+with datatype `xsd:date`.
 -}
 toDate : Term compatible -> Maybe Posix
 toDate (Term variant) =
     case variant of
-        BlankNode _ ->
-            Nothing
-
-        Iri _ ->
-            Nothing
-
         Literal data ->
             if data.datatype == urlXsdDate then
                 (data.value ++ "T00:00:00.000Z")
@@ -878,18 +1247,16 @@ toDate (Term variant) =
             else
                 Nothing
 
+        _ ->
+            Nothing
 
-{-| TODO Add documentation
+
+{-| Take any [`Term`](#Term) and extract its Posix value if it is a literal
+with datatype `xsd:dateTime`.
 -}
 toDateTime : Term compatible -> Maybe Posix
 toDateTime (Term variant) =
     case variant of
-        BlankNode _ ->
-            Nothing
-
-        Iri _ ->
-            Nothing
-
         Literal data ->
             if data.datatype == urlXsdDateTime then
                 data.value
@@ -899,18 +1266,16 @@ toDateTime (Term variant) =
             else
                 Nothing
 
+        _ ->
+            Nothing
 
-{-| TODO Add documentation
+
+{-| Take any [`Term`](#Term) and extract its Bool value if it is a literal
+with datatype `xsd:boolean`.
 -}
 toBool : Term compatible -> Maybe Bool
 toBool (Term variant) =
     case variant of
-        BlankNode _ ->
-            Nothing
-
-        Iri _ ->
-            Nothing
-
         Literal data ->
             if data.datatype == urlXsdBoolean then
                 case data.value of
@@ -926,15 +1291,29 @@ toBool (Term variant) =
             else
                 Nothing
 
+        _ ->
+            Nothing
 
-{-| TODO Add documentation
+
+
+-- TRANSFORM
+
+
+{-| Append a String to the path component of an [`Iri`](#Iri).
+
+    appendPath "/alice" (iri "http://example.org")
+    --> iri "http://example.org/alice"
+
+    appendPath "/datasets" (iri "http://example.org?sort=id")
+    --> iri "http://example.org/datasets?sort=id"
+
+    appendPath "/people" (iri "http://example.org#alice")
+    --> iri "http://example.org/people#alice"
+
 -}
 appendPath : String -> IsIri compatible -> Iri
 appendPath segment (Term variant) =
     case variant of
-        BlankNode _ ->
-            Term variant
-
         Iri url ->
             case String.split "?" url of
                 [ _ ] ->
@@ -962,18 +1341,19 @@ appendPath segment (Term variant) =
                 _ ->
                     Term (Iri (url ++ segment))
 
-        Literal _ ->
+        _ ->
             Term variant
 
 
-{-| TODO Add documentation
+{-| Drop the fragment from an [`Iri`](#Iri).
+
+    dropFragment (iri "http://example.org#alice")
+    --> iri "http://example.org"
+
 -}
 dropFragment : IsIri compatible -> Iri
 dropFragment (Term variant) =
     case variant of
-        BlankNode _ ->
-            Term variant
-
         Iri url ->
             case String.split "#" url of
                 [ _ ] ->
@@ -985,18 +1365,22 @@ dropFragment (Term variant) =
                 _ ->
                     Term variant
 
-        Literal _ ->
+        _ ->
             Term variant
 
 
-{-| TODO Add documentation
+{-| Set the fragment of an [`Iri`](#Iri)
+
+    setFragment "alice" (iri "http://example.org")
+    --> iri "http://example.org#alice"
+
+    setFragment "bob" (iri "http://example.org#alice")
+    --> iri "http://example.org#bob"
+
 -}
 setFragment : String -> IsIri compatible -> Iri
 setFragment fragment (Term variant) =
     case variant of
-        BlankNode _ ->
-            Term variant
-
         Iri url ->
             case String.split "#" url of
                 [ _ ] ->
@@ -1008,18 +1392,22 @@ setFragment fragment (Term variant) =
                 _ ->
                     Term variant
 
-        Literal _ ->
+        _ ->
             Term variant
 
 
-{-| TODO Add documentation
+{-| Set a query parameter in an [`Iri`](#Iri)
+
+    setQueryParam "sort" "id" (iri "http://example.org")
+    --> iri "http://example.org?sort=id"
+
+    setQueryParam "sort" "name" (iri "http://example.org?sort=id")
+    --> iri "http://example.org?sort=name"
+
 -}
 setQueryParam : String -> String -> IsIri compatible -> Iri
 setQueryParam name value (Term variant) =
     case variant of
-        BlankNode _ ->
-            Term variant
-
         Iri url ->
             case String.split "?" url of
                 [ beforeQuery ] ->
@@ -1082,7 +1470,7 @@ setQueryParam name value (Term variant) =
                 _ ->
                     Term variant
 
-        Literal _ ->
+        _ ->
             Term variant
 
 
@@ -1115,125 +1503,6 @@ serializeQuery query =
 
 
 
--- SERIALIZE
-
-
-{-| TODO Add documentation
--}
-serializeNode : Term compatible -> String
-serializeNode (Term variant) =
-    Internal.serializeVariant variant
-
-
-{-| TODO Add documentation
--}
-type alias SerializeConfig =
-    { base : Maybe String
-    , prefixes : List ( String, String )
-    }
-
-
-{-| TODO Add documentation
--}
-serializeNodeTurtle : SerializeConfig -> Term compatible -> String
-serializeNodeTurtle config (Term variant) =
-    serializeNodeTurtleHelp config variant
-
-
-{-| TODO Add documentation
--}
-serializeNodeTurtleHelp : SerializeConfig -> Variant -> String
-serializeNodeTurtleHelp config variant =
-    case variant of
-        BlankNode value ->
-            "_:" ++ value
-
-        Iri url ->
-            if url == "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" then
-                "a"
-
-            else
-                case config.base of
-                    Nothing ->
-                        case List.find (\( _, value ) -> String.startsWith value url) config.prefixes of
-                            Nothing ->
-                                "<" ++ url ++ ">"
-
-                            Just ( prefix, value ) ->
-                                prefix ++ ":" ++ String.rightOf value url
-
-                    Just base ->
-                        if String.startsWith base url then
-                            "<" ++ String.rightOf base url ++ ">"
-
-                        else
-                            case List.find (\( _, value ) -> String.startsWith value url) config.prefixes of
-                                Nothing ->
-                                    "<" ++ url ++ ">"
-
-                                Just ( prefix, value ) ->
-                                    prefix ++ ":" ++ String.rightOf value url
-
-        Literal data ->
-            let
-                replaceLineBreaks : String -> String
-                replaceLineBreaks =
-                    String.replace "\n" "\\n"
-
-                replaceQuotes : String -> String
-                replaceQuotes =
-                    String.replace "\"" "\\\""
-            in
-            if data.datatype == urlXsdString then
-                [ "\""
-                , data.value
-                    |> replaceLineBreaks
-                    |> replaceQuotes
-                , "\""
-                , case data.languageTag of
-                    Nothing ->
-                        ""
-
-                    Just languageTag ->
-                        "@" ++ languageTag
-                ]
-                    |> String.concat
-
-            else if
-                (data.datatype == urlXsdInteger)
-                    || (data.datatype == urlXsdInt)
-            then
-                data.value
-
-            else
-                [ "\""
-                , data.value
-                    |> replaceLineBreaks
-                    |> replaceQuotes
-                , "\""
-                , case data.languageTag of
-                    Nothing ->
-                        "^^" ++ serializeNodeTurtle config (iri data.datatype)
-
-                    Just languageTag ->
-                        "@" ++ languageTag
-                ]
-                    |> String.concat
-
-
-{-| TODO Add documentation
--}
-serializeTriple : Triple -> String
-serializeTriple { subject, predicate, object } =
-    [ serializeNode subject
-    , serializeNode predicate
-    , serializeNode object
-    , "."
-    ]
-        |> String.join " "
-
-
-
 -- STRING OR LANG STRING
 
 
@@ -1248,7 +1517,12 @@ type StringOrLangString
 
 {-| TODO Add documention
 -}
-stringOrLangStringInfo : StringOrLangString -> { string : Maybe String, langStrings : Dict String String }
+stringOrLangStringInfo :
+    StringOrLangString
+    ->
+        { string : Maybe String
+        , langStrings : Dict String String
+        }
 stringOrLangStringInfo (StringOrLangString stringOrLangString) =
     stringOrLangString
 
@@ -1301,15 +1575,148 @@ mergeStringOrLangStrings stringOrLangStrings =
     else
         { string =
             stringOrLangStrings
-                |> List.filterMap (\(StringOrLangString stringOrLangString) -> stringOrLangString.string)
+                |> List.filterMap
+                    (\(StringOrLangString stringOrLangString) -> stringOrLangString.string)
                 |> List.head
         , langStrings =
             stringOrLangStrings
-                |> List.map (\(StringOrLangString stringOrLangString) -> stringOrLangString.langStrings)
+                |> List.map
+                    (\(StringOrLangString stringOrLangString) -> stringOrLangString.langStrings)
                 |> List.foldr Dict.union Dict.empty
         }
             |> StringOrLangString
             |> Just
+
+
+
+-- SERIALIZE
+
+
+{-| Serialize a [`Term`](#Term) into how it would be represented in the
+[Turtle](https://www.w3.org/TR/turtle/) format or in
+[SPARQL](https://www.w3.org/TR/sparql11-query/).
+-}
+serialize : Term compatible -> String
+serialize (Term variant) =
+    Internal.serializeVariant variant
+
+
+{-| Serialize a [`Term`](#Term) within the context of
+a [`Prologue`](#Prologue).
+-}
+serializeWith : Prologue -> Term compatible -> String
+serializeWith config (Term variant) =
+    serializeWithHelp config variant
+
+
+{-| A `Prologue` captures the `base` and `prefixes` which are used to
+shorten the serialization of [`Term`](#Term)'s.
+-}
+type alias Prologue =
+    { base : Maybe String
+    , prefixes : List ( String, String )
+    }
+
+
+serializeWithHelp : Prologue -> Variant -> String
+serializeWithHelp config variant =
+    case variant of
+        Iri url ->
+            if url == "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" then
+                "a"
+
+            else
+                case config.base of
+                    Nothing ->
+                        case
+                            List.find
+                                (\( _, value ) -> String.startsWith value url)
+                                config.prefixes
+                        of
+                            Nothing ->
+                                "<" ++ url ++ ">"
+
+                            Just ( prefix, value ) ->
+                                prefix ++ ":" ++ String.rightOf value url
+
+                    Just base ->
+                        if String.startsWith base url then
+                            "<" ++ String.rightOf base url ++ ">"
+
+                        else
+                            case
+                                List.find
+                                    (\( _, value ) -> String.startsWith value url)
+                                    config.prefixes
+                            of
+                                Nothing ->
+                                    "<" ++ url ++ ">"
+
+                                Just ( prefix, value ) ->
+                                    prefix ++ ":" ++ String.rightOf value url
+
+        Literal data ->
+            let
+                replaceLineBreaks : String -> String
+                replaceLineBreaks =
+                    String.replace "\n" "\\n"
+
+                replaceQuotes : String -> String
+                replaceQuotes =
+                    String.replace "\"" "\\\""
+            in
+            if data.datatype == urlXsdString then
+                [ "\""
+                , data.value
+                    |> replaceLineBreaks
+                    |> replaceQuotes
+                , "\""
+                , case data.languageTag of
+                    Nothing ->
+                        ""
+
+                    Just languageTag ->
+                        "@" ++ languageTag
+                ]
+                    |> String.concat
+
+            else if
+                (data.datatype == urlXsdInteger)
+                    || (data.datatype == urlXsdInt)
+            then
+                data.value
+
+            else
+                [ "\""
+                , data.value
+                    |> replaceLineBreaks
+                    |> replaceQuotes
+                , "\""
+                , case data.languageTag of
+                    Nothing ->
+                        "^^" ++ serializeWith config (iri data.datatype)
+
+                    Just languageTag ->
+                        "@" ++ languageTag
+                ]
+                    |> String.concat
+
+        _ ->
+            Internal.serializeVariant variant
+
+
+{-| Serialize a [`Triple`](#Triple) into how it would be represented in the
+[Turtle](https://www.w3.org/TR/turtle/) format or in
+[SPARQL](https://www.w3.org/TR/sparql11-query/).
+-}
+serializeTriple : Triple -> String
+serializeTriple { subject, predicate, object } =
+    [ serialize subject
+    , serialize predicate
+    , serialize object
+    , "."
+    ]
+        |> String.join " "
 
 
 
@@ -1341,7 +1748,7 @@ predicateDecoder =
         |> Decode.map Term
 
 
-objectDecoder : Decoder BlankNodeOrIriOrAnyLiteral
+objectDecoder : Decoder BlankNodeOrIriOrLiteral
 objectDecoder =
     [ blankNodeDecoder
     , literalDecoder
@@ -1441,6 +1848,9 @@ encodeSubject (Term variant) =
         Literal _ ->
             Encode.null
 
+        _ ->
+            Encode.null
+
 
 encodePredicate : Iri -> Value
 encodePredicate (Term variant) =
@@ -1454,8 +1864,11 @@ encodePredicate (Term variant) =
         Literal _ ->
             Encode.null
 
+        _ ->
+            Encode.null
 
-encodeObject : BlankNodeOrIriOrAnyLiteral -> Value
+
+encodeObject : BlankNodeOrIriOrLiteral -> Value
 encodeObject (Term variant) =
     case variant of
         BlankNode name ->
@@ -1466,6 +1879,9 @@ encodeObject (Term variant) =
 
         Literal data ->
             encodeLiteral data
+
+        _ ->
+            Encode.null
 
 
 encodeBlankNode : String -> Value
@@ -1503,7 +1919,6 @@ encodeLiteral data =
 
 
 -- CONSTANTS
--- URLS
 
 
 urlXsdString : String

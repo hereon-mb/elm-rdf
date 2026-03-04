@@ -92,9 +92,8 @@ typing `Node`s.
 
 -}
 
-import Internal.Term exposing (Term)
 import List.NonEmpty as NonEmpty
-import Rdf
+import Rdf exposing (IsBlankNodeOrIriOrLiteral, Literal)
 import Rdf.Encode.Bunch as Bunch
 import Rdf.Graph as Rdf exposing (Graph, Seed)
 import Rdf.Predicate as Predicate
@@ -128,7 +127,7 @@ type alias Subject =
 {-| TODO
 -}
 type alias Object =
-    Rdf.BlankNodeOrIriOrAnyLiteral
+    Rdf.BlankNodeOrIriOrLiteral
 
 
 {-| TODO
@@ -331,7 +330,7 @@ predicate p (Encoder encoder) =
                     ( Rdf.insert
                         subject
                         (Rdf.asIri p)
-                        (Rdf.asBlankNodeOrIriOrAnyLiteral objectNew)
+                        (Rdf.asBlankNodeOrIriOrLiteral objectNew)
                         graphObject
                     , seedUpdated
                     )
@@ -350,7 +349,7 @@ predicate p (Encoder encoder) =
 inverse : Predicate -> IsGraphOrLiteralEncoder object -> PropertyEncoder
 inverse p (Encoder encoder) =
     let
-        encoderNew : Seed -> Term compatible -> ( Graph, Seed )
+        encoderNew : Seed -> IsBlankNodeOrIriOrLiteral compatible -> ( Graph, Seed )
         encoderNew seed subject =
             case encoder of
                 GraphEncoder f ->
@@ -361,7 +360,7 @@ inverse p (Encoder encoder) =
                     ( Rdf.insert
                         objectNew
                         (Rdf.asIri p)
-                        (Rdf.asBlankNodeOrIriOrAnyLiteral subject)
+                        (Rdf.asBlankNodeOrIriOrLiteral subject)
                         graphObject
                     , seedUpdated
                     )
@@ -379,7 +378,7 @@ inverse p (Encoder encoder) =
 
 {-| TODO
 -}
-object : Rdf.IsBlankNodeOrIriOrAnyLiteral compatible -> LiteralEncoder
+object : Rdf.IsBlankNodeOrIriOrLiteral compatible -> LiteralEncoder
 object object_ =
     Encoder
         (LiteralEncoder
@@ -391,16 +390,16 @@ object object_ =
 
 {-| TODO
 -}
-literal : Rdf.Literal a -> LiteralEncoder
+literal : Literal -> LiteralEncoder
 literal =
-    object << Rdf.asBlankNodeOrIriOrAnyLiteral
+    object << Rdf.asBlankNodeOrIriOrLiteral
 
 
 {-| TODO
 -}
 iri : Rdf.Iri -> LiteralEncoder
 iri =
-    object << Rdf.asBlankNodeOrIriOrAnyLiteral
+    object << Rdf.asBlankNodeOrIriOrLiteral
 
 
 {-| TODO

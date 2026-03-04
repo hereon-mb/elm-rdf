@@ -59,19 +59,19 @@ import Rdf
     exposing
         ( BlankNode
         , BlankNodeOrIri
-        , BlankNodeOrIriOrAnyLiteral
+        , BlankNodeOrIriOrLiteral
         , Iri
         , IsBlankNodeOrIri
+        , IsBlankNodeOrIriOrLiteral
         , IsIri
-        , SerializeConfig
+        , Prologue
         , Triple
         , asBlankNodeOrIri
-        , asBlankNodeOrIriOrAnyLiteral
+        , asBlankNodeOrIriOrLiteral
         , asIri
         , encodeTriple
-        , serializeNode
-        , serializeNodeTurtle
         , serializeTriple
+        , serializeWith
         , toBlankNodeOrIri
         , tripleDecoder
         )
@@ -152,12 +152,16 @@ emptyGraph =
 
 {-| TODO Add documentation
 -}
-singleton : IsBlankNodeOrIri compatible1 -> IsIri compatible2 -> Term compatible3 -> Graph
+singleton :
+    IsBlankNodeOrIri compatible1
+    -> IsIri compatible2
+    -> IsBlankNodeOrIriOrLiteral compatible3
+    -> Graph
 singleton subject predicate object =
     fromTriples
         [ { subject = asBlankNodeOrIri subject
           , predicate = asIri predicate
-          , object = asBlankNodeOrIriOrAnyLiteral object
+          , object = asBlankNodeOrIriOrLiteral object
           }
         ]
 
@@ -251,29 +255,34 @@ seedGenerator =
 
 {-| TODO Add documentation
 -}
-insert : IsBlankNodeOrIri compatible1 -> IsIri compatible2 -> Term compatible3 -> Graph -> Graph
+insert :
+    IsBlankNodeOrIri compatible1
+    -> IsIri compatible2
+    -> IsBlankNodeOrIriOrLiteral compatible3
+    -> Graph
+    -> Graph
 insert subject predicate object (Graph graph) =
     let
         keySubject : String
         keySubject =
-            serializeNode subject
+            Rdf.serialize subject
 
         keyPredicate : String
         keyPredicate =
-            serializeNode predicate
+            Rdf.serialize predicate
 
         triple : Triple
         triple =
             { subject = asBlankNodeOrIri subject
             , predicate = asIri predicate
-            , object = asBlankNodeOrIriOrAnyLiteral object
+            , object = Rdf.asBlankNodeOrIriOrLiteral object
             }
     in
     Graph
         { graph
             | triples = triple :: graph.triples
             , subjects = asBlankNodeOrIri subject :: graph.subjects
-            , objects = asBlankNodeOrIriOrAnyLiteral object :: graph.objects
+            , objects = asBlankNodeOrIriOrLiteral object :: graph.objects
             , bySubjectByPredicate =
                 Dict.update keySubject
                     (Maybe.map
@@ -305,7 +314,13 @@ insert subject predicate object (Graph graph) =
 
 {-| TODO Add documentation
 -}
-insertAt : IsBlankNodeOrIri compatible1 -> PropertyPath -> Term compatible2 -> Graph -> Seed -> ( Graph, Seed )
+insertAt :
+    IsBlankNodeOrIri compatible1
+    -> PropertyPath
+    -> IsBlankNodeOrIriOrLiteral compatible2
+    -> Graph
+    -> Seed
+    -> ( Graph, Seed )
 insertAt subject path object graph seed =
     case path of
         PredicatePath predicate ->
@@ -319,10 +334,18 @@ insertAt subject path object graph seed =
                             generateBlankNode seed
                     in
                     ( insert subject predicate idFocusNodeNext graph, seedUpdated )
-                        |> Tuple.apply (insertAtNext propertyPaths object (asBlankNodeOrIri idFocusNodeNext))
+                        |> Tuple.apply
+                            (insertAtNext propertyPaths
+                                object
+                                (asBlankNodeOrIri idFocusNodeNext)
+                            )
 
                 Just idFocusNodeNext ->
-                    insertAtNext propertyPaths object (asBlankNodeOrIri idFocusNodeNext) graph seed
+                    insertAtNext propertyPaths
+                        object
+                        (asBlankNodeOrIri idFocusNodeNext)
+                        graph
+                        seed
 
         InversePath (PredicatePath predicate) ->
             case toBlankNodeOrIri object of
@@ -331,13 +354,25 @@ insertAt subject path object graph seed =
                     ( graph, seed )
 
                 Just blankNodeOrIri ->
-                    ( insert blankNodeOrIri predicate subject graph, seed )
+                    ( insert
+                        blankNodeOrIri
+                        predicate
+                        (Rdf.asBlankNodeOrIri subject)
+                        graph
+                    , seed
+                    )
 
         _ ->
             ( graph, seed )
 
 
-insertAtNext : List PropertyPath -> Term compatible2 -> IsBlankNodeOrIri compatible1 -> Graph -> Seed -> ( Graph, Seed )
+insertAtNext :
+    List PropertyPath
+    -> IsBlankNodeOrIriOrLiteral compatible2
+    -> IsBlankNodeOrIri compatible1
+    -> Graph
+    -> Seed
+    -> ( Graph, Seed )
 insertAtNext propertyPaths object idFocusNodeNext graphNext seedNext =
     case propertyPaths of
         [] ->
@@ -364,12 +399,12 @@ getBlankNodeOrIriObject subject predicate (Graph graph) =
             Nothing
 
 
-followPropertyPath : Data -> Iri -> IsBlankNodeOrIri compatible -> List BlankNodeOrIriOrAnyLiteral
+followPropertyPath : Data -> Iri -> IsBlankNodeOrIri compatible -> List BlankNodeOrIriOrLiteral
 followPropertyPath data predicate subject =
     data.bySubjectByPredicate
-        |> Dict.get (serializeNode subject)
+        |> Dict.get (Rdf.serialize subject)
         |> Maybe.withDefault Dict.empty
-        |> Dict.get (serializeNode predicate)
+        |> Dict.get (Rdf.serialize predicate)
         |> Maybe.withDefault []
         |> List.map .object
 
@@ -421,7 +456,7 @@ serializeTurtle (Graph data) =
                         let
                             key : String
                             key =
-                                serializeNode object
+                                Rdf.serialize object
                         in
                         if Set.member key notInlined then
                             ( inlined, notInlined )
@@ -477,7 +512,7 @@ serializeTurtle (Graph data) =
 
                         Just { subject } ->
                             Just
-                                (serializeNodeTurtle config subject
+                                (serializeWith config subject
                                     ++ "\n"
                                     ++ serializePredicateObjects config
                                         data.bySubjectByPredicate
@@ -491,7 +526,7 @@ serializeTurtle (Graph data) =
 
 
 serializePredicateObjects :
-    SerializeConfig
+    Prologue
     -> Dict String (Dict String (List Triple))
     -> Set String
     -> List (List Triple)
@@ -607,7 +642,7 @@ indent text =
 
 
 serializePredicateObjectWith :
-    SerializeConfig
+    Prologue
     -> Dict String (Dict String (List Triple))
     -> Set String
     -> Triple
@@ -616,13 +651,13 @@ serializePredicateObjectWith config bySubjectByPredicate inlinedSubjects { predi
     let
         keyObject : String
         keyObject =
-            serializeNode object
+            Rdf.serialize object
     in
-    [ serializeNodeTurtle config predicate
+    [ serializeWith config predicate
     , if Set.member keyObject inlinedSubjects then
         case Dict.get keyObject bySubjectByPredicate of
             Nothing ->
-                serializeNodeTurtle config object
+                serializeWith config object
 
             Just predicateObjects ->
                 "[\n"
@@ -635,7 +670,7 @@ serializePredicateObjectWith config bySubjectByPredicate inlinedSubjects { predi
                         )
 
       else
-        serializeNodeTurtle config object
+        serializeWith config object
     ]
         |> String.join " "
 
@@ -1019,7 +1054,7 @@ collectObject object state =
     case object of
         Turtle.ObjectIri iri ->
             resolveIri state iri
-                |> Result.andThen (\url -> addTriple (asBlankNodeOrIriOrAnyLiteral (Rdf.iri url)) state)
+                |> Result.andThen (\url -> addTriple (asBlankNodeOrIriOrLiteral (Rdf.iri url)) state)
 
         Turtle.ObjectBlankNode (Turtle.BlankNodeLabel label) ->
             case Dict.get label state.blankNodes of
@@ -1028,25 +1063,25 @@ collectObject object state =
                         ( node, seed ) =
                             generateBlankNode state.seed
                     in
-                    addTriple (asBlankNodeOrIriOrAnyLiteral node)
+                    addTriple (asBlankNodeOrIriOrLiteral node)
                         { state
                             | seed = seed
                             , blankNodes = Dict.insert label node state.blankNodes
                         }
 
                 Just node ->
-                    addTriple (asBlankNodeOrIriOrAnyLiteral node) state
+                    addTriple (asBlankNodeOrIriOrLiteral node) state
 
         Turtle.ObjectBlankNode Turtle.Anon ->
             let
                 ( node, seed ) =
                     generateBlankNode state.seed
             in
-            addTriple (asBlankNodeOrIriOrAnyLiteral node) { state | seed = seed }
+            addTriple (asBlankNodeOrIriOrLiteral node) { state | seed = seed }
 
         Turtle.ObjectCollection objects ->
             if List.isEmpty objects then
-                addTriple (asBlankNodeOrIriOrAnyLiteral (rdf "nil")) state
+                addTriple (asBlankNodeOrIriOrLiteral (rdf "nil")) state
 
             else
                 let
@@ -1054,7 +1089,7 @@ collectObject object state =
                         generateBlankNode state.seed
                 in
                 { state | seed = seedFirst }
-                    |> addTriple (asBlankNodeOrIriOrAnyLiteral nodeFirst)
+                    |> addTriple (asBlankNodeOrIriOrLiteral nodeFirst)
                     |> Result.andThen (addCollection nodeFirst objects)
 
         Turtle.ObjectBlankNodePropertyList predicateObjects ->
@@ -1071,35 +1106,35 @@ collectObject object state =
                         }
                     )
                 |> Result.map dropSubject
-                |> Result.andThen (addTriple (asBlankNodeOrIriOrAnyLiteral node))
+                |> Result.andThen (addTriple (asBlankNodeOrIriOrLiteral node))
 
         Turtle.ObjectLiteral (Turtle.LiteralString value) ->
-            addTriple (asBlankNodeOrIriOrAnyLiteral (Rdf.string value)) state
+            addTriple (asBlankNodeOrIriOrLiteral (Rdf.string value)) state
 
         Turtle.ObjectLiteral (Turtle.LiteralLangString value lang) ->
-            addTriple (asBlankNodeOrIriOrAnyLiteral (Rdf.langString lang value)) state
+            addTriple (asBlankNodeOrIriOrLiteral (Rdf.langString lang value)) state
 
         Turtle.ObjectLiteral (Turtle.LiteralTyped value datatype) ->
             resolveIri state datatype
-                |> Result.andThen (\url -> addTriple (asBlankNodeOrIriOrAnyLiteral (Rdf.literal (Rdf.iri url) value)) state)
+                |> Result.andThen (\url -> addTriple (asBlankNodeOrIriOrLiteral (Rdf.literal (Rdf.iri url) value)) state)
 
         Turtle.ObjectLiteral (Turtle.LiteralInteger value) ->
-            addTriple (asBlankNodeOrIriOrAnyLiteral (Rdf.integer value)) state
+            addTriple (asBlankNodeOrIriOrLiteral (Rdf.integer value)) state
 
         Turtle.ObjectLiteral (Turtle.LiteralDecimal value) ->
-            addTriple (asBlankNodeOrIriOrAnyLiteral (Rdf.literal (xsd "decimal") value)) state
+            addTriple (asBlankNodeOrIriOrLiteral (Rdf.literal (xsd "decimal") value)) state
 
         Turtle.ObjectLiteral (Turtle.LiteralDouble value) ->
-            addTriple (asBlankNodeOrIriOrAnyLiteral (Rdf.literal (xsd "double") (String.fromFloat value))) state
+            addTriple (asBlankNodeOrIriOrLiteral (Rdf.literal (xsd "double") (String.fromFloat value))) state
 
         Turtle.ObjectLiteral Turtle.LiteralTrue ->
-            addTriple (asBlankNodeOrIriOrAnyLiteral (Rdf.bool True)) state
+            addTriple (asBlankNodeOrIriOrLiteral (Rdf.boolean True)) state
 
         Turtle.ObjectLiteral Turtle.LiteralFalse ->
-            addTriple (asBlankNodeOrIriOrAnyLiteral (Rdf.bool False)) state
+            addTriple (asBlankNodeOrIriOrLiteral (Rdf.boolean False)) state
 
 
-addTriple : BlankNodeOrIriOrAnyLiteral -> State -> Result Error State
+addTriple : BlankNodeOrIriOrLiteral -> State -> Result Error State
 addTriple object state =
     Result.map3 Triple
         (Result.fromMaybe MissingSubject (List.head state.subjects))
@@ -1112,7 +1147,7 @@ addCollection : BlankNode -> List Turtle.Object -> State -> Result Error State
 addCollection nodeFirst objects state =
     case List.reverse objects of
         [] ->
-            addTriple (asBlankNodeOrIriOrAnyLiteral (rdf "nil")) state
+            addTriple (asBlankNodeOrIriOrLiteral (rdf "nil")) state
 
         last :: rest ->
             rest
@@ -1137,7 +1172,7 @@ addCollection nodeFirst objects state =
                                             (\stateNextNext ->
                                                 { stateNextNext | predicates = rdf "rest" :: stateNextNext.predicates }
                                             )
-                                        |> Result.andThen (addTriple (asBlankNodeOrIriOrAnyLiteral nodeNext))
+                                        |> Result.andThen (addTriple (asBlankNodeOrIriOrLiteral nodeNext))
                                         |> Result.map dropPredicate
                                         |> Result.map dropSubject
                                         |> Result.map (Tuple.pair nodeNext)
@@ -1156,7 +1191,7 @@ addCollection nodeFirst objects state =
                                 (\stateNextNext ->
                                     { stateNextNext | predicates = rdf "rest" :: stateNextNext.predicates }
                                 )
-                            |> Result.andThen (addTriple (asBlankNodeOrIriOrAnyLiteral (rdf "nil")))
+                            |> Result.andThen (addTriple (asBlankNodeOrIriOrLiteral (rdf "nil")))
                             |> Result.map dropPredicate
                             |> Result.map dropSubject
                     )
@@ -1256,12 +1291,12 @@ fromTriples triples =
 
 annotateWithIriSubject : Triple -> ( String, Triple )
 annotateWithIriSubject triple =
-    ( serializeNode triple.subject, triple )
+    ( Rdf.serialize triple.subject, triple )
 
 
 annotateWithIriPredicate : Triple -> ( String, Triple )
 annotateWithIriPredicate triple =
-    ( serializeNode triple.predicate, triple )
+    ( Rdf.serialize triple.predicate, triple )
 
 
 groupByTupleFirst : List ( comparable, a ) -> List ( ( comparable, a ), List ( comparable, a ) )
@@ -1341,7 +1376,7 @@ renameBlankNodesHelp triples step =
                                     | triples =
                                         { subject = Rdf.asBlankNodeOrIri nodeSubject
                                         , predicate = triple.predicate
-                                        , object = Rdf.asBlankNodeOrIriOrAnyLiteral nodeObject
+                                        , object = Rdf.asBlankNodeOrIriOrLiteral nodeObject
                                         }
                                             :: stepAfterObject.triples
                                 }
@@ -1369,7 +1404,7 @@ renameBlankNodesHelp triples step =
                                     | triples =
                                         { subject = triple.subject
                                         , predicate = triple.predicate
-                                        , object = Rdf.asBlankNodeOrIriOrAnyLiteral nodeObject
+                                        , object = Rdf.asBlankNodeOrIriOrLiteral nodeObject
                                         }
                                             :: stepAfterObject.triples
                                 }

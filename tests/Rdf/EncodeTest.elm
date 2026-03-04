@@ -3,7 +3,7 @@ module Rdf.EncodeTest exposing (suite)
 import Expect exposing (Expectation)
 import Rdf
 import Rdf.Encode as Encode exposing (GraphEncoder)
-import Rdf.Graph as Rdf
+import Rdf.Graph as Graph
 import Rdf.PropertyPath as Rdf
 import Test exposing (Test, describe, test)
 
@@ -161,7 +161,7 @@ hasValue =
     Rdf.PredicatePath (base "hasValue")
 
 
-valueValue : Rdf.Literal Int
+valueValue : Rdf.Literal
 valueValue =
     Rdf.integer 1
 
@@ -186,7 +186,7 @@ hasConstant =
     Rdf.PredicatePath (base "hasConstant")
 
 
-valueConstant : Rdf.Literal String
+valueConstant : Rdf.Literal
 valueConstant =
     Rdf.string "something"
 
@@ -202,12 +202,12 @@ expectGraph raw encoder =
             """
     in
     encoder
-        |> Encode.encode Rdf.initialSeed
+        |> Encode.encode Graph.initialSeed
         |> Tuple.first
-        |> Rdf.serialize
+        |> Graph.serialize
         |> Ok
         |> Expect.equal
             ((prefix ++ raw)
-                |> Rdf.parse
-                |> Result.map Rdf.serialize
+                |> Graph.parse
+                |> Result.map Graph.serialize
             )

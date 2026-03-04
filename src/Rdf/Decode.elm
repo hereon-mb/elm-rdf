@@ -1,7 +1,7 @@
 module Rdf.Decode exposing
     ( Decoder
     , iri
-    , blankNodeOrIri, anyLiteral, blankNodeOrIriOrAnyLiteral
+    , blankNodeOrIri, anyLiteral, blankNodeOrIriOrLiteral
     , object
     , literal
     , string, stringOrLangString
@@ -47,7 +47,7 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 @docs Decoder
 
 @docs iri
-@docs blankNodeOrIri, anyLiteral, blankNodeOrIriOrAnyLiteral
+@docs blankNodeOrIri, anyLiteral, blankNodeOrIriOrLiteral
 @docs object
 
 @docs literal
@@ -116,11 +116,13 @@ import Maybe.Extra as Maybe
 import Rdf
     exposing
         ( BlankNodeOrIri
-        , BlankNodeOrIriOrAnyLiteral
+        , BlankNodeOrIriOrLiteral
         , Iri
         , IsBlankNodeOrIri
-        , IsBlankNodeOrIriOrAnyLiteral
+        , IsBlankNodeOrIriOrLiteral
         , IsIri
+        , Literal
+        , Triple
         )
 import Rdf.Namespaces as Rdf exposing (rdf)
 import Rdf.PropertyPath as Rdf exposing (PropertyPath)
@@ -186,7 +188,7 @@ indexedMany toDecoder =
 type Decoder a
     = Decoder
         (State
-         -> Result Error (List BlankNodeOrIriOrAnyLiteral)
+         -> Result Error (List BlankNodeOrIriOrLiteral)
          -> Result Error a
         )
 
@@ -199,14 +201,14 @@ type alias State =
 
 {-| TODO Add documentation
 -}
-at : List BlankNodeOrIriOrAnyLiteral -> Decoder a -> Decoder a
+at : List BlankNodeOrIriOrLiteral -> Decoder a -> Decoder a
 at nodes (Decoder f) =
     Decoder (\graph _ -> f graph (Ok nodes))
 
 
 {-| TODO Add documentation
 -}
-object : Decoder BlankNodeOrIriOrAnyLiteral
+object : Decoder BlankNodeOrIriOrLiteral
 object =
     Decoder
         (\state ->
@@ -228,14 +230,19 @@ object =
 {-| TODO Add documentation
 -}
 from : IsBlankNodeOrIri compatible -> Decoder a -> Decoder a
-from nodeFocus (Decoder f) =
+from nodeFocusCompatible (Decoder f) =
+    let
+        nodeFocus : BlankNodeOrIri
+        nodeFocus =
+            Rdf.asBlankNodeOrIri nodeFocusCompatible
+    in
     Decoder
         (\state _ ->
             if
                 hasTripleWithSubject nodeFocus state.graph
                     || hasTripleWithObject nodeFocus state.graph
             then
-                f state (Ok [ Rdf.asBlankNodeOrIriOrAnyLiteral nodeFocus ])
+                f state (Ok [ Rdf.asBlankNodeOrIriOrLiteral nodeFocus ])
 
             else
                 Err
@@ -253,7 +260,7 @@ fromSubject (Decoder f) =
         (\state _ ->
             state.graph
                 |> getSubjects
-                |> List.map Rdf.asBlankNodeOrIriOrAnyLiteral
+                |> List.map Rdf.asBlankNodeOrIriOrLiteral
                 |> Ok
                 |> f state
         )
@@ -287,12 +294,12 @@ type alias Error =
 [`errorToString`](#errorToString) to turn this into a human-friendly form.
 -}
 type Problem
-    = InvalidDate BlankNodeOrIriOrAnyLiteral
-    | InvalidDateTime BlankNodeOrIriOrAnyLiteral
-    | ExpectedBlankNode BlankNodeOrIriOrAnyLiteral
-    | ExpectedIri BlankNodeOrIriOrAnyLiteral
-    | ExpectedBlankNodeOrIri BlankNodeOrIriOrAnyLiteral
-    | ExpectedAnyLiteral BlankNodeOrIriOrAnyLiteral
+    = InvalidDate BlankNodeOrIriOrLiteral
+    | InvalidDateTime BlankNodeOrIriOrLiteral
+    | ExpectedBlankNode BlankNodeOrIriOrLiteral
+    | ExpectedIri BlankNodeOrIriOrLiteral
+    | ExpectedBlankNodeOrIri BlankNodeOrIriOrLiteral
+    | ExpectedLiteral BlankNodeOrIriOrLiteral
     | ExpectedBool String
     | ExpectedInt String
     | ExpectedFloat String
@@ -304,10 +311,10 @@ type Problem
     | UnexpectedEmptyList
     | CustomError String
     | Failure String
-    | FailureAt String (List BlankNodeOrIriOrAnyLiteral)
+    | FailureAt String (List BlankNodeOrIriOrLiteral)
     | Batch (List Error)
-    | TooManyNodes (List Rdf.BlankNodeOrIriOrAnyLiteral)
-    | MissingLangString Rdf.AnyLiteral
+    | TooManyNodes (List BlankNodeOrIriOrLiteral)
+    | MissingLangString Literal
     | TooManyStrings (List String)
     | NodeDoesNotExist BlankNodeOrIri
     | NoFocusNode
@@ -351,16 +358,16 @@ problemToString problem =
                 ++ "."
 
         ExpectedBlankNode nodeFound ->
-            "Expected a blank node, but found " ++ Rdf.serializeNode nodeFound ++ "."
+            "Expected a blank node, but found " ++ Rdf.serialize nodeFound ++ "."
 
         ExpectedIri nodeFound ->
-            "Expected an IRI, but found " ++ Rdf.serializeNode nodeFound ++ "."
+            "Expected an IRI, but found " ++ Rdf.serialize nodeFound ++ "."
 
         ExpectedBlankNodeOrIri nodeFound ->
-            "Expected a blank node or an IRI, but found " ++ Rdf.serializeNode nodeFound ++ "."
+            "Expected a blank node or an IRI, but found " ++ Rdf.serialize nodeFound ++ "."
 
-        ExpectedAnyLiteral nodeFound ->
-            "Expected a literal, but found " ++ Rdf.serializeNode nodeFound ++ "."
+        ExpectedLiteral nodeFound ->
+            "Expected a literal, but found " ++ Rdf.serialize nodeFound ++ "."
 
         ExpectedBool found ->
             "Expected a boolean, but found " ++ found ++ "."
@@ -375,18 +382,18 @@ problemToString problem =
             "No such property "
                 ++ Rdf.serializePropertyPath pathExpected
                 ++ " found at "
-                ++ Rdf.serializeNode nodeFocus
+                ++ Rdf.serialize nodeFocus
                 ++ "."
 
         PropertyPresent nodeFocus pathExpected ->
             "Found object for property "
                 ++ Rdf.serializePropertyPath pathExpected
                 ++ " at "
-                ++ Rdf.serializeNode nodeFocus
+                ++ Rdf.serialize nodeFocus
                 ++ "."
 
         NoProperty nodeFocus ->
-            "No property found at " ++ Rdf.serializeNode nodeFocus ++ "."
+            "No property found at " ++ Rdf.serialize nodeFocus ++ "."
 
         AtPropertyPath path errorNested ->
             "Problem with the value at "
@@ -407,7 +414,7 @@ problemToString problem =
             String.join "\n"
                 [ "Problem with the given value at"
                 , ""
-                , indent (String.join ",\n" (List.map Rdf.serializeNode nodes))
+                , indent (String.join ",\n" (List.map Rdf.serialize nodes))
                 , ""
                 , msg
                 ]
@@ -428,12 +435,12 @@ problemToString problem =
             "I expected a single node, but I found multiple:\n"
                 ++ indent
                     (String.join "\n"
-                        (List.map Rdf.serializeNode nodesFound)
+                        (List.map Rdf.serialize nodesFound)
                     )
 
         MissingLangString nodeFound ->
             "I expected a lang string, but I found "
-                ++ Rdf.serializeNode nodeFound
+                ++ Rdf.serialize nodeFound
                 ++ "."
 
         TooManyStrings stringsFound ->
@@ -443,7 +450,7 @@ problemToString problem =
 
         NodeDoesNotExist node ->
             "The node "
-                ++ Rdf.serializeNode node
+                ++ Rdf.serialize node
                 ++ " does not exist."
 
         NoFocusNode ->
@@ -470,7 +477,7 @@ blankNode (Decoder f) =
                         [ node ] ->
                             case Rdf.toBlankNode node of
                                 Just nodeNext ->
-                                    Ok [ Rdf.asBlankNodeOrIriOrAnyLiteral nodeNext ]
+                                    Ok [ Rdf.asBlankNodeOrIriOrLiteral nodeNext ]
                                         |> f state
 
                                 Nothing ->
@@ -490,7 +497,7 @@ blankNode (Decoder f) =
 
 {-| TODO
 -}
-subject : Decoder Rdf.BlankNodeOrIriOrAnyLiteral
+subject : Decoder BlankNodeOrIriOrLiteral
 subject =
     Decoder
         (\state ->
@@ -556,11 +563,11 @@ blankNodeOrIri =
 
 {-| TODO Add documentation
 -}
-blankNodeOrIriOrAnyLiteral : Decoder BlankNodeOrIriOrAnyLiteral
-blankNodeOrIriOrAnyLiteral =
+blankNodeOrIriOrLiteral : Decoder BlankNodeOrIriOrLiteral
+blankNodeOrIriOrLiteral =
     oneOf
-        [ map Rdf.asBlankNodeOrIriOrAnyLiteral iri
-        , map Rdf.asBlankNodeOrIriOrAnyLiteral
+        [ map Rdf.asBlankNodeOrIriOrLiteral iri
+        , map Rdf.asBlankNodeOrIriOrLiteral
             (blankNode
                 (subject
                     |> andThen
@@ -572,7 +579,7 @@ blankNodeOrIriOrAnyLiteral =
                         )
                 )
             )
-        , map Rdf.asBlankNodeOrIriOrAnyLiteral anyLiteral
+        , map Rdf.asBlankNodeOrIriOrLiteral anyLiteral
         ]
 
 
@@ -837,16 +844,10 @@ iri =
                     case nodes of
                         [ node ] ->
                             case node of
-                                Term (BlankNode _) ->
-                                    Err
-                                        { error = ExpectedIri node
-                                        , contextStack = state.context
-                                        }
-
                                 Term ((Iri _) as variant) ->
                                     Ok (Term variant)
 
-                                Term (Literal _) ->
+                                Term _ ->
                                     Err
                                         { error = ExpectedIri node
                                         , contextStack = state.context
@@ -918,13 +919,7 @@ list (Decoder f) =
                             Term ((BlankNode _) as variant) ->
                                 Ok (Term variant)
 
-                            Term (Iri _) ->
-                                Err
-                                    { error = ExpectedBlankNode node
-                                    , contextStack = state.context
-                                    }
-
-                            Term (Literal _) ->
+                            Term _ ->
                                 Err
                                     { error = ExpectedBlankNode node
                                     , contextStack = state.context
@@ -1038,18 +1033,6 @@ literalData datatype =
                     case nodes of
                         [ node ] ->
                             case node of
-                                Term (BlankNode _) ->
-                                    Err
-                                        { error = ExpectedAnyLiteral node
-                                        , contextStack = state.context
-                                        }
-
-                                Term (Iri _) ->
-                                    Err
-                                        { error = ExpectedAnyLiteral node
-                                        , contextStack = state.context
-                                        }
-
                                 Term (Literal literalData_) ->
                                     if literalData_.datatype /= Rdf.toUrl datatype then
                                         Err
@@ -1063,6 +1046,12 @@ literalData datatype =
                                     else
                                         Ok literalData_
 
+                                Term _ ->
+                                    Err
+                                        { error = ExpectedLiteral node
+                                        , contextStack = state.context
+                                        }
+
                         _ ->
                             Err
                                 { error = TooManyNodes nodes
@@ -1074,7 +1063,7 @@ literalData datatype =
 
 {-| TODO
 -}
-anyLiteral : Decoder Rdf.AnyLiteral
+anyLiteral : Decoder Literal
 anyLiteral =
     Decoder
         (\state ->
@@ -1083,20 +1072,14 @@ anyLiteral =
                     case nodes of
                         [ node ] ->
                             case node of
-                                Term (BlankNode _) ->
-                                    Err
-                                        { error = ExpectedAnyLiteral node
-                                        , contextStack = state.context
-                                        }
-
-                                Term (Iri _) ->
-                                    Err
-                                        { error = ExpectedAnyLiteral node
-                                        , contextStack = state.context
-                                        }
-
                                 Term ((Literal _) as variant) ->
                                     Ok (Term variant)
+
+                                Term _ ->
+                                    Err
+                                        { error = ExpectedLiteral node
+                                        , contextStack = state.context
+                                        }
 
                         _ ->
                             Err
@@ -1114,7 +1097,7 @@ property path (Decoder f) =
     let
         expectBlankNodeOrIri :
             State
-            -> BlankNodeOrIriOrAnyLiteral
+            -> BlankNodeOrIriOrLiteral
             -> Result Error BlankNodeOrIri
         expectBlankNodeOrIri state node =
             case node of
@@ -1124,7 +1107,7 @@ property path (Decoder f) =
                 Term ((Iri _) as variant) ->
                     Ok (Term variant)
 
-                Term (Literal _) ->
+                Term _ ->
                     Err
                         { error = ExpectedBlankNodeOrIri node
                         , contextStack = state.context
@@ -1133,7 +1116,7 @@ property path (Decoder f) =
     Decoder
         (\state ->
             let
-                get : BlankNodeOrIri -> Result Error (List BlankNodeOrIriOrAnyLiteral)
+                get : BlankNodeOrIri -> Result Error (List BlankNodeOrIriOrLiteral)
                 get focusNode =
                     case getObjectsAt focusNode path state.graph of
                         [] ->
@@ -1182,9 +1165,9 @@ noProperty path =
                                     Term ((Iri _) as variant) ->
                                         Ok (Term variant)
 
-                                    Term (Literal _) ->
+                                    Term _ ->
                                         Err
-                                            { error = ExpectedAnyLiteral node
+                                            { error = ExpectedLiteral node
                                             , contextStack = state.context
                                             }
                             )
@@ -1238,7 +1221,7 @@ anyPredicate (Decoder f) =
                                     Term ((Iri _) as variant) ->
                                         Ok (Term variant)
 
-                                    Term (Literal _) ->
+                                    Term _ ->
                                         Err
                                             { error = ExpectedBlankNodeOrIri node
                                             , contextStack = state.context
@@ -1250,7 +1233,7 @@ anyPredicate (Decoder f) =
                 >> Result.andThen
                     (\focusNodes ->
                         let
-                            nodeChilds : Result Error (List Rdf.BlankNodeOrIriOrAnyLiteral)
+                            nodeChilds : Result Error (List BlankNodeOrIriOrLiteral)
                             nodeChilds =
                                 Result.map List.concat <|
                                     Result.combine
@@ -1293,7 +1276,7 @@ predicates =
                                     Term ((Iri _) as variant) ->
                                         Ok (Term variant)
 
-                                    Term (Literal _) ->
+                                    Term _ ->
                                         Err
                                             { error = ExpectedBlankNodeOrIri node
                                             , contextStack = state.context
@@ -1353,7 +1336,7 @@ fail msg =
 
 {-| A decoder which always fails with the given message.
 -}
-failWith : (List BlankNodeOrIriOrAnyLiteral -> String) -> Decoder a
+failWith : (List BlankNodeOrIriOrLiteral -> String) -> Decoder a
 failWith toMsg =
     Decoder
         (\state ->
@@ -1729,11 +1712,11 @@ logFailure log msg (Decoder f) =
 hasTripleWithSubject : IsBlankNodeOrIri compatible -> Graph -> Bool
 hasTripleWithSubject nodeFocusCompatible (Graph data) =
     let
-        subjectMatches : Rdf.Triple -> Bool
+        subjectMatches : Triple -> Bool
         subjectMatches triple =
             triple.subject == nodeFocus
 
-        nodeFocus : Rdf.BlankNodeOrIri
+        nodeFocus : BlankNodeOrIri
         nodeFocus =
             Rdf.asBlankNodeOrIri nodeFocusCompatible
     in
@@ -1743,16 +1726,16 @@ hasTripleWithSubject nodeFocusCompatible (Graph data) =
         |> not
 
 
-hasTripleWithObject : IsBlankNodeOrIriOrAnyLiteral compatible -> Graph -> Bool
+hasTripleWithObject : IsBlankNodeOrIriOrLiteral compatible -> Graph -> Bool
 hasTripleWithObject nodeFocusCompatible (Graph data) =
     let
-        objectMatches : Rdf.Triple -> Bool
+        objectMatches : Triple -> Bool
         objectMatches triple =
             triple.object == nodeFocus
 
-        nodeFocus : Rdf.BlankNodeOrIriOrAnyLiteral
+        nodeFocus : BlankNodeOrIriOrLiteral
         nodeFocus =
-            Rdf.asBlankNodeOrIriOrAnyLiteral nodeFocusCompatible
+            Rdf.asBlankNodeOrIriOrLiteral nodeFocusCompatible
     in
     data.triples
         |> List.filter objectMatches
@@ -1768,7 +1751,7 @@ getSubjects (Graph data) =
         |> List.unique
 
 
-getObjectsAt : IsBlankNodeOrIri compatible -> PropertyPath -> Graph -> List BlankNodeOrIriOrAnyLiteral
+getObjectsAt : IsBlankNodeOrIri compatible -> PropertyPath -> Graph -> List BlankNodeOrIriOrLiteral
 getObjectsAt nodeFocus path (Graph data) =
     nodeFocus
         |> followPropertyPath data path
@@ -1777,8 +1760,8 @@ getObjectsAt nodeFocus path (Graph data) =
 
 type alias GraphData rest =
     { rest
-        | bySubjectByPredicate : Dict String (Dict String (List Rdf.Triple))
-        , byPredicateBySubject : Dict String (Dict String (List Rdf.Triple))
+        | bySubjectByPredicate : Dict String (Dict String (List Triple))
+        , byPredicateBySubject : Dict String (Dict String (List Triple))
     }
 
 
@@ -1786,20 +1769,25 @@ followPropertyPath :
     GraphData rest
     -> PropertyPath
     -> IsBlankNodeOrIri compatible
-    -> List BlankNodeOrIriOrAnyLiteral
-followPropertyPath data propertyPath nodeFocus =
+    -> List BlankNodeOrIriOrLiteral
+followPropertyPath data propertyPath nodeFocusCompatible =
+    let
+        nodeFocus : BlankNodeOrIri
+        nodeFocus =
+            Rdf.asBlankNodeOrIri nodeFocusCompatible
+    in
     case propertyPath of
         Rdf.PredicatePath iriPredicate ->
             data.bySubjectByPredicate
-                |> Dict.get (Rdf.serializeNode nodeFocus)
+                |> Dict.get (Rdf.serialize nodeFocus)
                 |> Maybe.withDefault Dict.empty
-                |> Dict.get (Rdf.serializeNode iriPredicate)
+                |> Dict.get (Rdf.serialize iriPredicate)
                 |> Maybe.withDefault []
                 |> List.map .object
 
         Rdf.InversePath (Rdf.PredicatePath iriPredicate) ->
             data.byPredicateBySubject
-                |> Dict.get (Rdf.serializeNode iriPredicate)
+                |> Dict.get (Rdf.serialize iriPredicate)
                 |> Maybe.withDefault Dict.empty
                 |> Dict.values
                 |> List.concatMap
@@ -1807,11 +1795,11 @@ followPropertyPath data propertyPath nodeFocus =
                         let
                             objectRaw : String
                             objectRaw =
-                                Rdf.serializeNode nodeFocus
+                                Rdf.serialize nodeFocus
                         in
                         List.filterMap
                             (\triple ->
-                                if Rdf.serializeNode triple.object == objectRaw then
+                                if Rdf.serialize triple.object == objectRaw then
                                     Just triple.subject
 
                                 else
@@ -1819,18 +1807,18 @@ followPropertyPath data propertyPath nodeFocus =
                             )
                             triples
                     )
-                |> List.map Rdf.asBlankNodeOrIriOrAnyLiteral
+                |> List.map Rdf.asBlankNodeOrIriOrLiteral
 
         Rdf.SequencePath first rest ->
             let
-                nodesAtFirst : List Rdf.BlankNodeOrIriOrAnyLiteral
+                nodesAtFirst : List BlankNodeOrIriOrLiteral
                 nodesAtFirst =
-                    followPropertyPath data first nodeFocus
+                    followPropertyPath data first nodeFocusCompatible
 
                 step :
-                    Rdf.PropertyPath
-                    -> List Rdf.BlankNodeOrIriOrAnyLiteral
-                    -> List Rdf.BlankNodeOrIriOrAnyLiteral
+                    PropertyPath
+                    -> List BlankNodeOrIriOrLiteral
+                    -> List BlankNodeOrIriOrLiteral
                 step next nodes =
                     nodes
                         |> List.filterMap Rdf.toBlankNodeOrIri
@@ -1842,16 +1830,17 @@ followPropertyPath data propertyPath nodeFocus =
 
         Rdf.ZeroOrMorePath propertyPathNested ->
             let
-                focusNodes : List BlankNodeOrIriOrAnyLiteral
+                focusNodes : List BlankNodeOrIriOrLiteral
                 focusNodes =
-                    followPropertyPath data propertyPathNested nodeFocus
-                        |> List.filter ((/=) (Rdf.asBlankNodeOrIriOrAnyLiteral nodeFocus))
+                    nodeFocusCompatible
+                        |> followPropertyPath data propertyPathNested
+                        |> List.filter ((/=) (Rdf.asBlankNodeOrIriOrLiteral nodeFocus))
             in
             if List.isEmpty focusNodes then
-                [ Rdf.asBlankNodeOrIriOrAnyLiteral nodeFocus ]
+                [ Rdf.asBlankNodeOrIriOrLiteral nodeFocus ]
 
             else
-                Rdf.asBlankNodeOrIriOrAnyLiteral nodeFocus
+                Rdf.asBlankNodeOrIriOrLiteral nodeFocus
                     :: (focusNodes
                             |> List.filterMap Rdf.toBlankNodeOrIri
                             |> List.map asBlankNodeOrIriCompatible
@@ -1861,10 +1850,11 @@ followPropertyPath data propertyPath nodeFocus =
 
         Rdf.OneOrMorePath propertyPathNested ->
             let
-                focusNodes : List BlankNodeOrIriOrAnyLiteral
+                focusNodes : List BlankNodeOrIriOrLiteral
                 focusNodes =
-                    followPropertyPath data propertyPathNested nodeFocus
-                        |> List.filter ((/=) (Rdf.asBlankNodeOrIriOrAnyLiteral nodeFocus))
+                    nodeFocusCompatible
+                        |> followPropertyPath data propertyPathNested
+                        |> List.filter ((/=) (Rdf.asBlankNodeOrIriOrLiteral nodeFocus))
             in
             if List.isEmpty focusNodes then
                 []
@@ -1877,24 +1867,25 @@ followPropertyPath data propertyPath nodeFocus =
                         (followPropertyPath data propertyPath)
 
         Rdf.ZeroOrOnePath propertyPathNested ->
-            Rdf.asBlankNodeOrIriOrAnyLiteral nodeFocus
-                :: (followPropertyPath data propertyPathNested nodeFocus
-                        |> List.filter ((/=) (Rdf.asBlankNodeOrIriOrAnyLiteral nodeFocus))
+            Rdf.asBlankNodeOrIriOrLiteral nodeFocus
+                :: (nodeFocusCompatible
+                        |> followPropertyPath data propertyPathNested
+                        |> List.filter ((/=) (Rdf.asBlankNodeOrIriOrLiteral nodeFocus))
                    )
 
         _ ->
             []
 
 
-asBlankNodeOrIriCompatible : Rdf.BlankNodeOrIri -> Rdf.IsBlankNodeOrIri compatible
+asBlankNodeOrIriCompatible : BlankNodeOrIri -> IsBlankNodeOrIri compatible
 asBlankNodeOrIriCompatible (Term node) =
     Term node
 
 
-getObjects : IsBlankNodeOrIri compatible -> Graph -> List BlankNodeOrIriOrAnyLiteral
+getObjects : IsBlankNodeOrIri compatible -> Graph -> List BlankNodeOrIriOrLiteral
 getObjects nodeFocus (Graph data) =
     data.bySubjectByPredicate
-        |> Dict.get (Rdf.serializeNode nodeFocus)
+        |> Dict.get (Rdf.serialize nodeFocus)
         |> Maybe.withDefault Dict.empty
         |> Dict.values
         |> List.concat
@@ -1915,13 +1906,13 @@ getPredicates nodeFocus (Graph data) =
                 |> Term
     in
     data.bySubjectByPredicate
-        |> Dict.get (Rdf.serializeNode nodeFocus)
+        |> Dict.get (Rdf.serialize nodeFocus)
         |> Maybe.withDefault Dict.empty
         |> Dict.keys
         |> List.map toIri
 
 
-objectToList : Graph -> BlankNodeOrIri -> Maybe (List BlankNodeOrIriOrAnyLiteral)
+objectToList : Graph -> BlankNodeOrIri -> Maybe (List BlankNodeOrIriOrLiteral)
 objectToList graph nodeFocus =
     if Rdf.toIri nodeFocus == Just rdfNil then
         Just []
@@ -1937,13 +1928,13 @@ objectToList graph nodeFocus =
             )
 
 
-getFirst : IsBlankNodeOrIri compatible -> Graph -> Maybe BlankNodeOrIriOrAnyLiteral
+getFirst : IsBlankNodeOrIri compatible -> Graph -> Maybe BlankNodeOrIriOrLiteral
 getFirst nodeFocus (Graph data) =
     case
         data.bySubjectByPredicate
-            |> Dict.get (Rdf.serializeNode nodeFocus)
+            |> Dict.get (Rdf.serialize nodeFocus)
             |> Maybe.withDefault Dict.empty
-            |> Dict.get (Rdf.serializeNode rdfFirst)
+            |> Dict.get (Rdf.serialize rdfFirst)
             |> Maybe.withDefault []
             |> List.map .object
             |> List.unique
@@ -1959,9 +1950,9 @@ getRest : IsBlankNodeOrIri compatible -> Graph -> Maybe BlankNodeOrIri
 getRest nodeFocus (Graph data) =
     case
         data.bySubjectByPredicate
-            |> Dict.get (Rdf.serializeNode nodeFocus)
+            |> Dict.get (Rdf.serialize nodeFocus)
             |> Maybe.withDefault Dict.empty
-            |> Dict.get (Rdf.serializeNode rdfRest)
+            |> Dict.get (Rdf.serialize rdfRest)
             |> Maybe.withDefault []
             |> List.map .object
             |> List.filterMap Rdf.toBlankNodeOrIri

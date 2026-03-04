@@ -10,7 +10,7 @@ module Rdf.PropertyPath exposing
 
 -}
 
-import Rdf exposing (Iri, serializeNode)
+import Rdf exposing (Iri, serialize)
 
 
 {-| TODO Add documentation
@@ -31,7 +31,7 @@ serializePropertyPath : PropertyPath -> String
 serializePropertyPath propertyPath =
     case propertyPath of
         PredicatePath iri ->
-            serializeNode iri
+            serialize iri
 
         SequencePath first rest ->
             (serializePropertyPath first :: List.map serializePropertyPath rest)

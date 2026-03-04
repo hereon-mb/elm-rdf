@@ -90,9 +90,14 @@ manyWithInverse =
                     )
             }
                 |> expectAll
-                    [ List.map Rdf.serializeNode
+                    [ List.map Rdf.serialize
                         >> List.sort
-                        >> Expect.equalLists (List.map Rdf.serializeNode [ example "alice", example "bob" ])
+                        >> Expect.equalLists
+                            (List.map Rdf.serialize
+                                [ example "alice"
+                                , example "bob"
+                                ]
+                            )
                     ]
 
 

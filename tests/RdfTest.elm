@@ -28,7 +28,7 @@ parse =
         , ( "<http://example.org/alice> <http://example.org/knows> <http://example.org/bob> ."
           , [ { subject = Rdf.asBlankNodeOrIri (Rdf.iri "http://example.org/alice")
               , predicate = Rdf.iri "http://example.org/knows"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.iri "http://example.org/bob")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.iri "http://example.org/bob")
               }
             ]
           )
@@ -38,14 +38,14 @@ parse =
                 |> String.join "\n"
           , [ { subject = Rdf.asBlankNodeOrIri (Rdf.iri "http://example.org/alice")
               , predicate = Rdf.iri "http://example.org/knows"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.iri "http://example.org/bob")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.iri "http://example.org/bob")
               }
             ]
           )
         , ( "[] <http://example.org/knows> <http://example.org/bob> ."
           , [ { subject = Rdf.asBlankNodeOrIri (Rdf.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
               , predicate = Rdf.iri "http://example.org/knows"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.iri "http://example.org/bob")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.iri "http://example.org/bob")
               }
             ]
           )
@@ -55,18 +55,18 @@ parse =
                 |> String.join "\n"
           , [ { subject = Rdf.asBlankNodeOrIri (Rdf.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
               , predicate = Rdf.iri "http://example.org/knows"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.iri "http://example.org/cindi")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.iri "http://example.org/cindi")
               }
             , { subject = Rdf.asBlankNodeOrIri (Rdf.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
               , predicate = Rdf.iri "http://example.org/knows"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.iri "http://example.org/bob")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.iri "http://example.org/bob")
               }
             ]
           )
         , ( "_:alice <http://example.org/knows> <http://example.org/bob> ."
           , [ { subject = Rdf.asBlankNodeOrIri (Rdf.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
               , predicate = Rdf.iri "http://example.org/knows"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.iri "http://example.org/bob")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.iri "http://example.org/bob")
               }
             ]
           )
@@ -76,18 +76,18 @@ parse =
                 |> String.join "\n"
           , [ { subject = Rdf.asBlankNodeOrIri (Rdf.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
               , predicate = Rdf.iri "http://example.org/knows"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.iri "http://example.org/cindi")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.iri "http://example.org/cindi")
               }
             , { subject = Rdf.asBlankNodeOrIri (Rdf.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
               , predicate = Rdf.iri "http://example.org/knows"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.iri "http://example.org/bob")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.iri "http://example.org/bob")
               }
             ]
           )
         , ( "<http://example.org/alice> <http://example.org/knows> [] ."
           , [ { subject = Rdf.asBlankNodeOrIri (Rdf.iri "http://example.org/alice")
               , predicate = Rdf.iri "http://example.org/knows"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
               }
             ]
           )
@@ -98,18 +98,18 @@ parse =
                 |> String.join "\n"
           , [ { subject = Rdf.asBlankNodeOrIri (Rdf.iri "http://example.org/alice")
               , predicate = Rdf.iri "http://example.org/knows"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
               }
             , { subject = Rdf.asBlankNodeOrIri (Rdf.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
               , predicate = Rdf.iri "http://example.org/knows"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.iri "http://example.org/bob")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.iri "http://example.org/bob")
               }
             ]
           )
         , ( "<http://example.org/alice> <http://example.org/knows> _:bob ."
           , [ { subject = Rdf.asBlankNodeOrIri (Rdf.iri "http://example.org/alice")
               , predicate = Rdf.iri "http://example.org/knows"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
               }
             ]
           )
@@ -119,7 +119,7 @@ parse =
                 |> String.join "\n"
           , [ { subject = Rdf.asBlankNodeOrIri (Rdf.iri "http://example.org/alice")
               , predicate = Rdf.iri "http://example.org/knows"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.iri "http://example.org/bob")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.iri "http://example.org/bob")
               }
             ]
           )
@@ -129,7 +129,7 @@ parse =
                 |> String.join "\n"
           , [ { subject = Rdf.asBlankNodeOrIri (Rdf.iri "http://example.org/alice")
               , predicate = Rdf.iri "http://example.org/value"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.string "Alice")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.string "Alice")
               }
             ]
           )
@@ -139,7 +139,7 @@ parse =
                 |> String.join "\n"
           , [ { subject = Rdf.asBlankNodeOrIri (Rdf.iri "http://example.org/alice")
               , predicate = Rdf.iri "http://example.org/value"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.langString "en" "Alice")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.langString "en" "Alice")
               }
             ]
           )
@@ -150,7 +150,7 @@ parse =
                 |> String.join "\n"
           , [ { subject = Rdf.asBlankNodeOrIri (Rdf.iri "http://example.org/alice")
               , predicate = Rdf.iri "http://example.org/value"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.literal (xsd "integer") "42")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.literal (xsd "integer") "42")
               }
             ]
           )
@@ -160,7 +160,7 @@ parse =
                 |> String.join "\n"
           , [ { subject = Rdf.asBlankNodeOrIri (Rdf.iri "http://example.org/alice")
               , predicate = Rdf.iri "http://example.org/value"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.literal (xsd "integer") "42")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.literal (xsd "integer") "42")
               }
             ]
           )
@@ -170,7 +170,7 @@ parse =
                 |> String.join "\n"
           , [ { subject = Rdf.asBlankNodeOrIri (Rdf.iri "http://example.org/alice")
               , predicate = Rdf.iri "http://example.org/value"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.literal (xsd "decimal") "3.14")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.literal (xsd "decimal") "3.14")
               }
             ]
           )
@@ -180,7 +180,7 @@ parse =
                 |> String.join "\n"
           , [ { subject = Rdf.asBlankNodeOrIri (Rdf.iri "http://example.org/alice")
               , predicate = Rdf.iri "http://example.org/value"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.literal (xsd "double") "3.14")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.literal (xsd "double") "3.14")
               }
             ]
           )
@@ -190,7 +190,7 @@ parse =
                 |> String.join "\n"
           , [ { subject = Rdf.asBlankNodeOrIri (Rdf.iri "http://example.org/alice")
               , predicate = Rdf.iri "http://example.org/value"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.literal (xsd "boolean") "true")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.literal (xsd "boolean") "true")
               }
             ]
           )
@@ -200,7 +200,7 @@ parse =
                 |> String.join "\n"
           , [ { subject = Rdf.asBlankNodeOrIri (Rdf.iri "http://example.org/alice")
               , predicate = Rdf.iri "http://example.org/value"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.literal (xsd "boolean") "false")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.literal (xsd "boolean") "false")
               }
             ]
           )
@@ -210,11 +210,11 @@ parse =
                 |> String.join "\n"
           , [ { subject = Rdf.asBlankNodeOrIri (Rdf.iri "http://example.org/alice")
               , predicate = Rdf.iri "http://example.org/knows"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.iri "http://example.org/cindi")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.iri "http://example.org/cindi")
               }
             , { subject = Rdf.asBlankNodeOrIri (Rdf.iri "http://example.org/alice")
               , predicate = Rdf.iri "http://example.org/knows"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.iri "http://example.org/bob")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.iri "http://example.org/bob")
               }
             ]
           )
@@ -224,11 +224,11 @@ parse =
                 |> String.join "\n"
           , [ { subject = Rdf.asBlankNodeOrIri (Rdf.iri "http://example.org/alice")
               , predicate = Rdf.iri "http://example.org/knows"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.iri "http://example.org/cindi")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.iri "http://example.org/cindi")
               }
             , { subject = Rdf.asBlankNodeOrIri (Rdf.iri "http://example.org/alice")
               , predicate = Rdf.iri "http://example.org/knows"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.iri "http://example.org/bob")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.iri "http://example.org/bob")
               }
             ]
           )
@@ -238,11 +238,11 @@ parse =
                 |> String.join "\n"
           , [ { subject = Rdf.asBlankNodeOrIri (Rdf.iri "http://example.org/alice")
               , predicate = Rdf.iri "http://example.org/knows"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.iri "http://example.org/cindi")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.iri "http://example.org/cindi")
               }
             , { subject = Rdf.asBlankNodeOrIri (Rdf.iri "http://example.org/alice")
               , predicate = Rdf.iri "http://example.org/knows"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.iri "http://example.org/bob")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.iri "http://example.org/bob")
               }
             ]
           )
@@ -252,7 +252,7 @@ parse =
                 |> String.join "\n"
           , [ { subject = Rdf.asBlankNodeOrIri (Rdf.iri "http://example.org/alice")
               , predicate = Rdf.iri "http://example.org/knows"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (rdf "nil")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (rdf "nil")
               }
             ]
           )
@@ -262,23 +262,23 @@ parse =
                 |> String.join "\n"
           , [ { subject = Rdf.asBlankNodeOrIri (Rdf.blankNode "06aa2bfa-af53-42c5-aa42-a0b964471911")
               , predicate = rdf "rest"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (rdf "nil")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (rdf "nil")
               }
             , { subject = Rdf.asBlankNodeOrIri (Rdf.blankNode "06aa2bfa-af53-42c5-aa42-a0b964471911")
               , predicate = rdf "first"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.integer 2)
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.integer 2)
               }
             , { subject = Rdf.asBlankNodeOrIri (Rdf.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
               , predicate = rdf "rest"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.blankNode "06aa2bfa-af53-42c5-aa42-a0b964471911")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.blankNode "06aa2bfa-af53-42c5-aa42-a0b964471911")
               }
             , { subject = Rdf.asBlankNodeOrIri (Rdf.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
               , predicate = rdf "first"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.integer 1)
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.integer 1)
               }
             , { subject = Rdf.asBlankNodeOrIri (Rdf.iri "http://example.org/alice")
               , predicate = Rdf.iri "http://example.org/knows"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
               }
             ]
           )
@@ -288,7 +288,7 @@ parse =
                 |> String.join "\n"
           , [ { subject = Rdf.asBlankNodeOrIri (rdf "nil")
               , predicate = Rdf.iri "http://example.org/knows"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.iri "http://example.org/alice")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.iri "http://example.org/alice")
               }
             ]
           )
@@ -298,23 +298,23 @@ parse =
                 |> String.join "\n"
           , [ { subject = Rdf.asBlankNodeOrIri (Rdf.blankNode "06aa2bfa-af53-42c5-aa42-a0b964471911")
               , predicate = rdf "rest"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (rdf "nil")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (rdf "nil")
               }
             , { subject = Rdf.asBlankNodeOrIri (Rdf.blankNode "06aa2bfa-af53-42c5-aa42-a0b964471911")
               , predicate = rdf "first"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.integer 2)
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.integer 2)
               }
             , { subject = Rdf.asBlankNodeOrIri (Rdf.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
               , predicate = rdf "rest"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.blankNode "06aa2bfa-af53-42c5-aa42-a0b964471911")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.blankNode "06aa2bfa-af53-42c5-aa42-a0b964471911")
               }
             , { subject = Rdf.asBlankNodeOrIri (Rdf.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
               , predicate = rdf "first"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.integer 1)
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.integer 1)
               }
             , { subject = Rdf.asBlankNodeOrIri (Rdf.blankNode "2273e9c9-fa2d-4c28-ae87-947ad36cbecd")
               , predicate = Rdf.iri "http://example.org/knows"
-              , object = Rdf.asBlankNodeOrIriOrAnyLiteral (Rdf.iri "http://example.org/alice")
+              , object = Rdf.asBlankNodeOrIriOrLiteral (Rdf.iri "http://example.org/alice")
               }
             ]
           )

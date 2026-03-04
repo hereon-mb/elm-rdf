@@ -2,6 +2,7 @@ module Internal.Term exposing
     ( Term(..)
     , Variant(..), DataLiteral
     , serializeVariant
+    , toVariant
     )
 
 {-|
@@ -10,6 +11,7 @@ module Internal.Term exposing
 @docs Variant, DataLiteral
 
 @docs serializeVariant
+@docs toVariant
 
 -}
 
@@ -22,6 +24,14 @@ type Variant
     = BlankNode String
     | Iri String
     | Literal DataLiteral
+    | VarQ String
+    | VarD String
+    | Sequence Variant (List Variant)
+    | Alternative Variant (List Variant)
+    | Inverse Variant
+    | ZeroOrMore Variant
+    | OneOrMore Variant
+    | ZeroOrOne Variant
 
 
 {-| TODO Add documentation
@@ -70,3 +80,36 @@ serializeVariant variant =
                     "@" ++ languageTag
             ]
                 |> String.concat
+
+        VarQ name ->
+            "?" ++ name
+
+        VarD name ->
+            "$" ++ name
+
+        Sequence first rest ->
+            serializeVariant first
+                ++ " / "
+                ++ String.join " / " (List.map serializeVariant rest)
+
+        Alternative first rest ->
+            serializeVariant first
+                ++ " | "
+                ++ String.join " | " (List.map serializeVariant rest)
+
+        Inverse nested ->
+            "^" ++ serializeVariant nested
+
+        ZeroOrMore nested ->
+            serializeVariant nested ++ "*"
+
+        OneOrMore nested ->
+            serializeVariant nested ++ "+"
+
+        ZeroOrOne nested ->
+            serializeVariant nested ++ "?"
+
+
+toVariant : Term compatible -> Variant
+toVariant (Term variant) =
+    variant

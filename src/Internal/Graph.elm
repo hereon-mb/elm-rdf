@@ -23,7 +23,7 @@ type alias Data =
     , prefixes : Dict String String
     , triples : List Rdf.Triple
     , subjects : List Rdf.BlankNodeOrIri
-    , objects : List Rdf.BlankNodeOrIriOrAnyLiteral
+    , objects : List Rdf.BlankNodeOrIriOrLiteral
     , bySubjectByPredicate : Dict String (Dict String (List Rdf.Triple))
     , byPredicateBySubject : Dict String (Dict String (List Rdf.Triple))
     }
