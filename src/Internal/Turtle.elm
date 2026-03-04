@@ -443,8 +443,7 @@ urlSubstitute : List String -> Parser (Parser.Step (List String) String)
 urlSubstitute revChunks =
     Parser.succeed (\chunk -> Parser.Loop (chunk :: revChunks))
         |. Parser.token "\\"
-        |= Parser.oneOf
-            [ Parser.succeed String.fromChar
+        |= (Parser.succeed String.fromChar
                 |. Parser.token "u"
                 |= (Parser.getChompedString
                         (Parser.succeed (\_ _ _ _ -> ())
@@ -455,7 +454,7 @@ urlSubstitute revChunks =
                         )
                         |> Parser.andThen codeToChar
                    )
-            ]
+           )
 
 
 urlChomp : List String -> Parser (Parser.Step (List String) String)
@@ -501,19 +500,6 @@ blankNodeLabel =
                 , reserved = Set.empty
                 }
         )
-
-
-allowedUrlChar : Char -> Bool
-allowedUrlChar char =
-    (char /= '<')
-        && (char /= '>')
-        && (char /= '{')
-        && (char /= '}')
-        && (char /= '|')
-        && (char /= '^')
-        && (char /= '`')
-        && (char /= '\\')
-        && (Char.toCode char > 0x20)
 
 
 literal : Parser Literal
