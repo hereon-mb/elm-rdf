@@ -118,14 +118,15 @@ import Rdf
         ( BlankNodeOrIri
         , BlankNodeOrIriOrLiteral
         , Iri
+        , IriOrPath
         , IsBlankNodeOrIri
         , IsBlankNodeOrIriOrLiteral
         , IsIri
+        , IsIriOrPath
         , Literal
         , Triple
         )
 import Rdf.Namespaces as Rdf exposing (rdf)
-import Rdf.PropertyPath as Rdf exposing (PropertyPath)
 import Result.Extra as Result
 import Time
 
@@ -304,10 +305,10 @@ type Problem
     | ExpectedInt String
     | ExpectedFloat String
     | ExpectedLiteralDatatype Iri Iri
-    | UnknownProperty BlankNodeOrIri PropertyPath
-    | PropertyPresent BlankNodeOrIri PropertyPath
+    | UnknownProperty BlankNodeOrIri IriOrPath
+    | PropertyPresent BlankNodeOrIri IriOrPath
     | NoProperty BlankNodeOrIri
-    | AtPropertyPath PropertyPath Error
+    | AtPropertyPath IriOrPath Error
     | UnexpectedEmptyList
     | CustomError String
     | Failure String
@@ -380,14 +381,14 @@ problemToString problem =
 
         UnknownProperty nodeFocus pathExpected ->
             "No such property "
-                ++ Rdf.serializePropertyPath pathExpected
+                ++ Rdf.serialize pathExpected
                 ++ " found at "
                 ++ Rdf.serialize nodeFocus
                 ++ "."
 
         PropertyPresent nodeFocus pathExpected ->
             "Found object for property "
-                ++ Rdf.serializePropertyPath pathExpected
+                ++ Rdf.serialize pathExpected
                 ++ " at "
                 ++ Rdf.serialize nodeFocus
                 ++ "."
@@ -397,7 +398,7 @@ problemToString problem =
 
         AtPropertyPath path errorNested ->
             "Problem with the value at "
-                ++ Rdf.serializePropertyPath path
+                ++ Rdf.serialize path
                 ++ ":\n\n    "
                 ++ errorToString errorNested
 
@@ -1092,7 +1093,7 @@ anyLiteral =
 
 {-| TODO
 -}
-property : PropertyPath -> Decoder a -> Decoder a
+property : IsIriOrPath compatible -> Decoder a -> Decoder a
 property path (Decoder f) =
     let
         expectBlankNodeOrIri :
@@ -1121,7 +1122,7 @@ property path (Decoder f) =
                     case getObjectsAt focusNode path state.graph of
                         [] ->
                             Err
-                                { error = UnknownProperty focusNode path
+                                { error = UnknownProperty focusNode (Rdf.asIriOrPath path)
                                 , contextStack = state.context
                                 }
 
@@ -1137,7 +1138,7 @@ property path (Decoder f) =
                         >> Result.combine
                         >> Result.mapError
                             (\errorNested ->
-                                { error = AtPropertyPath path errorNested
+                                { error = AtPropertyPath (Rdf.asIriOrPath path) errorNested
                                 , contextStack = state.context
                                 }
                             )
@@ -1149,7 +1150,7 @@ property path (Decoder f) =
 
 {-| TODO
 -}
-noProperty : PropertyPath -> Decoder ()
+noProperty : IsIriOrPath compatible -> Decoder ()
 noProperty path =
     Decoder
         (\state ->
@@ -1186,7 +1187,10 @@ noProperty path =
 
                                             _ ->
                                                 Err
-                                                    { error = PropertyPresent focusNode path
+                                                    { error =
+                                                        PropertyPresent
+                                                            focusNode
+                                                            (Rdf.asIriOrPath path)
                                                     , contextStack = state.context
                                                     }
                                     )
@@ -1200,7 +1204,7 @@ noProperty path =
 -}
 predicate : IsIri compatible -> Decoder a -> Decoder a
 predicate =
-    property << Rdf.PredicatePath << Rdf.asIri
+    property << Rdf.asIri
 
 
 {-| TODO
@@ -1483,7 +1487,6 @@ required iriPredicate decoderA decoderF =
     import Rdf
     import Rdf.Graph as Rdf exposing (Graph)
     import Rdf.Namespaces exposing (a)
-    import Rdf.PropertyPath exposing (PropertyPath(..))
     import Time
 
     graph : Graph
@@ -1505,9 +1508,9 @@ required iriPredicate decoderA decoderF =
             (Rdf.iri "http://example.org/alice")
             (succeed Person
                 |> requiredAt
-                    (SequencePath
-                        (PredicatePath (Rdf.iri "http://example.org/#knows"))
-                        [ PredicatePath (Rdf.iri "http://example.org/#name") ]
+                    (Rdf.sequence
+                        (Rdf.iri "http://example.org/#knows")
+                        [ Rdf.iri "http://example.org/#name" ]
                     )
                     string
             )
@@ -1518,7 +1521,7 @@ required iriPredicate decoderA decoderF =
     -->     }
 
 -}
-requiredAt : PropertyPath -> Decoder a -> Decoder (a -> b) -> Decoder b
+requiredAt : IsIriOrPath compatible -> Decoder a -> Decoder (a -> b) -> Decoder b
 requiredAt path decoderA decoderF =
     map2 (\f a -> f a) decoderF (property path decoderA)
 
@@ -1575,7 +1578,6 @@ optional iriPredicate decoderA defaultA decoderF =
     import Rdf
     import Rdf.Graph as Rdf exposing (Graph)
     import Rdf.Namespaces exposing (a)
-    import Rdf.PropertyPath exposing (PropertyPath(..))
     import Time
 
     graph : Graph
@@ -1597,9 +1599,9 @@ optional iriPredicate decoderA defaultA decoderF =
             (Rdf.iri "http://example.org/alice")
             (succeed Person
                 |> optionalAt
-                    (SequencePath
-                        (PredicatePath (Rdf.iri "http://example.org/#knows"))
-                        [ PredicatePath (Rdf.iri "http://example.org/#name") ]
+                    (Rdf.sequence
+                        (Rdf.iri "http://example.org/#knows")
+                        [ Rdf.iri "http://example.org/#name" ]
                     )
                     string
                     "Unknown"
@@ -1611,7 +1613,7 @@ optional iriPredicate decoderA defaultA decoderF =
     -->     }
 
 -}
-optionalAt : PropertyPath -> Decoder a -> a -> Decoder (a -> b) -> Decoder b
+optionalAt : IsIriOrPath compatible -> Decoder a -> a -> Decoder (a -> b) -> Decoder b
 optionalAt path decoderA defaultA decoderF =
     map2 (\f a -> f a)
         decoderF
@@ -1751,7 +1753,11 @@ getSubjects (Graph data) =
         |> List.unique
 
 
-getObjectsAt : IsBlankNodeOrIri compatible -> PropertyPath -> Graph -> List BlankNodeOrIriOrLiteral
+getObjectsAt :
+    IsBlankNodeOrIri compatible1
+    -> IsIriOrPath compatible2
+    -> Graph
+    -> List BlankNodeOrIriOrLiteral
 getObjectsAt nodeFocus path (Graph data) =
     nodeFocus
         |> followPropertyPath data path
@@ -1767,27 +1773,27 @@ type alias GraphData rest =
 
 followPropertyPath :
     GraphData rest
-    -> PropertyPath
-    -> IsBlankNodeOrIri compatible
+    -> IsIriOrPath compatible1
+    -> IsBlankNodeOrIri compatible2
     -> List BlankNodeOrIriOrLiteral
-followPropertyPath data propertyPath nodeFocusCompatible =
+followPropertyPath data ((Term variant) as path) nodeFocusCompatible =
     let
         nodeFocus : BlankNodeOrIri
         nodeFocus =
             Rdf.asBlankNodeOrIri nodeFocusCompatible
     in
-    case propertyPath of
-        Rdf.PredicatePath iriPredicate ->
+    case variant of
+        Iri _ ->
             data.bySubjectByPredicate
                 |> Dict.get (Rdf.serialize nodeFocus)
                 |> Maybe.withDefault Dict.empty
-                |> Dict.get (Rdf.serialize iriPredicate)
+                |> Dict.get (Rdf.serialize path)
                 |> Maybe.withDefault []
                 |> List.map .object
 
-        Rdf.InversePath (Rdf.PredicatePath iriPredicate) ->
+        Inverse ((Iri _) as nested) ->
             data.byPredicateBySubject
-                |> Dict.get (Rdf.serialize iriPredicate)
+                |> Dict.get (Rdf.serialize (Term nested))
                 |> Maybe.withDefault Dict.empty
                 |> Dict.values
                 |> List.concatMap
@@ -1809,31 +1815,30 @@ followPropertyPath data propertyPath nodeFocusCompatible =
                     )
                 |> List.map Rdf.asBlankNodeOrIriOrLiteral
 
-        Rdf.SequencePath first rest ->
+        Sequence first rest ->
             let
                 nodesAtFirst : List BlankNodeOrIriOrLiteral
                 nodesAtFirst =
-                    followPropertyPath data first nodeFocusCompatible
+                    followPropertyPath data (Term first) nodeFocusCompatible
 
                 step :
-                    PropertyPath
+                    Variant
                     -> List BlankNodeOrIriOrLiteral
                     -> List BlankNodeOrIriOrLiteral
                 step next nodes =
                     nodes
                         |> List.filterMap Rdf.toBlankNodeOrIri
                         |> List.map asBlankNodeOrIriCompatible
-                        |> List.concatMap (followPropertyPath data next)
+                        |> List.concatMap (followPropertyPath data (Term next))
             in
-            rest
-                |> List.foldl step nodesAtFirst
+            List.foldl step nodesAtFirst rest
 
-        Rdf.ZeroOrMorePath propertyPathNested ->
+        ZeroOrMore propertyPathNested ->
             let
                 focusNodes : List BlankNodeOrIriOrLiteral
                 focusNodes =
                     nodeFocusCompatible
-                        |> followPropertyPath data propertyPathNested
+                        |> followPropertyPath data (Term propertyPathNested)
                         |> List.filter ((/=) (Rdf.asBlankNodeOrIriOrLiteral nodeFocus))
             in
             if List.isEmpty focusNodes then
@@ -1844,16 +1849,15 @@ followPropertyPath data propertyPath nodeFocusCompatible =
                     :: (focusNodes
                             |> List.filterMap Rdf.toBlankNodeOrIri
                             |> List.map asBlankNodeOrIriCompatible
-                            |> List.concatMap
-                                (followPropertyPath data propertyPath)
+                            |> List.concatMap (followPropertyPath data path)
                        )
 
-        Rdf.OneOrMorePath propertyPathNested ->
+        OneOrMore propertyPathNested ->
             let
                 focusNodes : List BlankNodeOrIriOrLiteral
                 focusNodes =
                     nodeFocusCompatible
-                        |> followPropertyPath data propertyPathNested
+                        |> followPropertyPath data (Term propertyPathNested)
                         |> List.filter ((/=) (Rdf.asBlankNodeOrIriOrLiteral nodeFocus))
             in
             if List.isEmpty focusNodes then
@@ -1864,12 +1868,12 @@ followPropertyPath data propertyPath nodeFocusCompatible =
                     |> List.filterMap Rdf.toBlankNodeOrIri
                     |> List.map asBlankNodeOrIriCompatible
                     |> List.concatMap
-                        (followPropertyPath data propertyPath)
+                        (followPropertyPath data path)
 
-        Rdf.ZeroOrOnePath propertyPathNested ->
+        ZeroOrOne propertyPathNested ->
             Rdf.asBlankNodeOrIriOrLiteral nodeFocus
                 :: (nodeFocusCompatible
-                        |> followPropertyPath data propertyPathNested
+                        |> followPropertyPath data (Term propertyPathNested)
                         |> List.filter ((/=) (Rdf.asBlankNodeOrIriOrLiteral nodeFocus))
                    )
 

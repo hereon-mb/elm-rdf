@@ -47,7 +47,7 @@ module Rdf.Graph exposing
 
 import Dict exposing (Dict)
 import Internal.Graph as Internal exposing (Data, Graph(..))
-import Internal.Term exposing (Term(..), Variant(..))
+import Internal.Term exposing (Term(..), Variant(..), toVariant)
 import Internal.Turtle as Turtle
 import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode exposing (Value)
@@ -64,6 +64,7 @@ import Rdf
         , IsBlankNodeOrIri
         , IsBlankNodeOrIriOrLiteral
         , IsIri
+        , IsIriOrPath
         , Prologue
         , Triple
         , asBlankNodeOrIri
@@ -76,7 +77,6 @@ import Rdf
         , tripleDecoder
         )
 import Rdf.Namespaces exposing (rdf, xsd)
-import Rdf.PropertyPath exposing (PropertyPath(..))
 import Regex exposing (Regex)
 import Set exposing (Set)
 import Tuple.Extra as Tuple
@@ -316,38 +316,42 @@ insert subject predicate object (Graph graph) =
 -}
 insertAt :
     IsBlankNodeOrIri compatible1
-    -> PropertyPath
-    -> IsBlankNodeOrIriOrLiteral compatible2
+    -> IsIriOrPath compatible2
+    -> IsBlankNodeOrIriOrLiteral compatible3
     -> Graph
     -> Seed
     -> ( Graph, Seed )
-insertAt subject path object graph seed =
-    case path of
-        PredicatePath predicate ->
-            ( insert subject predicate object graph, seed )
+insertAt subject (Term variant) object graph seed =
+    case variant of
+        (Iri _) as predicate ->
+            ( insert subject (Term predicate) object graph, seed )
 
-        SequencePath (PredicatePath predicate) propertyPaths ->
-            case getBlankNodeOrIriObject subject predicate graph of
+        Sequence ((Iri _) as predicate) propertyPaths ->
+            case getBlankNodeOrIriObject subject (Term predicate) graph of
                 Nothing ->
                     let
                         ( idFocusNodeNext, seedUpdated ) =
                             generateBlankNode seed
                     in
-                    ( insert subject predicate idFocusNodeNext graph, seedUpdated )
+                    ( insert subject (Term predicate) idFocusNodeNext graph
+                    , seedUpdated
+                    )
                         |> Tuple.apply
-                            (insertAtNext propertyPaths
+                            (insertAtNext
+                                (List.map Term propertyPaths)
                                 object
                                 (asBlankNodeOrIri idFocusNodeNext)
                             )
 
                 Just idFocusNodeNext ->
-                    insertAtNext propertyPaths
+                    insertAtNext
+                        (List.map Term propertyPaths)
                         object
                         (asBlankNodeOrIri idFocusNodeNext)
                         graph
                         seed
 
-        InversePath (PredicatePath predicate) ->
+        Inverse ((Iri _) as predicate) ->
             case toBlankNodeOrIri object of
                 Nothing ->
                     -- FIXME We want to error here
@@ -356,7 +360,7 @@ insertAt subject path object graph seed =
                 Just blankNodeOrIri ->
                     ( insert
                         blankNodeOrIri
-                        predicate
+                        (Term predicate)
                         (Rdf.asBlankNodeOrIri subject)
                         graph
                     , seed
@@ -367,9 +371,9 @@ insertAt subject path object graph seed =
 
 
 insertAtNext :
-    List PropertyPath
+    List (IsIriOrPath compatible1)
     -> IsBlankNodeOrIriOrLiteral compatible2
-    -> IsBlankNodeOrIri compatible1
+    -> IsBlankNodeOrIri compatible3
     -> Graph
     -> Seed
     -> ( Graph, Seed )
@@ -381,8 +385,12 @@ insertAtNext propertyPaths object idFocusNodeNext graphNext seedNext =
         [ first ] ->
             insertAt idFocusNodeNext first object graphNext seedNext
 
-        first :: rest ->
-            insertAt idFocusNodeNext (SequencePath first rest) object graphNext seedNext
+        (Term first) :: rest ->
+            insertAt idFocusNodeNext
+                (Term (Sequence first (List.map toVariant rest)))
+                object
+                graphNext
+                seedNext
 
 
 getBlankNodeOrIriObject : IsBlankNodeOrIri compatible1 -> Iri -> Graph -> Maybe BlankNodeOrIri

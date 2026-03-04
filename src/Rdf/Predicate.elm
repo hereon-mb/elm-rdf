@@ -10,10 +10,10 @@ module Rdf.Predicate exposing
 
 -}
 
+import Internal.Term as Internal exposing (Term(..))
 import List.NonEmpty as NonEmpty exposing (NonEmpty)
 import Maybe.Extra as Maybe
-import Rdf exposing (Iri)
-import Rdf.PropertyPath as PropertyPath exposing (PropertyPath)
+import Rdf exposing (Iri, IsIriOrPath)
 
 
 {-| TODO Add documentation
@@ -41,33 +41,36 @@ But since we use the super-class `PropertyPath` everywhere, we have to special
 case the impossible variants, cf. `property` which is a no-op if it encounters
 a such special property path.
 -}
-fromPropertyPath : PropertyPath -> Maybe (NonEmpty Predicate)
-fromPropertyPath propertyPath =
-    case propertyPath of
-        PropertyPath.PredicatePath x ->
-            Just (NonEmpty.singleton (Predicate x))
+fromPropertyPath : IsIriOrPath compatible -> Maybe (NonEmpty Predicate)
+fromPropertyPath (Term variant) =
+    case variant of
+        (Internal.Iri _) as x ->
+            Just (NonEmpty.singleton (Predicate (Term x)))
 
-        PropertyPath.SequencePath firstPropertyPath otherPropertyPaths ->
+        Internal.Sequence firstPropertyPath otherPropertyPaths ->
             Maybe.map NonEmpty.concat
                 (Maybe.map2 Tuple.pair
-                    (fromPropertyPath firstPropertyPath)
-                    (Maybe.combine (List.map fromPropertyPath otherPropertyPaths))
+                    (fromPropertyPath (Term firstPropertyPath))
+                    (Maybe.combine (List.map (fromPropertyPath << Term) otherPropertyPaths))
                 )
 
-        PropertyPath.AlternativePath _ _ ->
+        Internal.Alternative _ _ ->
             Nothing
 
-        PropertyPath.InversePath (PropertyPath.PredicatePath x) ->
-            Just (NonEmpty.singleton (Inverse x))
+        Internal.Inverse ((Internal.Iri _) as x) ->
+            Just (NonEmpty.singleton (Inverse (Term x)))
 
-        PropertyPath.InversePath _ ->
+        Internal.Inverse _ ->
             Nothing
 
-        PropertyPath.ZeroOrMorePath _ ->
+        Internal.ZeroOrMore _ ->
             Nothing
 
-        PropertyPath.OneOrMorePath _ ->
+        Internal.OneOrMore _ ->
             Nothing
 
-        PropertyPath.ZeroOrOnePath _ ->
+        Internal.ZeroOrOne _ ->
+            Nothing
+
+        _ ->
             Nothing

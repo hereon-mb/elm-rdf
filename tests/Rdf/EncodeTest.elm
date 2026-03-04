@@ -1,10 +1,9 @@
 module Rdf.EncodeTest exposing (suite)
 
 import Expect exposing (Expectation)
-import Rdf
+import Rdf exposing (IriOrPath)
 import Rdf.Encode as Encode exposing (GraphEncoder)
 import Rdf.Graph as Graph
-import Rdf.PropertyPath as Rdf
 import Test exposing (Test, describe, test)
 
 
@@ -24,10 +23,10 @@ bunchLeaf =
             Encode.node (Rdf.asBlankNodeOrIri (base "root"))
                 (Encode.bunch
                     [ ( hasValue, Encode.literal valueValue )
-                    , ( Rdf.SequencePath hasNested [ hasUnit ]
+                    , ( Rdf.sequence hasNested [ hasUnit ]
                       , Encode.iri valueUnit
                       )
-                    , ( Rdf.SequencePath hasNested [ hasConstant ]
+                    , ( Rdf.sequence hasNested [ hasConstant ]
                       , Encode.literal valueConstant
                       )
                     ]
@@ -156,9 +155,9 @@ base name =
     Rdf.iri ("http://example.org/" ++ name)
 
 
-hasValue : Rdf.PropertyPath
+hasValue : IriOrPath
 hasValue =
-    Rdf.PredicatePath (base "hasValue")
+    Rdf.asIriOrPath (base "hasValue")
 
 
 valueValue : Rdf.Literal
@@ -166,14 +165,14 @@ valueValue =
     Rdf.integer 1
 
 
-hasNested : Rdf.PropertyPath
+hasNested : IriOrPath
 hasNested =
-    Rdf.PredicatePath (base "hasNested")
+    Rdf.asIriOrPath (base "hasNested")
 
 
-hasUnit : Rdf.PropertyPath
+hasUnit : IriOrPath
 hasUnit =
-    Rdf.PredicatePath (base "hasUnit")
+    Rdf.asIriOrPath (base "hasUnit")
 
 
 valueUnit : Rdf.Iri
@@ -181,9 +180,9 @@ valueUnit =
     base "meter"
 
 
-hasConstant : Rdf.PropertyPath
+hasConstant : IriOrPath
 hasConstant =
-    Rdf.PredicatePath (base "hasConstant")
+    Rdf.asIriOrPath (base "hasConstant")
 
 
 valueConstant : Rdf.Literal

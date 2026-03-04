@@ -8,7 +8,11 @@ module Rdf exposing
     , Path, IsPath, asPath
     , BlankNodeOrIri, IsBlankNodeOrIri, asBlankNodeOrIri
     , BlankNodeOrIriOrLiteral, IsBlankNodeOrIriOrLiteral, asBlankNodeOrIriOrLiteral
-    , IsIriOrPath
+    , BlankNodeOrIriOrLiteralOrVar, IsBlankNodeOrIriOrLiteralOrVar, asBlankNodeOrIriOrLiteralOrVar
+    , BlankNodeOrIriOrVar, IsBlankNodeOrIriOrVar, asBlankNodeOrIriOrVar
+    , IriOrLiteralOrVar, IsIriOrLiteralOrVar, asIriOrLiteralOrVar
+    , IriOrVarOrPath, IsIriOrVarOrPath, asIriOrVarOrPath
+    , IriOrPath, IsIriOrPath, asIriOrPath
     , Yes, No
     , iri
     , blankNode
@@ -24,6 +28,7 @@ module Rdf exposing
     , toIri
     , toBlankNode
     , toLiteral
+    , toVar
     , toBlankNodeOrIri, toBlankNodeOrIriOrLiteral
     , toUrl
     , lexicalForm
@@ -34,11 +39,15 @@ module Rdf exposing
     , appendPath
     , dropFragment, setFragment
     , setQueryParam
+    , append
     , StringOrLangString
     , localize, nonLocalized
     , stringOrLangStringFrom, stringOrLangStringFromList
     , mergeStringOrLangStrings
     , stringOrLangStringInfo
+    , startsWith
+    , rightOf
+    , lastPredicatePath
     , serialize, serializeWith, Prologue
     , serializeTriple
     , encodeTriple
@@ -74,7 +83,11 @@ a introduction on its data model.
 
 @docs BlankNodeOrIri, IsBlankNodeOrIri, asBlankNodeOrIri
 @docs BlankNodeOrIriOrLiteral, IsBlankNodeOrIriOrLiteral, asBlankNodeOrIriOrLiteral
-@docs IsIriOrPath
+@docs BlankNodeOrIriOrLiteralOrVar, IsBlankNodeOrIriOrLiteralOrVar, asBlankNodeOrIriOrLiteralOrVar
+@docs BlankNodeOrIriOrVar, IsBlankNodeOrIriOrVar, asBlankNodeOrIriOrVar
+@docs IriOrLiteralOrVar, IsIriOrLiteralOrVar, asIriOrLiteralOrVar
+@docs IriOrVarOrPath, IsIriOrVarOrPath, asIriOrVarOrPath
+@docs IriOrPath, IsIriOrPath, asIriOrPath
 
 
 ### Utility
@@ -123,6 +136,7 @@ a more specific variant.
 @docs toIri
 @docs toBlankNode
 @docs toLiteral
+@docs toVar
 @docs toBlankNodeOrIri, toBlankNodeOrIriOrLiteral
 
 
@@ -148,6 +162,11 @@ A few helper functions to transform [`Iri`](#Iri)'s.
 @docs setQueryParam
 
 
+### Transform query variables
+
+@docs append
+
+
 ### StringOrLangString
 
 A few convenience functions for working with literals of type `xsd:string` and
@@ -158,6 +177,13 @@ A few convenience functions for working with literals of type `xsd:string` and
 @docs stringOrLangStringFrom, stringOrLangStringFromList
 @docs mergeStringOrLangStrings
 @docs stringOrLangStringInfo
+
+
+### Property paths
+
+@docs startsWith
+@docs rightOf
+@docs lastPredicatePath
 
 
 ## Serialization
@@ -187,6 +213,7 @@ import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline as Decode
 import Json.Encode as Encode exposing (Value)
 import List.Extra as List
+import List.NonEmpty as NonEmpty
 import Maybe.Extra as Maybe
 import String.Extra as String
 import Time exposing (Posix)
@@ -327,7 +354,6 @@ the idea behind this.
 type alias Iri =
     Term
         { isIri : Yes
-        , isVar : No
         , isBlankNodeOrIri : Yes
         , isBlankNodeOrIriOrLiteral : Yes
         , isBlankNodeOrIriOrLiteralOrVar : Yes
@@ -345,7 +371,18 @@ are passed. Take a look at [Term](Rdf#Term) for a general explanation of the
 idea behind this.
 -}
 type alias IsIri compatible =
-    Term { compatible | isIri : Yes }
+    Term
+        { compatible
+            | isIri : Yes
+            , isBlankNodeOrIri : Yes
+            , isBlankNodeOrIriOrLiteral : Yes
+            , isBlankNodeOrIriOrLiteralOrVar : Yes
+            , isBlankNodeOrIriOrVar : Yes
+            , isIriOrLiteralOrVar : Yes
+            , isIriOrVar : Yes
+            , isIriOrVarOrPath : Yes
+            , isIriOrPath : Yes
+        }
 
 
 {-| When writing your own helper functions, it might be necessary that you have
@@ -371,16 +408,10 @@ explanation of the idea behind this.
 -}
 type alias BlankNode =
     Term
-        { isIri : No
-        , isVar : No
-        , isBlankNodeOrIri : Yes
+        { isBlankNodeOrIri : Yes
         , isBlankNodeOrIriOrLiteral : Yes
         , isBlankNodeOrIriOrLiteralOrVar : Yes
         , isBlankNodeOrIriOrVar : Yes
-        , isIriOrLiteralOrVar : No
-        , isIriOrVar : No
-        , isIriOrVarOrPath : No
-        , isIriOrPath : No
         }
 
 
@@ -391,7 +422,13 @@ are passed. Take a look at [Term](Rdf#Term) for a general explanation of the
 idea behind this.
 -}
 type alias IsBlankNode compatible =
-    Term { compatible | isBlankNode : Yes }
+    Term
+        { compatible
+            | isBlankNodeOrIri : Yes
+            , isBlankNodeOrIriOrLiteral : Yes
+            , isBlankNodeOrIriOrLiteralOrVar : Yes
+            , isBlankNodeOrIriOrVar : Yes
+        }
 
 
 {-| When writing your own helper functions, it might be necessary that you have
@@ -415,16 +452,9 @@ explanation of the idea behind this.
 -}
 type alias Literal =
     Term
-        { isIri : No
-        , isVar : No
-        , isBlankNodeOrIri : No
-        , isBlankNodeOrIriOrLiteral : Yes
+        { isBlankNodeOrIriOrLiteral : Yes
         , isBlankNodeOrIriOrLiteralOrVar : Yes
-        , isBlankNodeOrIriOrVar : No
         , isIriOrLiteralOrVar : Yes
-        , isIriOrVar : No
-        , isIriOrVarOrPath : No
-        , isIriOrPath : No
         }
 
 
@@ -435,7 +465,12 @@ are passed. Take a look at [Term](Rdf#Term) for a general explanation of the
 idea behind this.
 -}
 type alias IsLiteral compatible =
-    Term { compatible | isLiteral : Yes }
+    Term
+        { compatible
+            | isBlankNodeOrIriOrLiteral : Yes
+            , isBlankNodeOrIriOrLiteralOrVar : Yes
+            , isIriOrLiteralOrVar : Yes
+        }
 
 
 {-| When writing your own helper functions, it might be necessary that you have
@@ -459,16 +494,12 @@ explanation of the idea behind this.
 -}
 type alias Var =
     Term
-        { isIri : No
-        , isVar : Yes
-        , isBlankNodeOrIri : No
-        , isBlankNodeOrIriOrLiteral : No
+        { isVar : Yes
         , isBlankNodeOrIriOrLiteralOrVar : Yes
         , isBlankNodeOrIriOrVar : Yes
         , isIriOrLiteralOrVar : Yes
         , isIriOrVar : Yes
         , isIriOrVarOrPath : Yes
-        , isIriOrPath : No
         }
 
 
@@ -479,7 +510,15 @@ passed. Take a look at [Term](Rdf#Term) for a general explanation of the idea
 behind this.
 -}
 type alias IsVar compatible =
-    Term { compatible | isVar : Yes }
+    Term
+        { compatible
+            | isVar : Yes
+            , isBlankNodeOrIriOrLiteralOrVar : Yes
+            , isBlankNodeOrIriOrVar : Yes
+            , isIriOrLiteralOrVar : Yes
+            , isIriOrVar : Yes
+            , isIriOrVarOrPath : Yes
+        }
 
 
 {-| When writing your own helper functions, it might be necessary that you have
@@ -503,15 +542,7 @@ of the idea behind this.
 -}
 type alias Path =
     Term
-        { isIri : No
-        , isVar : No
-        , isBlankNodeOrIri : No
-        , isBlankNodeOrIriOrLiteral : No
-        , isBlankNodeOrIriOrLiteralOrVar : No
-        , isBlankNodeOrIriOrVar : No
-        , isIriOrLiteralOrVar : No
-        , isIriOrVar : No
-        , isIriOrVarOrPath : Yes
+        { isIriOrVarOrPath : Yes
         , isIriOrPath : Yes
         }
 
@@ -522,7 +553,11 @@ passed. Take a look at [Term](Rdf#Term) for a general explanation of the idea
 behind this.
 -}
 type alias IsPath compatible =
-    Term { compatible | isPath : Yes }
+    Term
+        { compatible
+            | isIriOrVarOrPath : Yes
+            , isIriOrPath : Yes
+        }
 
 
 {-| When writing your own helper functions, it might be necessary that you have
@@ -548,16 +583,10 @@ explanation of the idea behind this.
 -}
 type alias BlankNodeOrIri =
     Term
-        { isIri : No
-        , isVar : No
-        , isBlankNodeOrIri : Yes
+        { isBlankNodeOrIri : Yes
         , isBlankNodeOrIriOrLiteral : Yes
         , isBlankNodeOrIriOrLiteralOrVar : Yes
         , isBlankNodeOrIriOrVar : Yes
-        , isIriOrLiteralOrVar : No
-        , isIriOrVar : No
-        , isIriOrVarOrPath : No
-        , isIriOrPath : No
         }
 
 
@@ -569,7 +598,13 @@ passed. Take a look at [Term](Rdf#Term) for a general explanation of the idea
 behind this.
 -}
 type alias IsBlankNodeOrIri compatible =
-    Term { compatible | isBlankNodeOrIri : Yes }
+    Term
+        { compatible
+            | isBlankNodeOrIri : Yes
+            , isBlankNodeOrIriOrLiteral : Yes
+            , isBlankNodeOrIriOrLiteralOrVar : Yes
+            , isBlankNodeOrIriOrVar : Yes
+        }
 
 
 {-| When writing your own helper functions, it might be necessary that you have
@@ -597,16 +632,8 @@ explanation of the idea behind this.
 -}
 type alias BlankNodeOrIriOrLiteral =
     Term
-        { isIri : No
-        , isVar : No
-        , isBlankNodeOrIri : No
-        , isBlankNodeOrIriOrLiteral : Yes
+        { isBlankNodeOrIriOrLiteral : Yes
         , isBlankNodeOrIriOrLiteralOrVar : Yes
-        , isBlankNodeOrIriOrVar : No
-        , isIriOrLiteralOrVar : No
-        , isIriOrVar : No
-        , isIriOrVarOrPath : No
-        , isIriOrPath : No
         }
 
 
@@ -619,7 +646,11 @@ are passed. Take a look at [Term](Rdf#Term) for a general explanation of the
 idea behind this.
 -}
 type alias IsBlankNodeOrIriOrLiteral compatible =
-    Term { compatible | isBlankNodeOrIriOrLiteral : Yes }
+    Term
+        { compatible
+            | isBlankNodeOrIriOrLiteral : Yes
+            , isBlankNodeOrIriOrLiteralOrVar : Yes
+        }
 
 
 {-| When writing your own helper functions, it might be necessary that you have
@@ -633,7 +664,128 @@ asBlankNodeOrIriOrLiteral (Term variant) =
 
 
 
+-- BLANK NODE OR IRI OR LITERAL OR VAR
+
+
+{-| TODO Add documentation
+-}
+type alias BlankNodeOrIriOrLiteralOrVar =
+    Term
+        { isBlankNodeOrIriOrLiteralOrVar : Yes
+        }
+
+
+{-| TODO Add documentation
+-}
+type alias IsBlankNodeOrIriOrLiteralOrVar compatible =
+    Term { compatible | isBlankNodeOrIriOrLiteralOrVar : Yes }
+
+
+{-| TODO Add documentation
+-}
+asBlankNodeOrIriOrLiteralOrVar :
+    IsBlankNodeOrIriOrLiteralOrVar compatible
+    -> BlankNodeOrIriOrLiteralOrVar
+asBlankNodeOrIriOrLiteralOrVar (Term variant) =
+    Term variant
+
+
+
+-- BLANK NODE OR IRI OR VAR
+
+
+{-| TODO Add documentation
+-}
+type alias BlankNodeOrIriOrVar =
+    Term
+        { isBlankNodeOrIriOrLiteralOrVar : Yes
+        , isBlankNodeOrIriOrVar : Yes
+        }
+
+
+{-| TODO Add documentation
+-}
+type alias IsBlankNodeOrIriOrVar compatible =
+    Term
+        { compatible
+            | isBlankNodeOrIriOrLiteralOrVar : Yes
+            , isBlankNodeOrIriOrVar : Yes
+        }
+
+
+{-| TODO Add documentation
+-}
+asBlankNodeOrIriOrVar : IsBlankNodeOrIriOrVar compatible -> BlankNodeOrIriOrVar
+asBlankNodeOrIriOrVar (Term variant) =
+    Term variant
+
+
+
+-- IRI OR LITERAL OR VAR
+
+
+{-| TODO Add documentation
+-}
+type alias IriOrLiteralOrVar =
+    Term
+        { isIriOrLiteralOrVar : Yes
+        }
+
+
+{-| TODO Add documentation
+-}
+type alias IsIriOrLiteralOrVar compatible =
+    Term { compatible | isIriOrLiteralOrVar : Yes }
+
+
+{-| TODO Add documentation
+-}
+asIriOrLiteralOrVar : IsIriOrLiteralOrVar compatible -> IriOrLiteralOrVar
+asIriOrLiteralOrVar (Term variant) =
+    Term variant
+
+
+
+-- IRI OR VAR OR PATH
+
+
+{-| TODO Add documentation
+-}
+type alias IriOrVarOrPath =
+    Term
+        { isIriOrVarOrPath : Yes
+        }
+
+
+{-| TODO Add documentation
+-}
+type alias IsIriOrVarOrPath compatible =
+    Term { compatible | isIriOrVarOrPath : Yes }
+
+
+{-| TODO Add documentation
+-}
+asIriOrVarOrPath : IsIriOrVarOrPath compatible -> IriOrVarOrPath
+asIriOrVarOrPath (Term variant) =
+    Term variant
+
+
+
 -- IRI OR PATH
+
+
+{-| An RDF term which can only be a
+[IRI](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-ri), or
+a [property path](https://www.w3.org/TR/sparql11-query/#propertypaths). This
+type will only be used as the return type of functions and if the values need
+to be stored in the model. Take a look at [Term](Rdf#Term) for a general
+explanation of the idea behind this.
+-}
+type alias IriOrPath =
+    Term
+        { isIriOrPath : Yes
+        , isIriOrVarOrPath : Yes
+        }
 
 
 {-| This type will only be used as the argument of functions and ensures that
@@ -643,7 +795,18 @@ passed. Take a look at [Term](Rdf#Term) for a general explanation of the idea
 behind this.
 -}
 type alias IsIriOrPath compatible =
-    Term { compatible | isIriOrPath : Yes }
+    Term
+        { compatible
+            | isIriOrPath : Yes
+            , isIriOrVarOrPath : Yes
+        }
+
+
+{-| TODO Add documentation
+-}
+asIriOrPath : IsIriOrPath compatible -> IriOrPath
+asIriOrPath (Term variant) =
+    Term variant
 
 
 
@@ -1060,6 +1223,22 @@ toLiteral : Term compatible -> Maybe Literal
 toLiteral (Term variant) =
     case variant of
         Literal _ ->
+            Just (Term variant)
+
+        _ ->
+            Nothing
+
+
+{-| Turn any [`Term`](#Term) into a [`Var`](#Var) if
+possible.
+-}
+toVar : Term compatible -> Maybe Var
+toVar (Term variant) =
+    case variant of
+        VarQ _ ->
+            Just (Term variant)
+
+        VarD _ ->
             Just (Term variant)
 
         _ ->
@@ -1503,6 +1682,33 @@ serializeQuery query =
 
 
 
+-- TRANSFORM QUERY VARIABLES
+
+
+{-| Append a `String` to a query variable.
+
+    append "Label" (varQ "instance")
+    --> varQ "instanceLabel"
+
+
+    append "Label" (varD "instance")
+    --> varD "instanceLabel"
+
+-}
+append : String -> IsVar compatible -> IsVar compatible
+append suffix ((Term variant) as term) =
+    case variant of
+        VarQ var ->
+            Term (VarQ (var ++ suffix))
+
+        VarD var ->
+            Term (VarD (var ++ suffix))
+
+        _ ->
+            term
+
+
+
 -- STRING OR LANG STRING
 
 
@@ -1586,6 +1792,198 @@ mergeStringOrLangStrings stringOrLangStrings =
         }
             |> StringOrLangString
             |> Just
+
+
+
+-- PROPERTY PATHS
+
+
+{-| TODO Explain properties.
+-}
+normalize : IsIriOrPath compatible -> IriOrPath
+normalize ((Term variant) as path) =
+    case variant of
+        Iri _ ->
+            asIriOrPath path
+
+        Sequence first rest ->
+            case rest of
+                [] ->
+                    normalize (Term first)
+
+                _ ->
+                    (first :: rest)
+                        |> flatten
+                        |> NonEmpty.fromList
+                        |> Maybe.map
+                            (\( firstFlat, restFlat ) ->
+                                Term
+                                    (Sequence
+                                        (toVariant (normalize (Term firstFlat)))
+                                        (List.map (Term >> normalize >> toVariant) restFlat)
+                                    )
+                            )
+                        |> Maybe.withDefault (asIriOrPath path)
+
+        Alternative _ _ ->
+            asIriOrPath path
+
+        Inverse _ ->
+            asIriOrPath path
+
+        ZeroOrMore _ ->
+            asIriOrPath path
+
+        OneOrMore _ ->
+            asIriOrPath path
+
+        ZeroOrOne _ ->
+            asIriOrPath path
+
+        _ ->
+            asIriOrPath path
+
+
+flatten : List Variant -> List Variant
+flatten paths =
+    List.concatMap
+        (\path ->
+            case path of
+                Sequence first rest ->
+                    first :: rest
+
+                _ ->
+                    [ path ]
+        )
+        paths
+
+
+{-| TODO Add documentation
+-}
+startsWith : IsIriOrPath compatible1 -> IsPath compatible2 -> Bool
+startsWith a b =
+    startsWithHelp (normalize a) (normalize b)
+
+
+startsWithHelp : IsPath compatible1 -> IsPath compatible2 -> Bool
+startsWithHelp (Term a) (Term b) =
+    case a of
+        Iri iriA ->
+            case b of
+                Iri iriB ->
+                    iriA == iriB
+
+                Sequence (Iri iriB) _ ->
+                    iriA == iriB
+
+                _ ->
+                    False
+
+        Sequence (Iri iriA) restA ->
+            case b of
+                Iri _ ->
+                    False
+
+                Sequence (Iri iriB) restB ->
+                    (iriA == iriB)
+                        && (List.zip restA restB
+                                |> List.map
+                                    (\( nextA, nextB ) ->
+                                        startsWithHelp (Term nextA) (Term nextB)
+                                    )
+                                |> List.all identity
+                           )
+
+                _ ->
+                    -- FIXME Implement
+                    False
+
+        _ ->
+            -- FIXME Implement
+            False
+
+
+{-| TODO Add documentation
+-}
+rightOf : IsIriOrPath compatible1 -> IsIriOrPath compatible2 -> Maybe IriOrPath
+rightOf a b =
+    rightOfHelp (normalize a) (normalize b)
+
+
+{-| TODO Add documentation
+-}
+lastPredicatePath : IsIriOrPath compatible -> Maybe Iri
+lastPredicatePath (Term variant) =
+    case variant of
+        Iri _ ->
+            Just (Term variant)
+
+        Sequence first rest ->
+            case rest of
+                [] ->
+                    lastPredicatePath (Term first)
+
+                _ ->
+                    rest
+                        |> List.reverse
+                        |> List.head
+                        |> Maybe.andThen (Term >> lastPredicatePath)
+
+        _ ->
+            Nothing
+
+
+rightOfHelp : IsPath compatible1 -> IsPath compatible2 -> Maybe Path
+rightOfHelp (Term a) (Term b) =
+    case a of
+        Iri iriA ->
+            case b of
+                Iri _ ->
+                    Nothing
+
+                Sequence (Iri iriB) (firstB :: restB) ->
+                    if iriA == iriB then
+                        Just (Term (Sequence firstB restB))
+
+                    else
+                        Nothing
+
+                _ ->
+                    Nothing
+
+        Sequence (Iri iriA) restA ->
+            case b of
+                Iri _ ->
+                    Nothing
+
+                Sequence (Iri iriB) restB ->
+                    if
+                        (iriA == iriB)
+                            && (List.zip restA restB
+                                    |> List.map
+                                        (\( nextA, nextB ) ->
+                                            startsWithHelp (Term nextA) (Term nextB)
+                                        )
+                                    |> List.all identity
+                               )
+                    then
+                        case List.drop (List.length restA) restB of
+                            firstB :: restRestB ->
+                                Just (Term (Sequence firstB restRestB))
+
+                            _ ->
+                                Nothing
+
+                    else
+                        Nothing
+
+                _ ->
+                    -- FIXME Implement
+                    Nothing
+
+        _ ->
+            -- FIXME Implement
+            Nothing
 
 
 

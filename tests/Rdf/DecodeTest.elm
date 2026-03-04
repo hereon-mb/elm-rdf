@@ -5,7 +5,6 @@ import Rdf
 import Rdf.Decode as Decode exposing (Decoder)
 import Rdf.Graph as Graph
 import Rdf.Namespaces as Rdf
-import Rdf.PropertyPath as Rdf
 import Test exposing (Test, describe, test)
 
 
@@ -47,7 +46,7 @@ many =
                 Decode.from
                     (example "x")
                     (Decode.property
-                        (Rdf.PredicatePath (example "label"))
+                        (example "label")
                         (Decode.many Decode.string)
                     )
             }
@@ -66,7 +65,7 @@ manyMany =
             , decoder =
                 Decode.from (example "x")
                     (Decode.property
-                        (Rdf.PredicatePath (example "label"))
+                        (example "label")
                         (Decode.map List.concat (Decode.many (Decode.many Decode.string)))
                     )
             }
@@ -85,7 +84,7 @@ manyWithInverse =
                 """
             , decoder =
                 Decode.from (example "#Person")
-                    (Decode.property (Rdf.InversePath (Rdf.PredicatePath Rdf.a))
+                    (Decode.property (Rdf.inverse Rdf.a)
                         (Decode.many Decode.iri)
                     )
             }
@@ -117,7 +116,7 @@ manyWithInverseAndData =
                 """
             , decoder =
                 Decode.from (example "#Person")
-                    (Decode.property (Rdf.InversePath (Rdf.PredicatePath Rdf.a))
+                    (Decode.property (Rdf.inverse Rdf.a)
                         (Decode.many (Decode.predicate (example "#name") Decode.string))
                     )
             }
@@ -139,7 +138,7 @@ stringOrLangString =
                 """
             , decoder =
                 Decode.from (example "x")
-                    (Decode.property (Rdf.PredicatePath (Rdf.rdfs "label"))
+                    (Decode.property (Rdf.rdfs "label")
                         Decode.stringOrLangString
                     )
             }
@@ -164,7 +163,7 @@ propertyWithCorrectObject =
                 """
             , decoder =
                 Decode.from (example "x")
-                    (Decode.property (Rdf.PredicatePath (example "hasString"))
+                    (Decode.property (example "hasString")
                         Decode.string
                     )
             }
@@ -182,7 +181,7 @@ propertyWithIncorrectObject =
                 """
             , decoder =
                 Decode.from (example "x")
-                    (Decode.property (Rdf.PredicatePath (example "hasString"))
+                    (Decode.property (example "hasString")
                         Decode.string
                     )
             }
@@ -206,19 +205,19 @@ propertyMissing =
                 """
             , decoder =
                 Decode.from (example "x")
-                    (Decode.property (Rdf.PredicatePath (example "hasString"))
+                    (Decode.property (example "hasString")
                         Decode.string
                     )
             }
                 |> expectAllError
                     [ Expect.equal
                         (Decode.AtPropertyPath
-                            (Rdf.PredicatePath (example "hasString"))
+                            (Rdf.asIriOrPath (example "hasString"))
                             { contextStack = []
                             , error =
                                 Decode.UnknownProperty
                                     (Rdf.asBlankNodeOrIri (example "x"))
-                                    (Rdf.PredicatePath (example "hasString"))
+                                    (Rdf.asIriOrPath (example "hasString"))
                             }
                         )
                     ]
@@ -238,9 +237,9 @@ propertyWithPathAndWithManyInstances =
             , decoder =
                 Decode.from (example "x")
                     (Decode.property
-                        (Rdf.SequencePath
-                            (Rdf.PredicatePath (example "hasInstance"))
-                            [ Rdf.PredicatePath (example "hasInteger") ]
+                        (Rdf.sequence
+                            (example "hasInstance")
+                            [ example "hasInteger" ]
                         )
                         (Decode.many Decode.int)
                     )
@@ -259,7 +258,7 @@ noPropertySuccess =
                 """
             , decoder =
                 Decode.from (example "x")
-                    (Decode.noProperty (Rdf.PredicatePath (example "hasString")))
+                    (Decode.noProperty (example "hasString"))
             }
                 |> expectAll [ Expect.equal () ]
 
@@ -275,13 +274,13 @@ noPropertyWithProperty =
                 """
             , decoder =
                 Decode.from (example "x")
-                    (Decode.noProperty (Rdf.PredicatePath (example "hasString")))
+                    (Decode.noProperty (example "hasString"))
             }
                 |> expectAllError
                     [ Expect.equal
                         (Decode.PropertyPresent
                             (Rdf.asBlankNodeOrIri (example "x"))
-                            (Rdf.PredicatePath (example "hasString"))
+                            (Rdf.asIriOrPath (example "hasString"))
                         )
                     ]
 

@@ -11,7 +11,7 @@
         "Rdf.Graph",
         "Rdf.Namespaces",
         "Rdf.Predicate",
-        "Rdf.PropertyPath"
+        "Rdf.Sparql"
     ],
     "elm-version": "0.19.1 <= v < 0.20.0",
     "dependencies": {
