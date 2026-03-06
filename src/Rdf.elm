@@ -30,7 +30,7 @@ module Rdf exposing
     , toVar
     , toBlankNodeOrIri, toBlankNodeOrIriOrLiteral
     , toUrl
-    , lexicalForm
+    , lexicalForm, datatype
     , toString, toLangString
     , toInt, toFloat, toDecimal
     , toDate, toDateTime
@@ -144,7 +144,7 @@ This section contains helper functions to convert specific [`Term`](#Term)'s
 into Elm values.
 
 @docs toUrl
-@docs lexicalForm
+@docs lexicalForm, datatype
 @docs toString, toLangString
 @docs toInt, toFloat, toDecimal
 @docs toDate, toDateTime
@@ -821,11 +821,11 @@ datatypes](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#xsd-datatypes
 
 -}
 literal : Iri -> String -> Literal
-literal datatype value =
+literal datatype_ value =
     Term
         (Literal
             { value = value
-            , datatype = toUrl datatype
+            , datatype = toUrl datatype_
             , languageTag = Nothing
             }
         )
@@ -1272,6 +1272,18 @@ lexicalForm (Term variant) =
 
         _ ->
             ""
+
+
+{-| Get the [`Literal`](#Literal)'s datatype as [`Iri`](#Iri).
+-}
+datatype : Literal -> Iri
+datatype (Term variant) =
+    case variant of
+        Literal data ->
+            iri data.datatype
+
+        _ ->
+            iri ""
 
 
 {-| Take any [`Term`](#Term) and extract its String value if it is a literal
