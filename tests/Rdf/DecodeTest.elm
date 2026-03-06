@@ -117,7 +117,7 @@ manyWithInverseAndData =
             , decoder =
                 Decode.from (example "#Person")
                     (Decode.property (Rdf.inverse Rdf.a)
-                        (Decode.many (Decode.predicate (example "#name") Decode.string))
+                        (Decode.many (Decode.property (example "#name") Decode.string))
                     )
             }
                 |> expectAll
@@ -187,9 +187,9 @@ propertyWithIncorrectObject =
             }
                 |> expectAllError
                     [ Expect.equal
-                        (Decode.ExpectedLiteralDatatype
-                            (xsd "string")
-                            (xsd "integer")
+                        (Decode.ExpectedLiteralOf
+                            [ xsd "string" ]
+                            (Rdf.integer 42)
                         )
                     ]
 
@@ -211,14 +211,9 @@ propertyMissing =
             }
                 |> expectAllError
                     [ Expect.equal
-                        (Decode.AtPropertyPath
+                        (Decode.ExpectedPath
+                            (Rdf.asBlankNodeOrIri (example "x"))
                             (Rdf.asPath (example "hasString"))
-                            { contextStack = []
-                            , error =
-                                Decode.UnknownProperty
-                                    (Rdf.asBlankNodeOrIri (example "x"))
-                                    (Rdf.asPath (example "hasString"))
-                            }
                         )
                     ]
 
@@ -278,9 +273,12 @@ noPropertyWithProperty =
             }
                 |> expectAllError
                     [ Expect.equal
-                        (Decode.PropertyPresent
+                        (Decode.ExpectedNoPath
                             (Rdf.asBlankNodeOrIri (example "x"))
                             (Rdf.asPath (example "hasString"))
+                            [ Rdf.asBlankNodeOrIriOrLiteral
+                                (Rdf.string "string")
+                            ]
                         )
                     ]
 
@@ -298,8 +296,8 @@ combineSuccess =
             , decoder =
                 Decode.from (example "x")
                     (Decode.combine
-                        [ Decode.predicate (example "hasIntegerA") Decode.int
-                        , Decode.predicate (example "hasIntegerB") Decode.int
+                        [ Decode.property (example "hasIntegerA") Decode.int
+                        , Decode.property (example "hasIntegerB") Decode.int
                         ]
                     )
             }
@@ -319,27 +317,18 @@ combineOneFails =
             , decoder =
                 Decode.from (example "x")
                     (Decode.combine
-                        [ Decode.predicate (example "hasIntegerA") Decode.int
-                        , Decode.predicate (example "hasIntegerB") Decode.int
+                        [ Decode.property (example "hasIntegerA") Decode.int
+                        , Decode.property (example "hasIntegerB") Decode.int
                         ]
                     )
             }
                 |> expectAllError
                     [ Expect.equal
-                        (Decode.Batch
-                            [ { error =
-                                    Decode.ExpectedLiteralDatatype
-                                        (xsd "integer")
-                                        (xsd "string")
-                              , contextStack = []
-                              }
-                            , { error =
-                                    Decode.ExpectedLiteralDatatype
-                                        (xsd "int")
-                                        (xsd "string")
-                              , contextStack = []
-                              }
+                        (Decode.ExpectedLiteralOf
+                            [ xsd "integer"
+                            , xsd "int"
                             ]
+                            (Rdf.string "string")
                         )
                     ]
 
@@ -369,7 +358,10 @@ expectAll expectations { raw, decoder } =
                     Expect.all expectations value
 
 
-expectAllError : List (Decode.Problem -> Expectation) -> { raw : String, decoder : Decoder a } -> Expectation
+expectAllError :
+    List (Decode.Problem -> Expectation)
+    -> { raw : String, decoder : Decoder a }
+    -> Expectation
 expectAllError expectations { raw, decoder } =
     case Graph.parse raw of
         Err error ->

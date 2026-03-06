@@ -1,45 +1,49 @@
 module Rdf.Decode exposing
     ( Decoder
     , iri
-    , blankNodeOrIri, anyLiteral, blankNodeOrIriOrLiteral
-    , object
-    , literal
-    , string, stringOrLangString
-    , bool, int, float, number
-    , date, dateTime
-    , subject
-    , from, fromSubject
     , blankNode
-    , predicate, property, anyPredicate
+    , literal
+    , blankNodeOrIri, blankNodeOrIriOrLiteral
+    , string, langString, stringOrLangString
+    , bool
+    , decimal, int, float, number
+    , date, dateTime
+    , from, fromSubject
+    , at
+    , many, indexedMany
+    , oneOf
+    , list, nonEmpty
+    , property
+    , anyPredicate
     , noProperty
     , predicates
-    , list, nonEmpty
-    , at
     , decode
-    , Problem(..), Error, errorToString
-    , map
-    , map2
+    , Error, Problem(..), errorToString
+    , inContext
+    , succeed, fail, failWith
+    , map, map2
+    , andMap
+    , andThen
     , combine
-    , required, requiredAt
-    , optional, optionalAt
+    , lazy
+    , required
+    , optional
     , hardcoded
     , custom
-    , succeed, fail, failWith
-    , andThen
-    , oneOf
-    , many, indexedMany
-    , lazy
-    , inContext
-    , logFailure
     )
 
-{-| The `DefaultValue` API is a parser combinator for functions `Node -> a` that supports querying.
+{-| Extract Elm values from `Rdf.Graph`'s. This works similar to
+[Json.Decode](https://package.elm-lang.org/packages/elm/json/latest/Json-Decode)
+with a few differences:
 
-The `Rdf` functions, say, `toIri`, are functions `Node -> a`, but do not allow for combination or querying.
+  - You have to specify the node at which decoding starts. The reason is, that
+    there is no obvious choice within a graph, like it is for a JSON object where
+    decoding always starts at the root.
 
-The `Rdf.Query` functions are functions `Graph -> a`, that do support querying (duh!), but no also combination.
-
-So there _is_ some value there, but I think inlining the module out-of-existence might not be too bad of code duplication, either.
+  - RDF allows multiple objects for one predicate, unlike JSON where a field is
+    assumed to appear once. Therefore one has to use [`many`](#many) to switch
+    from decoding **exactly one** value to allowing **arbitrarily many** values
+    at a certain predicate.
 
 
 # Basic Decoders
@@ -47,69 +51,79 @@ So there _is_ some value there, but I think inlining the module out-of-existence
 @docs Decoder
 
 @docs iri
-@docs blankNodeOrIri, anyLiteral, blankNodeOrIriOrLiteral
-@docs object
-
+@docs blankNode
 @docs literal
-@docs string, stringOrLangString
-@docs bool, int, float, number
+
+@docs blankNodeOrIri, blankNodeOrIriOrLiteral
+
+
+## Specific literals
+
+@docs string, langString, stringOrLangString
+@docs bool
+@docs decimal, int, float, number
 @docs date, dateTime
 
-@docs subject
 
-
-# Finding Values
+## Focus nodes
 
 @docs from, fromSubject
-@docs blankNode
-@docs predicate, property, anyPredicate
+@docs at
+
+
+## Multiplicities
+
+@docs many, indexedMany
+
+
+## Inconsistent structure
+
+@docs oneOf
+
+
+## Containers
+
+@docs list, nonEmpty
+
+
+## Properties
+
+@docs property
+@docs anyPredicate
 @docs noProperty
 @docs predicates
-@docs list, nonEmpty
-@docs at
 
 
 # Running Decoders
 
 @docs decode
-@docs Problem, Error, errorToString
+@docs Error, Problem, errorToString
+@docs inContext
 
 
-# Transforming Values
-
-@docs map
-@docs map2
-@docs combine
-
-
-## Pipeline
-
-@docs required, requiredAt
-@docs optional, optionalAt
-@docs hardcoded
-@docs custom
-
-
-# Combining Decoders
+# Transforming and chaining
 
 @docs succeed, fail, failWith
+@docs map, map2
+@docs andMap
 @docs andThen
-@docs oneOf
-@docs many, indexedMany
+@docs combine
 @docs lazy
 
 
-# Improving error messages and debugging
+## Pipelines
 
-@docs inContext
-@docs logFailure
+@docs required
+@docs optional
+@docs hardcoded
+@docs custom
 
 -}
 
-import Basics.Extra exposing (flip)
+import Decimal exposing (Decimal)
 import Dict exposing (Dict)
 import Internal.Graph exposing (Graph(..))
-import Internal.Term exposing (DataLiteral, Term(..), Variant(..))
+import Internal.Term exposing (Term(..), Variant(..))
 import List.Extra as List
 import List.NonEmpty as NonEmpty exposing (NonEmpty)
 import Maybe.Extra as Maybe
@@ -120,68 +134,19 @@ import Rdf
         , Iri
         , IsBlankNodeOrIri
         , IsBlankNodeOrIriOrLiteral
-        , IsIri
         , IsPath
         , Literal
         , Path
+        , StringOrLangString
         , Triple
         )
-import Rdf.Namespaces as Rdf exposing (rdf)
+import Rdf.Namespaces exposing (rdf)
 import Result.Extra as Result
 import Time
 
 
-{-| Decode a list of focus nodes by the given decoder.
 
-Note that the position of `many` within a decode expression matters. Say, a focus node has multiple classes.
-
-The following decoder works as expected:
-
-    property a (many class)
-
-Hoever, the following (type-valid) decoder does NOT work:
-
-    many (property a class)
-
-Note that `property a class` alone fails (since there are many classes), and so `many (property a class)` fails as a whole!
-
--}
-many : Decoder a -> Decoder (List a)
-many (Decoder f) =
-    Decoder
-        (\graph ->
-            Result.andThen
-                (\nodes ->
-                    Result.combine (List.map (f graph << Ok << List.singleton) nodes)
-                )
-        )
-
-
-{-| FIXME We also want a indexedManySafe which always succeeds by filtering out
-the elements for which the provided decoder fails, and which re-uses an index
-if the element failed decoding.
--}
-indexedMany : (Int -> Decoder a) -> Decoder (List a)
-indexedMany toDecoder =
-    Decoder
-        (\graph ->
-            Result.andThen
-                (\nodes ->
-                    Result.combine
-                        (List.indexedMap
-                            (\index ->
-                                let
-                                    (Decoder f) =
-                                        toDecoder index
-                                in
-                                List.singleton
-                                    >> Ok
-                                    >> f graph
-                            )
-                            nodes
-                        )
-                )
-        )
+-- BASIC DECODERS
 
 
 {-| A way to specify what kind of thing you want to decode into.
@@ -200,273 +165,59 @@ type alias State =
     }
 
 
-{-| TODO Add documentation
--}
-at : List BlankNodeOrIriOrLiteral -> Decoder a -> Decoder a
-at nodes (Decoder f) =
-    Decoder (\graph _ -> f graph (Ok nodes))
+{-| Decode an [IRI](https://www.w3.org/TR/rdf11-concepts/#section-IRIs).
 
+    import Rdf
+    import Rdf.Graph as Rdf exposing (Graph)
+    import Rdf.Namespaces exposing (a)
 
-{-| TODO Add documentation
+    graph : Graph
+    graph =
+        """
+        @base <http://example.org/> .
+        <alice> a <#Person> .
+        """
+            |> Rdf.parse
+            |> Result.withDefault Rdf.emptyGraph
+
+    decode
+        (from
+            (Rdf.iri "http://example.org/alice")
+            (property a iri)
+        )
+        graph
+    --> Ok (Rdf.iri "http://example.org/#Person")
+
 -}
-object : Decoder BlankNodeOrIriOrLiteral
-object =
+iri : Decoder Iri
+iri =
     Decoder
         (\state ->
             Result.andThen
                 (\nodes ->
                     case nodes of
                         [ node ] ->
-                            Ok node
+                            case node of
+                                Term ((Iri _) as variant) ->
+                                    Ok (Term variant)
+
+                                Term _ ->
+                                    Err
+                                        { error = ExpectedIri node
+                                        , contextStack = state.context
+                                        }
 
                         _ ->
                             Err
-                                { error = TooManyNodes nodes
+                                { error = ExpectedOneNode nodes
                                 , contextStack = state.context
                                 }
                 )
         )
 
 
-{-| TODO Add documentation
--}
-from : IsBlankNodeOrIri compatible -> Decoder a -> Decoder a
-from nodeFocusCompatible (Decoder f) =
-    let
-        nodeFocus : BlankNodeOrIri
-        nodeFocus =
-            Rdf.asBlankNodeOrIri nodeFocusCompatible
-    in
-    Decoder
-        (\state _ ->
-            if
-                hasTripleWithSubject nodeFocus state.graph
-                    || hasTripleWithObject nodeFocus state.graph
-            then
-                f state (Ok [ Rdf.asBlankNodeOrIriOrLiteral nodeFocus ])
-
-            else
-                Err
-                    { error = NodeDoesNotExist (Rdf.asBlankNodeOrIri nodeFocus)
-                    , contextStack = state.context
-                    }
-        )
-
-
-{-| TODO Add documentation
--}
-fromSubject : Decoder a -> Decoder a
-fromSubject (Decoder f) =
-    Decoder
-        (\state _ ->
-            state.graph
-                |> getSubjects
-                |> List.map Rdf.asBlankNodeOrIriOrLiteral
-                |> Ok
-                |> f state
-        )
-
-
-{-| Run a [`Decoder`](#Decoder) on an actual `Graph` starting at the provided
-`Node`'s.
--}
-decode : Decoder a -> Graph -> Result Error a
-decode (Decoder f) graph =
-    f
-        { graph = graph
-        , context = []
-        }
-        (Err
-            { error = NoFocusNode
-            , contextStack = []
-            }
-        )
-
-
-{-| TODO add documentation
--}
-type alias Error =
-    { error : Problem
-    , contextStack : List String
-    }
-
-
-{-| When the decoding fails, we get on of these. Use
-[`errorToString`](#errorToString) to turn this into a human-friendly form.
--}
-type Problem
-    = InvalidDate BlankNodeOrIriOrLiteral
-    | InvalidDateTime BlankNodeOrIriOrLiteral
-    | ExpectedBlankNode BlankNodeOrIriOrLiteral
-    | ExpectedIri BlankNodeOrIriOrLiteral
-    | ExpectedBlankNodeOrIri BlankNodeOrIriOrLiteral
-    | ExpectedLiteral BlankNodeOrIriOrLiteral
-    | ExpectedBool String
-    | ExpectedInt String
-    | ExpectedFloat String
-    | ExpectedLiteralDatatype Iri Iri
-    | UnknownProperty BlankNodeOrIri Path
-    | PropertyPresent BlankNodeOrIri Path
-    | NoProperty BlankNodeOrIri
-    | AtPropertyPath Path Error
-    | UnexpectedEmptyList
-    | CustomError String
-    | Failure String
-    | FailureAt String (List BlankNodeOrIriOrLiteral)
-    | Batch (List Error)
-    | TooManyNodes (List BlankNodeOrIriOrLiteral)
-    | MissingLangString Literal
-    | TooManyStrings (List String)
-    | NodeDoesNotExist BlankNodeOrIri
-    | NoFocusNode
-
-
-{-| Turn a decoding error into a human friendly string. E.g.
-
-    errorToString { error = ExpectedBool "42", contextStack = [] }
-    --> "Expected a boolean, but found 42."
-
--}
-errorToString : Error -> String
-errorToString { error, contextStack } =
-    if List.isEmpty contextStack then
-        problemToString error
-
-    else
-        String.join "\n"
-            [ problemToString error
-            , ""
-            , "Context:"
-            , ""
-            , indent (String.join "\n" contextStack)
-            ]
-
-
-problemToString : Problem -> String
-problemToString problem =
-    case problem of
-        InvalidDate _ ->
-            "Not a date"
-
-        InvalidDateTime _ ->
-            "Not a date time"
-
-        ExpectedLiteralDatatype datatypeExpected datatypeFound ->
-            "Expected a literal of type "
-                ++ Rdf.toUrl datatypeExpected
-                ++ ", but found a literal of type "
-                ++ Rdf.toUrl datatypeFound
-                ++ "."
-
-        ExpectedBlankNode nodeFound ->
-            "Expected a blank node, but found " ++ Rdf.serialize nodeFound ++ "."
-
-        ExpectedIri nodeFound ->
-            "Expected an IRI, but found " ++ Rdf.serialize nodeFound ++ "."
-
-        ExpectedBlankNodeOrIri nodeFound ->
-            "Expected a blank node or an IRI, but found " ++ Rdf.serialize nodeFound ++ "."
-
-        ExpectedLiteral nodeFound ->
-            "Expected a literal, but found " ++ Rdf.serialize nodeFound ++ "."
-
-        ExpectedBool found ->
-            "Expected a boolean, but found " ++ found ++ "."
-
-        ExpectedInt found ->
-            "Expected an integer, but found " ++ found ++ "."
-
-        ExpectedFloat found ->
-            "Expected a float, but found " ++ found ++ "."
-
-        UnknownProperty nodeFocus pathExpected ->
-            "No such property "
-                ++ Rdf.serialize pathExpected
-                ++ " found at "
-                ++ Rdf.serialize nodeFocus
-                ++ "."
-
-        PropertyPresent nodeFocus pathExpected ->
-            "Found object for property "
-                ++ Rdf.serialize pathExpected
-                ++ " at "
-                ++ Rdf.serialize nodeFocus
-                ++ "."
-
-        NoProperty nodeFocus ->
-            "No property found at " ++ Rdf.serialize nodeFocus ++ "."
-
-        AtPropertyPath path errorNested ->
-            "Problem with the value at "
-                ++ Rdf.serialize path
-                ++ ":\n\n    "
-                ++ errorToString errorNested
-
-        UnexpectedEmptyList ->
-            "Expected a non-empty list, but found an empty list."
-
-        CustomError s ->
-            s
-
-        Failure msg ->
-            msg
-
-        FailureAt msg nodes ->
-            String.join "\n"
-                [ "Problem with the given value at"
-                , ""
-                , indent (String.join ",\n" (List.map Rdf.serialize nodes))
-                , ""
-                , msg
-                ]
-
-        Batch errors ->
-            "Decoding failed in one of the following ways:\n\n"
-                ++ indent
-                    (String.join "\n\n"
-                        (List.map
-                            (\errorNested ->
-                                "- " ++ errorToString errorNested
-                            )
-                            errors
-                        )
-                    )
-
-        TooManyNodes nodesFound ->
-            "I expected a single node, but I found multiple:\n"
-                ++ indent
-                    (String.join "\n"
-                        (List.map Rdf.serialize nodesFound)
-                    )
-
-        MissingLangString nodeFound ->
-            "I expected a lang string, but I found "
-                ++ Rdf.serialize nodeFound
-                ++ "."
-
-        TooManyStrings stringsFound ->
-            "I expected a single string, but I found multiple strings "
-                ++ String.join ", " stringsFound
-                ++ "."
-
-        NodeDoesNotExist node ->
-            "The node "
-                ++ Rdf.serialize node
-                ++ " does not exist."
-
-        NoFocusNode ->
-            "There is no focus node to start decoding from."
-
-
-indent : String -> String
-indent lines =
-    lines
-        |> String.lines
-        |> List.map (\line -> "    " ++ line)
-        |> String.join "\n"
-
-
-{-| TODO
+{-| Decode a [blank
+node](https://www.w3.org/TR/rdf11-concepts/#section-blank-nodes).
 -}
 blankNode : Decoder a -> Decoder a
 blankNode (Decoder f) =
@@ -489,28 +240,36 @@ blankNode (Decoder f) =
 
                         _ ->
                             Err
-                                { error = TooManyNodes nodes
+                                { error = ExpectedOneNode nodes
                                 , contextStack = state.context
                                 }
                 )
         )
 
 
-{-| TODO
+{-| Decode a literal of any datatype.
 -}
-subject : Decoder BlankNodeOrIriOrLiteral
-subject =
+literal : Decoder Literal
+literal =
     Decoder
         (\state ->
             Result.andThen
                 (\nodes ->
                     case nodes of
                         [ node ] ->
-                            Ok node
+                            case node of
+                                Term ((Literal _) as variant) ->
+                                    Ok (Term variant)
+
+                                Term _ ->
+                                    Err
+                                        { error = ExpectedLiteral node
+                                        , contextStack = state.context
+                                        }
 
                         _ ->
                             Err
-                                { error = TooManyNodes nodes
+                                { error = ExpectedOneNode nodes
                                 , contextStack = state.context
                                 }
                 )
@@ -537,7 +296,7 @@ Node](https://www.w3.org/TR/rdf11-concepts/#section-blank-nodes) or
     decode
         (from
             (Rdf.iri "http://example.org/alice")
-            (predicate (Rdf.iri "http://example.org/#knows") blankNodeOrIri)
+            (property (Rdf.iri "http://example.org/#knows") blankNodeOrIri)
         )
         graph
     --> Ok (Rdf.asBlankNodeOrIri (Rdf.iri "http://example.org/bob"))
@@ -545,43 +304,139 @@ Node](https://www.w3.org/TR/rdf11-concepts/#section-blank-nodes) or
 -}
 blankNodeOrIri : Decoder BlankNodeOrIri
 blankNodeOrIri =
-    oneOf
-        [ map Rdf.asBlankNodeOrIri iri
-        , map Rdf.asBlankNodeOrIri
-            (blankNode
-                (subject
-                    |> andThen
-                        (\node ->
-                            Maybe.unwrap
-                                (err (ExpectedBlankNode node))
-                                succeed
-                                (Rdf.toBlankNode node)
-                        )
+    Decoder
+        (\state ->
+            Result.andThen
+                (\nodes ->
+                    case nodes of
+                        [ node ] ->
+                            case node of
+                                Term ((Iri _) as variant) ->
+                                    Ok (Term variant)
+
+                                Term ((BlankNode _) as variant) ->
+                                    Ok (Term variant)
+
+                                _ ->
+                                    Err
+                                        { error = ExpectedBlankNodeOrIri node
+                                        , contextStack = state.context
+                                        }
+
+                        _ ->
+                            Err
+                                { error = ExpectedOneNode nodes
+                                , contextStack = state.context
+                                }
                 )
-            )
-        ]
+        )
 
 
-{-| TODO Add documentation
+{-| Decode a [blank
+node](https://www.w3.org/TR/rdf11-concepts/#section-blank-nodes), an
+[IRI](https://www.w3.org/TR/rdf11-concepts/#section-IRIs), or
+a [literal](https://www.w3.org/TR/rdf11-concepts/#section-literal).
 -}
 blankNodeOrIriOrLiteral : Decoder BlankNodeOrIriOrLiteral
 blankNodeOrIriOrLiteral =
-    oneOf
-        [ map Rdf.asBlankNodeOrIriOrLiteral iri
-        , map Rdf.asBlankNodeOrIriOrLiteral
-            (blankNode
-                (subject
-                    |> andThen
-                        (\node ->
-                            Maybe.unwrap
-                                (err (ExpectedBlankNode node))
-                                succeed
-                                (Rdf.toBlankNode node)
-                        )
+    Decoder
+        (\state ->
+            Result.andThen
+                (\nodes ->
+                    case nodes of
+                        [ node ] ->
+                            Ok node
+
+                        _ ->
+                            Err
+                                { error = ExpectedOneNode nodes
+                                , contextStack = state.context
+                                }
                 )
+        )
+
+
+
+-- SPECIFIC LITERALS
+
+
+{-| Decode a Literal of type `xsd:string` into a `String`.
+
+    import Rdf
+    import Rdf.Graph as Rdf exposing (Graph)
+    import Rdf.Namespaces exposing (a)
+
+    graph : Graph
+    graph =
+        """
+        @base <http://example.org/> .
+        <alice> <#name> "Alice Wonderland" .
+        """
+            |> Rdf.parse
+            |> Result.withDefault Rdf.emptyGraph
+
+    decode
+        (from
+            (Rdf.iri "http://example.org/alice")
+            (property (Rdf.iri "http://example.org/#name") string)
+        )
+        graph
+    --> Ok "Alice Wonderland"
+
+-}
+string : Decoder String
+string =
+    andThen
+        (\lit ->
+            case Rdf.toString lit of
+                Nothing ->
+                    err (ExpectedLiteralOf [ iriXsdString ] lit)
+
+                Just val ->
+                    succeed val
+        )
+        literal
+
+
+{-| Decode a literal of type `rdf:langString` into a `( String, String )` where
+the first element is the language tag and the second the String value.
+-}
+langString : Decoder ( String, String )
+langString =
+    andThen
+        (\lit ->
+            case Rdf.toLangString lit of
+                Nothing ->
+                    err (ExpectedLiteralOf [ iriRdfLangString ] lit)
+
+                Just val ->
+                    succeed val
+        )
+        literal
+
+
+{-| Decode a `StringOrLangString`.
+-}
+stringOrLangString : Decoder StringOrLangString
+stringOrLangString =
+    many
+        (oneOf
+            [ map Err langString
+            , map Ok string
+            ]
+        )
+        |> andThen
+            (\stringsOrLangStrings ->
+                case Result.partition stringsOrLangStrings of
+                    ( [], langStrings ) ->
+                        succeed (Rdf.stringOrLangStringFrom Nothing langStrings)
+
+                    ( [ string_ ], langStrings ) ->
+                        succeed (Rdf.stringOrLangStringFrom (Just string_) langStrings)
+
+                    ( strings, _ ) ->
+                        err (TooManyStrings strings)
             )
-        , map Rdf.asBlankNodeOrIriOrLiteral anyLiteral
-        ]
 
 
 {-| Decode a Literal of type `xsd:boolean` into a `Bool`.
@@ -602,7 +457,7 @@ blankNodeOrIriOrLiteral =
     decode
         (from
             (Rdf.iri "http://example.org/alice")
-            (predicate (Rdf.iri "http://example.org/#isAdmin") bool)
+            (property (Rdf.iri "http://example.org/#isAdmin") bool)
         )
         graph
     --> Ok True
@@ -610,22 +465,40 @@ blankNodeOrIriOrLiteral =
 -}
 bool : Decoder Bool
 bool =
-    literal (Rdf.xsd "boolean")
-        |> andThen
-            (\stringLiteral ->
-                case stringLiteral of
-                    "true" ->
-                        succeed True
+    andThen
+        (\lit ->
+            case Rdf.toBool lit of
+                Nothing ->
+                    err (ExpectedLiteralOf [ iriXsdBoolean ] lit)
 
-                    "false" ->
-                        succeed False
-
-                    _ ->
-                        err (ExpectedBool stringLiteral)
-            )
+                Just val ->
+                    succeed val
+        )
+        literal
 
 
-{-| Decode a Literal of type `xsd:integer` into a `Int`.
+{-| Decode a literal of type `xsd:decimal` into a `Decimal`.
+-}
+decimal : Decoder Decimal
+decimal =
+    andThen
+        (\lit ->
+            case Rdf.toDecimal lit of
+                Nothing ->
+                    err
+                        (ExpectedLiteralOf
+                            [ iriXsdDecimal
+                            ]
+                            lit
+                        )
+
+                Just val ->
+                    succeed val
+        )
+        literal
+
+
+{-| Decode a Literal of type `xsd:integer` or `xsd:int` into a `Int`.
 
     import Rdf
     import Rdf.Graph as Rdf exposing (Graph)
@@ -643,7 +516,7 @@ bool =
     decode
         (from
             (Rdf.iri "http://example.org/question")
-            (predicate (Rdf.iri "http://example.org/#hasAnswer") int)
+            (property (Rdf.iri "http://example.org/#hasAnswer") int)
         )
         graph
     --> Ok 42
@@ -651,22 +524,25 @@ bool =
 -}
 int : Decoder Int
 int =
-    oneOf
-        [ literal (Rdf.xsd "integer")
-        , literal (Rdf.xsd "int")
-        ]
-        |> andThen
-            (\intLiteral ->
-                case String.toInt intLiteral of
-                    Nothing ->
-                        err (ExpectedInt intLiteral)
+    andThen
+        (\lit ->
+            case Rdf.toInt lit of
+                Nothing ->
+                    err
+                        (ExpectedLiteralOf
+                            [ iriXsdInteger
+                            , iriXsdInt
+                            ]
+                            lit
+                        )
 
-                    Just intValue ->
-                        succeed intValue
-            )
+                Just val ->
+                    succeed val
+        )
+        literal
 
 
-{-| Decode a Literal of type `xsd:double` into a `Float`.
+{-| Decode a Literal of type `xsd:double` or `xsd:float` into a `Float`.
 
     import Rdf
     import Rdf.Graph as Rdf exposing (Graph)
@@ -684,7 +560,7 @@ int =
     decode
         (from
             (Rdf.iri "http://example.org/question")
-            (predicate (Rdf.iri "http://example.org/#hasAnswer") float)
+            (property (Rdf.iri "http://example.org/#hasAnswer") float)
         )
         graph
     --> Ok 3.14
@@ -692,19 +568,26 @@ int =
 -}
 float : Decoder Float
 float =
-    literal (Rdf.xsd "double")
-        |> andThen
-            (\floatLiteral ->
-                case String.toFloat floatLiteral of
-                    Nothing ->
-                        err (ExpectedFloat floatLiteral)
+    andThen
+        (\lit ->
+            case Rdf.toFloat lit of
+                Nothing ->
+                    err
+                        (ExpectedLiteralOf
+                            [ iriXsdDouble
+                            , iriXsdFloat
+                            ]
+                            lit
+                        )
 
-                    Just floatValue ->
-                        succeed floatValue
-            )
+                Just val ->
+                    succeed val
+        )
+        literal
 
 
-{-| TODO
+{-| Decode a Literal of type `xsd:integer`, `xsd:int`, `xsd:double`, or
+`xsd:float` into a `Float`.
 -}
 number : Decoder Float
 number =
@@ -734,7 +617,7 @@ number =
     decode
         (from
             (Rdf.iri "http://example.org/alice")
-            (predicate (Rdf.iri "http://example.org/#birthDate") date)
+            (property (Rdf.iri "http://example.org/#birthDate") date)
         )
         graph
     --> Ok (Time.millisToPosix 0)
@@ -742,25 +625,16 @@ number =
 -}
 date : Decoder Time.Posix
 date =
-    Decoder
-        (\state ->
-            Result.andThen
-                (\nodes ->
-                    case nodes of
-                        [ node ] ->
-                            Rdf.toDate node
-                                |> Result.fromMaybe
-                                    { error = InvalidDate node
-                                    , contextStack = state.context
-                                    }
+    andThen
+        (\lit ->
+            case Rdf.toDate lit of
+                Nothing ->
+                    err (ExpectedLiteralOf [ iriXsdDate ] lit)
 
-                        _ ->
-                            Err
-                                { error = TooManyNodes nodes
-                                , contextStack = state.context
-                                }
-                )
+                Just val ->
+                    succeed val
         )
+        literal
 
 
 {-| Decode a Literal of type `xsd:date` into a `Time.Posix`.
@@ -783,7 +657,7 @@ date =
     decode
         (from
             (Rdf.iri "http://example.org/alice")
-            (predicate (Rdf.iri "http://example.org/#birthTime") dateTime)
+            (property (Rdf.iri "http://example.org/#birthTime") dateTime)
         )
         graph
     --> Ok (Time.millisToPosix 0)
@@ -791,79 +665,176 @@ date =
 -}
 dateTime : Decoder Time.Posix
 dateTime =
+    andThen
+        (\lit ->
+            case Rdf.toDateTime lit of
+                Nothing ->
+                    err (ExpectedLiteralOf [ iriXsdDateTime ] lit)
+
+                Just val ->
+                    succeed val
+        )
+        literal
+
+
+
+-- FOCUS NODES
+
+
+{-| Start decoding from the provided (focus) node. You can also nest this
+`Decoder` in other `Decoder`'s if you have to change the focus node.
+-}
+from : IsBlankNodeOrIri compatible -> Decoder a -> Decoder a
+from nodeFocusCompatible (Decoder f) =
+    let
+        nodeFocus : BlankNodeOrIri
+        nodeFocus =
+            Rdf.asBlankNodeOrIri nodeFocusCompatible
+    in
     Decoder
-        (\state ->
-            Result.andThen
-                (\nodes ->
-                    case nodes of
-                        [ node ] ->
-                            Rdf.toDateTime node
-                                |> Result.fromMaybe
-                                    { error = InvalidDateTime node
-                                    , contextStack = state.context
-                                    }
+        (\state _ ->
+            if
+                hasTripleWithSubject nodeFocus state.graph
+                    || hasTripleWithObject nodeFocus state.graph
+            then
+                f state (Ok [ Rdf.asBlankNodeOrIriOrLiteral nodeFocus ])
 
-                        _ ->
-                            Err
-                                { error = TooManyNodes nodes
-                                , contextStack = state.context
-                                }
-                )
+            else
+                Err
+                    { error = ExpectedNode (Rdf.asBlankNodeOrIri nodeFocus)
+                    , contextStack = state.context
+                    }
         )
 
 
-{-| Decode an [IRI](https://www.w3.org/TR/rdf11-concepts/#section-IRIs).
-
-    import Rdf
-    import Rdf.Graph as Rdf exposing (Graph)
-    import Rdf.Namespaces exposing (a)
-
-    graph : Graph
-    graph =
-        """
-        @base <http://example.org/> .
-        <alice> a <#Person> .
-        """
-            |> Rdf.parse
-            |> Result.withDefault Rdf.emptyGraph
-
-    decode
-        (from
-            (Rdf.iri "http://example.org/alice")
-            (predicate a iri)
+{-| Start decoding from **all** subjects. If the graph contains more then one
+triple, you have to combine this with [`many`](#many) to get a result.
+-}
+fromSubject : Decoder a -> Decoder a
+fromSubject (Decoder f) =
+    Decoder
+        (\state _ ->
+            state.graph
+                |> getSubjects
+                |> List.map Rdf.asBlankNodeOrIriOrLiteral
+                |> Ok
+                |> f state
         )
-        graph
-    --> Ok (Rdf.iri "http://example.org/#Person")
+
+
+{-| Start decoding at each of the provided (focus) node. If more then one of
+these nodes exist in your graph, you have to combine this with
+[`many`](#many) to get a result.
+-}
+at : List BlankNodeOrIriOrLiteral -> Decoder a -> Decoder a
+at nodes (Decoder f) =
+    Decoder (\graph _ -> f graph (Ok nodes))
+
+
+
+-- MULITIPLICITIES
+
+
+{-| Decode a list of focus nodes by the given decoder.
+
+Note that the position of `many` within a decode expression matters. Say, a focus node has multiple classes.
+
+The following decoder works as expected:
+
+    property a (many class)
+
+Hoever, the following (type-valid) decoder does NOT work:
+
+    many (property a class)
+
+Note that `property a class` alone fails (since there are many classes), and so `many (property a class)` fails as a whole!
 
 -}
-iri : Decoder Iri
-iri =
+many : Decoder a -> Decoder (List a)
+many (Decoder f) =
     Decoder
-        (\state ->
+        (\graph ->
             Result.andThen
                 (\nodes ->
-                    case nodes of
-                        [ node ] ->
-                            case node of
-                                Term ((Iri _) as variant) ->
-                                    Ok (Term variant)
-
-                                Term _ ->
-                                    Err
-                                        { error = ExpectedIri node
-                                        , contextStack = state.context
-                                        }
-
-                        _ ->
-                            Err
-                                { error = TooManyNodes nodes
-                                , contextStack = state.context
-                                }
+                    Result.combine (List.map (f graph << Ok << List.singleton) nodes)
                 )
         )
 
 
-{-| TODO
+{-| This is like [`many`](#many) but you also get the index of the currently
+decoded value. Note that the order in which nodes are decoded is
+non-deterministic.
+-}
+indexedMany : (Int -> Decoder a) -> Decoder (List a)
+indexedMany toDecoder =
+    Decoder
+        (\graph ->
+            Result.andThen
+                (\nodes ->
+                    Result.combine
+                        (List.indexedMap
+                            (\index ->
+                                let
+                                    (Decoder f) =
+                                        toDecoder index
+                                in
+                                List.singleton
+                                    >> Ok
+                                    >> f graph
+                            )
+                            nodes
+                        )
+                )
+        )
+
+
+
+-- INCONSISTENT STRUCTURE
+
+
+{-| Try a bunch of different `Decoder`'s. It will succeed with the first one
+which succeeded. When all fail, you get the error for all cases.
+-}
+oneOf : List (Decoder a) -> Decoder a
+oneOf fs =
+    Decoder
+        (\state node ->
+            case
+                List.foldl
+                    (\(Decoder f) a ->
+                        case a of
+                            Ok x ->
+                                Ok x
+
+                            Err es ->
+                                case f state node of
+                                    Ok x ->
+                                        Ok x
+
+                                    Err e ->
+                                        Err (e :: es)
+                    )
+                    (Err [])
+                    fs
+            of
+                Ok x ->
+                    Ok x
+
+                Err es ->
+                    Err
+                        { error = ExpectedOneOf (List.reverse es)
+                        , contextStack = state.context
+                        }
+        )
+
+
+
+-- CONTAINERS
+
+
+{-| Decode an [RDF
+collections](https://www.w3.org/TR/rdf-schema/#ch_collectionvocab) into
+a `List`.
 
     import Rdf
     import Rdf.Graph as Rdf exposing (Graph)
@@ -884,7 +855,7 @@ iri =
     decode
         (from
             (Rdf.iri "http://example.org/alice")
-            (predicate (Rdf.iri "http://example.org/#knows") (list iri))
+            (property (Rdf.iri "http://example.org/#knows") (list iri))
         )
         graph
     --> Ok [ Rdf.iri "http://example.org/bob", Rdf.iri "http://example.org/cindi" ]
@@ -892,7 +863,7 @@ iri =
     decode
         (from
             (Rdf.iri "http://example.org/alice")
-            (predicate (Rdf.iri "http://example.org/#knows") (many (list iri)))
+            (property (Rdf.iri "http://example.org/#knows") (many (list iri)))
         )
         graph
     --> Ok [ [ Rdf.iri "http://example.org/bob", Rdf.iri "http://example.org/cindi" ] ]
@@ -910,7 +881,7 @@ list (Decoder f) =
 
                         _ ->
                             Err
-                                { error = TooManyNodes nodes
+                                { error = ExpectedOneNode nodes
                                 , contextStack = state.context
                                 }
                 )
@@ -941,7 +912,7 @@ list (Decoder f) =
         )
 
 
-{-| TODO
+{-| Like [`list`](#list) but ensure that the resulting `List` is not empty.
 -}
 nonEmpty : Decoder a -> Decoder (NonEmpty a)
 nonEmpty =
@@ -952,146 +923,13 @@ nonEmpty =
             )
 
 
-{-| Decode a Literal of type `xsd:string` into a `String`.
 
-    import Rdf
-    import Rdf.Graph as Rdf exposing (Graph)
-    import Rdf.Namespaces exposing (a)
-
-    graph : Graph
-    graph =
-        """
-        @base <http://example.org/> .
-        <alice> <#name> "Alice Wonderland" .
-        """
-            |> Rdf.parse
-            |> Result.withDefault Rdf.emptyGraph
-
-    decode
-        (from
-            (Rdf.iri "http://example.org/alice")
-            (predicate (Rdf.iri "http://example.org/#name") string)
-        )
-        graph
-    --> Ok "Alice Wonderland"
-
--}
-string : Decoder String
-string =
-    literal (Rdf.xsd "string")
+-- PREDICATES
 
 
-{-| TODO
--}
-langString : Decoder ( String, String )
-langString =
-    literalData (Rdf.rdf "langString")
-        |> andThen
-            (\({ value, languageTag } as node) ->
-                Maybe.unwrap (err (MissingLangString (Term (Literal node))))
-                    (succeed << flip Tuple.pair value)
-                    languageTag
-            )
-
-
-{-| TODO
--}
-stringOrLangString : Decoder Rdf.StringOrLangString
-stringOrLangString =
-    many
-        (oneOf
-            [ map Err langString
-            , map Ok string
-            ]
-        )
-        |> andThen
-            (\stringsOrLangStrings ->
-                case Result.partition stringsOrLangStrings of
-                    ( [], langStrings ) ->
-                        succeed (Rdf.stringOrLangStringFrom Nothing langStrings)
-
-                    ( [ string_ ], langStrings ) ->
-                        succeed (Rdf.stringOrLangStringFrom (Just string_) langStrings)
-
-                    ( strings, _ ) ->
-                        err (TooManyStrings strings)
-            )
-
-
-{-| TODO
--}
-literal : Iri -> Decoder String
-literal datatype =
-    map .value (literalData datatype)
-
-
-literalData : Iri -> Decoder DataLiteral
-literalData datatype =
-    Decoder
-        (\state ->
-            Result.andThen
-                (\nodes ->
-                    case nodes of
-                        [ node ] ->
-                            case node of
-                                Term (Literal literalData_) ->
-                                    if literalData_.datatype /= Rdf.toUrl datatype then
-                                        Err
-                                            { error =
-                                                ExpectedLiteralDatatype
-                                                    datatype
-                                                    (Rdf.iri literalData_.datatype)
-                                            , contextStack = state.context
-                                            }
-
-                                    else
-                                        Ok literalData_
-
-                                Term _ ->
-                                    Err
-                                        { error = ExpectedLiteral node
-                                        , contextStack = state.context
-                                        }
-
-                        _ ->
-                            Err
-                                { error = TooManyNodes nodes
-                                , contextStack = state.context
-                                }
-                )
-        )
-
-
-{-| TODO
--}
-anyLiteral : Decoder Literal
-anyLiteral =
-    Decoder
-        (\state ->
-            Result.andThen
-                (\nodes ->
-                    case nodes of
-                        [ node ] ->
-                            case node of
-                                Term ((Literal _) as variant) ->
-                                    Ok (Term variant)
-
-                                Term _ ->
-                                    Err
-                                        { error = ExpectedLiteral node
-                                        , contextStack = state.context
-                                        }
-
-                        _ ->
-                            Err
-                                { error = TooManyNodes nodes
-                                , contextStack = state.context
-                                }
-                )
-        )
-
-
-{-| TODO
+{-| Run a decoder at the node which is obtained by following the provided
+property path. Make sure to use [`many`](#many) if more then one node can be
+found, otherwise decoding will fail.
 -}
 property : IsPath compatible -> Decoder a -> Decoder a
 property path (Decoder f) =
@@ -1117,12 +955,17 @@ property path (Decoder f) =
     Decoder
         (\state ->
             let
-                get : BlankNodeOrIri -> Result Error (List BlankNodeOrIriOrLiteral)
+                get :
+                    BlankNodeOrIri
+                    -> Result Error (List BlankNodeOrIriOrLiteral)
                 get focusNode =
                     case getObjectsAt focusNode path state.graph of
                         [] ->
                             Err
-                                { error = UnknownProperty focusNode (Rdf.asPath path)
+                                { error =
+                                    ExpectedPath
+                                        focusNode
+                                        (Rdf.asPath path)
                                 , contextStack = state.context
                                 }
 
@@ -1136,19 +979,14 @@ property path (Decoder f) =
                 >> Result.andThen
                     (List.map get
                         >> Result.combine
-                        >> Result.mapError
-                            (\errorNested ->
-                                { error = AtPropertyPath (Rdf.asPath path) errorNested
-                                , contextStack = state.context
-                                }
-                            )
                         >> Result.map List.concat
                         >> f state
                     )
         )
 
 
-{-| TODO
+{-| This decoder succeeds if no nodes can be reached by following the provided
+property path.
 -}
 noProperty : IsPath compatible -> Decoder ()
 noProperty path =
@@ -1185,12 +1023,13 @@ noProperty path =
                                             [] ->
                                                 Ok ()
 
-                                            _ ->
+                                            objects ->
                                                 Err
                                                     { error =
-                                                        PropertyPresent
+                                                        ExpectedNoPath
                                                             focusNode
                                                             (Rdf.asPath path)
+                                                            objects
                                                     , contextStack = state.context
                                                     }
                                     )
@@ -1200,14 +1039,9 @@ noProperty path =
         )
 
 
-{-| TODO
--}
-predicate : IsIri compatible -> Decoder a -> Decoder a
-predicate =
-    property << Rdf.asIri
-
-
-{-| TODO
+{-| Run a decoder on the nodes which can be reached by any predicate from the
+current focus node. Make sure to use [`many`](#many) if more then one node can
+be reached in this way.
 -}
 anyPredicate : Decoder a -> Decoder a
 anyPredicate (Decoder f) =
@@ -1246,7 +1080,7 @@ anyPredicate (Decoder f) =
                                                 case getObjects focusNode state.graph of
                                                     [] ->
                                                         Err
-                                                            { error = NoProperty focusNode
+                                                            { error = ExpectedPredicates focusNode
                                                             , contextStack = state.context
                                                             }
 
@@ -1262,7 +1096,8 @@ anyPredicate (Decoder f) =
         )
 
 
-{-| TODO
+{-| Decode the list of all predicates for which the current focus node is the
+subject.
 -}
 predicates : Decoder (List Iri)
 predicates =
@@ -1298,7 +1133,7 @@ predicates =
                                         case getPredicates focusNode state.graph of
                                             [] ->
                                                 Err
-                                                    { error = NoProperty focusNode
+                                                    { error = ExpectedPredicates focusNode
                                                     , contextStack = state.context
                                                     }
 
@@ -1309,6 +1144,196 @@ predicates =
                                 )
                     )
         )
+
+
+
+-- RUNNING DECODERS
+
+
+{-| Run a [`Decoder`](#Decoder) on an actual `Graph` starting at the provided
+`Node`'s.
+-}
+decode : Decoder a -> Graph -> Result Error a
+decode (Decoder f) graph =
+    f
+        { graph = graph
+        , context = []
+        }
+        (Err
+            { error = NoFocusNode
+            , contextStack = []
+            }
+        )
+
+
+{-| When the decoding fails, we get on of these. Use
+[`errorToString`](#errorToString) to turn this into a human-friendly form.
+-}
+type alias Error =
+    { error : Problem
+    , contextStack : List String
+    }
+
+
+{-| The problem which made decoding fail.
+-}
+type Problem
+    = NoFocusNode
+    | ExpectedNode BlankNodeOrIri
+    | ExpectedIri BlankNodeOrIriOrLiteral
+    | ExpectedBlankNode BlankNodeOrIriOrLiteral
+    | ExpectedLiteral BlankNodeOrIriOrLiteral
+    | ExpectedLiteralOf (List Iri) Literal
+    | ExpectedBlankNodeOrIri BlankNodeOrIriOrLiteral
+    | ExpectedOneNode (List BlankNodeOrIriOrLiteral)
+    | ExpectedPath BlankNodeOrIri Path
+    | ExpectedNoPath BlankNodeOrIri Path (List BlankNodeOrIriOrLiteral)
+    | ExpectedPredicates BlankNodeOrIri
+    | ExpectedOneOf (List Error)
+      --
+    | UnexpectedEmptyList
+    | CustomError String
+    | Failure String
+    | FailureAt String (List BlankNodeOrIriOrLiteral)
+    | TooManyStrings (List String)
+
+
+{-| Turn a decoding error into a human friendly string.
+-}
+errorToString : Error -> String
+errorToString { error, contextStack } =
+    if List.isEmpty contextStack then
+        problemToString error
+
+    else
+        String.join "\n"
+            [ problemToString error
+            , ""
+            , "Context:"
+            , ""
+            , indent (String.join "\n" contextStack)
+            ]
+
+
+problemToString : Problem -> String
+problemToString problem =
+    case problem of
+        NoFocusNode ->
+            "This decoder did not specify any node to start decoding from."
+
+        ExpectedNode node ->
+            "I wanted to start decoding at the node "
+                ++ Rdf.serialize node
+                ++ " but it is not object or subject in any triple."
+
+        ExpectedLiteral term ->
+            "Expected a literal, but got " ++ Rdf.serialize term ++ "."
+
+        ExpectedLiteralOf datatypesExpected lit ->
+            String.join "\n"
+                [ "Expected a literal of type"
+                , indent
+                    (String.join ", or\n"
+                        (List.map Rdf.serialize datatypesExpected)
+                    )
+                , "but got " ++ Rdf.serialize lit ++ "."
+                ]
+
+        ExpectedBlankNode nodeFound ->
+            "Expected a blank node, but found " ++ Rdf.serialize nodeFound ++ "."
+
+        ExpectedIri nodeFound ->
+            "Expected an IRI, but found " ++ Rdf.serialize nodeFound ++ "."
+
+        ExpectedBlankNodeOrIri nodeFound ->
+            "Expected a blank node or an IRI, but found " ++ Rdf.serialize nodeFound ++ "."
+
+        ExpectedOneNode nodesFound ->
+            String.join "\n"
+                [ "I expected exactly one node, but I got"
+                , indent
+                    (String.join "\n"
+                        (List.map Rdf.serialize nodesFound)
+                    )
+                ]
+
+        ExpectedPath nodeFocus path ->
+            "Starting at "
+                ++ Rdf.serialize nodeFocus
+                ++ " I expected nodes along "
+                ++ Rdf.serialize path
+                ++ "."
+
+        ExpectedNoPath nodeFocus path objects ->
+            "I expected that "
+                ++ Rdf.serialize nodeFocus
+                ++ " is not connected to any other node via "
+                ++ Rdf.serialize path
+                ++ " but I got"
+                ++ indent
+                    (String.join "\n"
+                        (List.map Rdf.serialize objects)
+                    )
+
+        ExpectedPredicates nodeFocus ->
+            "I expected that "
+                ++ Rdf.serialize nodeFocus
+                ++ " is the subject of any triple."
+
+        ExpectedOneOf errors ->
+            String.join "\n\n"
+                [ "Decoding failed in one of the following ways:"
+                , indent
+                    (String.join "\n\n"
+                        (List.map errorToString errors)
+                    )
+                ]
+
+        UnexpectedEmptyList ->
+            "Expected a non-empty list, but found an empty list."
+
+        CustomError s ->
+            s
+
+        Failure msg ->
+            msg
+
+        FailureAt msg nodes ->
+            String.join "\n"
+                [ "Problem with the given value at"
+                , ""
+                , indent (String.join ",\n" (List.map Rdf.serialize nodes))
+                , ""
+                , msg
+                ]
+
+        TooManyStrings stringsFound ->
+            "I expected a single string, but I found multiple strings "
+                ++ String.join ", " stringsFound
+                ++ "."
+
+
+indent : String -> String
+indent lines =
+    lines
+        |> String.lines
+        |> List.map (\line -> "    " ++ line)
+        |> String.join "\n"
+
+
+{-| You can use this to mark that you are in a certain context. A stack of
+these contexts will be provided with the `Problem` when decoding fails,
+which you then can use to improve the reported error message.
+-}
+inContext : String -> Decoder a -> Decoder a
+inContext context (Decoder f) =
+    Decoder <|
+        \state ->
+            f { state | context = context :: state.context }
+
+
+
+-- TRANSFORMING VALUES
 
 
 {-| A decoder which always succeeds with the given value.
@@ -1338,7 +1363,9 @@ fail msg =
                         }
 
 
-{-| A decoder which always fails with the given message.
+{-| A decoder which always fails with the given message. This is like
+[`fail`](#fail), but you also get the list of current focus nodes when creating
+the error message.
 -}
 failWith : (List BlankNodeOrIriOrLiteral -> String) -> Decoder a
 failWith toMsg =
@@ -1354,14 +1381,29 @@ failWith toMsg =
         )
 
 
-{-| TODO
+{-| Transform the decoded value by applying the provided function.
 -}
 map : (a -> b) -> Decoder a -> Decoder b
 map f (Decoder g) =
     Decoder (\graph -> Result.map f << g graph)
 
 
-{-| TODO
+{-| Like [`map`](#map) but it takes two `Decoder`'s.
+-}
+map2 : (a -> b -> c) -> Decoder a -> Decoder b -> Decoder c
+map2 f g h =
+    apply (map f g) h
+
+
+{-| A helper for combining `Decoder`'s in a pipeline.
+-}
+andMap : Decoder a -> Decoder (a -> b) -> Decoder b
+andMap decoderA decoderF =
+    apply decoderF decoderA
+
+
+{-| Run a `Decoder` and then run another one, where you can use the already
+decoded value.
 -}
 andThen : (a -> Decoder b) -> Decoder a -> Decoder b
 andThen f (Decoder g) =
@@ -1380,109 +1422,26 @@ andThen f (Decoder g) =
         )
 
 
-{-| TODO
+{-| Turn a list of `Decoder`'s into a `Decoder` of a list. This decoder will
+fail whenever on of its elements fails.
 -}
-map2 : (a -> b -> c) -> Decoder a -> Decoder b -> Decoder c
-map2 f g h =
-    apply (map f g) h
+combine : List (Decoder a) -> Decoder (List a)
+combine =
+    List.foldr (map2 (::)) (succeed [])
 
 
-apply : Decoder (a -> b) -> Decoder a -> Decoder b
-apply (Decoder f) (Decoder g) =
-    Decoder (\graph x -> Result.map2 (<|) (f graph x) (g graph x))
-
-
-err : Problem -> Decoder a
-err e =
-    Decoder
-        (\state _ ->
-            Err
-                { error = e
-                , contextStack = state.context
-                }
-        )
-
-
-{-| TODO
+{-| Use this if you need to decode recursive data structures.
 -}
-oneOf : List (Decoder a) -> Decoder a
-oneOf fs =
-    Decoder
-        (\state node ->
-            case
-                List.foldl
-                    (\(Decoder f) a ->
-                        case a of
-                            Ok x ->
-                                Ok x
-
-                            Err es ->
-                                case f state node of
-                                    Ok x ->
-                                        Ok x
-
-                                    Err e ->
-                                        Err (e :: es)
-                    )
-                    (Err [])
-                    fs
-            of
-                Ok x ->
-                    Ok x
-
-                Err es ->
-                    Err
-                        { error = Batch (List.reverse es)
-                        , contextStack = state.context
-                        }
-        )
+lazy : (() -> Decoder a) -> Decoder a
+lazy f =
+    andThen f (succeed ())
 
 
-{-| TODO
 
-    import Rdf
-    import Rdf.Graph as Rdf exposing (Graph)
-    import Rdf.Namespaces exposing (a)
-    import Time
-
-    graph : Graph
-    graph =
-        """
-        @base <http://example.org/> .
-        @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-        <alice>
-            <#name> "Alice Wonderland" ;
-            <#birthDate> "1970-01-01"^^xsd:date .
-        """
-            |> Rdf.parse
-            |> Result.withDefault Rdf.emptyGraph
-
-    type alias Person =
-        { name : String
-        , birthDate : Time.Posix
-        }
-
-    decode
-        (from
-            (Rdf.iri "http://example.org/alice")
-            (succeed Person
-                |> required (Rdf.iri "http://example.org/#name") string
-                |> required (Rdf.iri "http://example.org/#birthDate") date
-            )
-        )
-        graph
-    --> Ok
-    -->     { name = "Alice Wonderland"
-    -->     , birthDate = Time.millisToPosix 0
-    -->     }
-
--}
-required : IsIri compatible -> Decoder a -> Decoder (a -> b) -> Decoder b
-required iriPredicate decoderA decoderF =
-    map2 (\f a -> f a) decoderF (predicate iriPredicate decoderA)
+-- PIPELINES
 
 
-{-| TODO
+{-| Decode a required property.
 
     import Rdf
     import Rdf.Graph as Rdf exposing (Graph)
@@ -1507,7 +1466,7 @@ required iriPredicate decoderA decoderF =
         (from
             (Rdf.iri "http://example.org/alice")
             (succeed Person
-                |> requiredAt
+                |> required
                     (Rdf.sequence
                         (Rdf.iri "http://example.org/#knows")
                         [ Rdf.iri "http://example.org/#name" ]
@@ -1521,59 +1480,12 @@ required iriPredicate decoderA decoderF =
     -->     }
 
 -}
-requiredAt : IsPath compatible -> Decoder a -> Decoder (a -> b) -> Decoder b
-requiredAt path decoderA decoderF =
+required : IsPath compatible -> Decoder a -> Decoder (a -> b) -> Decoder b
+required path decoderA decoderF =
     map2 (\f a -> f a) decoderF (property path decoderA)
 
 
-{-| TODO
-
-    import Rdf
-    import Rdf.Graph as Rdf exposing (Graph)
-    import Rdf.Namespaces exposing (a)
-    import Time
-
-    graph : Graph
-    graph =
-        """
-        @base <http://example.org/> .
-        <alice> <#name> "Alice Wonderland" .
-        """
-            |> Rdf.parse
-            |> Result.withDefault Rdf.emptyGraph
-
-    type alias Person =
-        { name : String
-        , birthDate : Maybe Time.Posix
-        }
-
-    decode
-        (from
-            (Rdf.iri "http://example.org/alice")
-            (succeed Person
-                |> required (Rdf.iri "http://example.org/#name") string
-                |> optional (Rdf.iri "http://example.org/#birthDate") (map Just date) Nothing
-            )
-        )
-        graph
-    --> Ok
-    -->     { name = "Alice Wonderland"
-    -->     , birthDate = Nothing
-    -->     }
-
--}
-optional : IsIri compatible -> Decoder a -> a -> Decoder (a -> b) -> Decoder b
-optional iriPredicate decoderA defaultA decoderF =
-    map2 (\f a -> f a)
-        decoderF
-        (oneOf
-            [ predicate iriPredicate decoderA
-            , succeed defaultA
-            ]
-        )
-
-
-{-| TODO
+{-| Decode an optional property.
 
     import Rdf
     import Rdf.Graph as Rdf exposing (Graph)
@@ -1598,7 +1510,7 @@ optional iriPredicate decoderA defaultA decoderF =
         (from
             (Rdf.iri "http://example.org/alice")
             (succeed Person
-                |> optionalAt
+                |> optional
                     (Rdf.sequence
                         (Rdf.iri "http://example.org/#knows")
                         [ Rdf.iri "http://example.org/#name" ]
@@ -1613,8 +1525,8 @@ optional iriPredicate decoderA defaultA decoderF =
     -->     }
 
 -}
-optionalAt : IsPath compatible -> Decoder a -> a -> Decoder (a -> b) -> Decoder b
-optionalAt path decoderA defaultA decoderF =
+optional : IsPath compatible -> Decoder a -> a -> Decoder (a -> b) -> Decoder b
+optional path decoderA defaultA decoderF =
     map2 (\f a -> f a)
         decoderF
         (oneOf
@@ -1624,7 +1536,8 @@ optionalAt path decoderA defaultA decoderF =
         )
 
 
-{-| TODO
+{-| Rather than decoding anything, use a fixed value for the next step in the
+pipeline. `harcoded` does not look at the RDF graph at all.
 
     import Rdf
     import Rdf.Graph as Rdf exposing (Graph)
@@ -1664,51 +1577,31 @@ hardcoded a decoderF =
     map (\f -> f a) decoderF
 
 
-{-| TODO Add documentation
+{-| Run the given decoder and feed its result into the pipeline at this point.
 -}
 custom : Decoder a -> Decoder (a -> b) -> Decoder b
 custom decoderA decoderF =
     map2 (\f a -> f a) decoderF decoderA
 
 
-{-| TODO
--}
-lazy : (() -> Decoder a) -> Decoder a
-lazy f =
-    andThen f (succeed ())
+
+-- HELPER
 
 
-{-| TODO Add documentation
--}
-inContext : String -> Decoder a -> Decoder a
-inContext context (Decoder f) =
-    Decoder <|
-        \state ->
-            f { state | context = context :: state.context }
+apply : Decoder (a -> b) -> Decoder a -> Decoder b
+apply (Decoder f) (Decoder g) =
+    Decoder (\graph x -> Result.map2 (<|) (f graph x) (g graph x))
 
 
-{-| TODO Add documentation
--}
-combine : List (Decoder a) -> Decoder (List a)
-combine =
-    List.foldr (map2 (::)) (succeed [])
-
-
-{-| TODO Add documentation
--}
-logFailure : (String -> Error -> Error) -> String -> Decoder a -> Decoder a
-logFailure log msg (Decoder f) =
-    Decoder <|
-        \state nodes ->
-            f state
-                (nodes
-                    |> Result.mapError (log msg)
-                )
-                |> Result.mapError (log msg)
-
-
-
---  QUERY
+err : Problem -> Decoder a
+err e =
+    Decoder
+        (\state _ ->
+            Err
+                { error = e
+                , contextStack = state.context
+                }
+        )
 
 
 hasTripleWithSubject : IsBlankNodeOrIri compatible -> Graph -> Bool
@@ -1969,6 +1862,10 @@ getRest nodeFocus (Graph data) =
             Nothing
 
 
+
+-- CONSTANTS
+
+
 rdfNil : Iri
 rdfNil =
     rdf "nil"
@@ -1982,3 +1879,53 @@ rdfFirst =
 rdfRest : Iri
 rdfRest =
     rdf "rest"
+
+
+iriXsdString : Iri
+iriXsdString =
+    Rdf.iri "http://www.w3.org/2001/XMLSchema#string"
+
+
+iriXsdInt : Iri
+iriXsdInt =
+    Rdf.iri "http://www.w3.org/2001/XMLSchema#int"
+
+
+iriXsdInteger : Iri
+iriXsdInteger =
+    Rdf.iri "http://www.w3.org/2001/XMLSchema#integer"
+
+
+iriXsdDouble : Iri
+iriXsdDouble =
+    Rdf.iri "http://www.w3.org/2001/XMLSchema#double"
+
+
+iriXsdFloat : Iri
+iriXsdFloat =
+    Rdf.iri "http://www.w3.org/2001/XMLSchema#float"
+
+
+iriXsdDecimal : Iri
+iriXsdDecimal =
+    Rdf.iri "http://www.w3.org/2001/XMLSchema#decimal"
+
+
+iriXsdDate : Iri
+iriXsdDate =
+    Rdf.iri "http://www.w3.org/2001/XMLSchema#date"
+
+
+iriXsdDateTime : Iri
+iriXsdDateTime =
+    Rdf.iri "http://www.w3.org/2001/XMLSchema#dateTime"
+
+
+iriXsdBoolean : Iri
+iriXsdBoolean =
+    Rdf.iri "http://www.w3.org/2001/XMLSchema#boolean"
+
+
+iriRdfLangString : Iri
+iriRdfLangString =
+    Rdf.iri "http://www.w3.org/1999/02/22-rdf-syntax-ns#langString"
