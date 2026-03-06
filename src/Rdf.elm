@@ -1972,7 +1972,15 @@ type alias Prologue =
 
 serializeWithHelp : Prologue -> Variant -> String
 serializeWithHelp config variant =
+    serializeVariantWith config variant
+
+
+serializeVariantWith : Prologue -> Variant -> String
+serializeVariantWith config variant =
     case variant of
+        BlankNode value ->
+            "_:" ++ value
+
         Iri url ->
             if url == "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" then
                 "a"
@@ -2053,8 +2061,35 @@ serializeWithHelp config variant =
                 ]
                     |> String.concat
 
-        _ ->
-            Internal.serializeVariant variant
+        VarQ name ->
+            "?" ++ name
+
+        VarD name ->
+            "$" ++ name
+
+        Sequence first rest ->
+            serializeVariantWith config first
+                ++ " / "
+                ++ String.join " / "
+                    (List.map (serializeVariantWith config) rest)
+
+        Alternative first rest ->
+            serializeVariantWith config first
+                ++ " | "
+                ++ String.join " | "
+                    (List.map (serializeVariantWith config) rest)
+
+        Inverse nested ->
+            "^" ++ serializeVariantWith config nested
+
+        ZeroOrMore nested ->
+            serializeVariantWith config nested ++ "*"
+
+        OneOrMore nested ->
+            serializeVariantWith config nested ++ "+"
+
+        ZeroOrOne nested ->
+            serializeVariantWith config nested ++ "?"
 
 
 {-| Serialize a [`Triple`](#Triple) into how it would be represented in the
