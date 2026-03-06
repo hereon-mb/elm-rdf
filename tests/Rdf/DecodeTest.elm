@@ -212,12 +212,12 @@ propertyMissing =
                 |> expectAllError
                     [ Expect.equal
                         (Decode.AtPropertyPath
-                            (Rdf.asIriOrPath (example "hasString"))
+                            (Rdf.asPath (example "hasString"))
                             { contextStack = []
                             , error =
                                 Decode.UnknownProperty
                                     (Rdf.asBlankNodeOrIri (example "x"))
-                                    (Rdf.asIriOrPath (example "hasString"))
+                                    (Rdf.asPath (example "hasString"))
                             }
                         )
                     ]
@@ -280,7 +280,7 @@ noPropertyWithProperty =
                     [ Expect.equal
                         (Decode.PropertyPresent
                             (Rdf.asBlankNodeOrIri (example "x"))
-                            (Rdf.asIriOrPath (example "hasString"))
+                            (Rdf.asPath (example "hasString"))
                         )
                     ]
 

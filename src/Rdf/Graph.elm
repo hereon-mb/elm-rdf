@@ -64,7 +64,7 @@ import Rdf
         , IsBlankNodeOrIri
         , IsBlankNodeOrIriOrLiteral
         , IsIri
-        , IsIriOrPath
+        , IsPath
         , Prologue
         , Triple
         , asBlankNodeOrIri
@@ -316,7 +316,7 @@ insert subject predicate object (Graph graph) =
 -}
 insertAt :
     IsBlankNodeOrIri compatible1
-    -> IsIriOrPath compatible2
+    -> IsPath compatible2
     -> IsBlankNodeOrIriOrLiteral compatible3
     -> Graph
     -> Seed
@@ -371,7 +371,7 @@ insertAt subject (Term variant) object graph seed =
 
 
 insertAtNext :
-    List (IsIriOrPath compatible1)
+    List (IsPath compatible1)
     -> IsBlankNodeOrIriOrLiteral compatible2
     -> IsBlankNodeOrIri compatible3
     -> Graph

@@ -11,9 +11,8 @@ module Rdf exposing
     , BlankNodeOrIriOrLiteralOrVar, IsBlankNodeOrIriOrLiteralOrVar, asBlankNodeOrIriOrLiteralOrVar
     , BlankNodeOrIriOrVar, IsBlankNodeOrIriOrVar, asBlankNodeOrIriOrVar
     , IriOrLiteralOrVar, IsIriOrLiteralOrVar, asIriOrLiteralOrVar
-    , IriOrVarOrPath, IsIriOrVarOrPath, asIriOrVarOrPath
-    , IriOrPath, IsIriOrPath, asIriOrPath
-    , Yes, No
+    , VarOrPath, IsVarOrPath, asVarOrPath
+    , Compatible
     , iri
     , blankNode
     , literal
@@ -86,13 +85,12 @@ a introduction on its data model.
 @docs BlankNodeOrIriOrLiteralOrVar, IsBlankNodeOrIriOrLiteralOrVar, asBlankNodeOrIriOrLiteralOrVar
 @docs BlankNodeOrIriOrVar, IsBlankNodeOrIriOrVar, asBlankNodeOrIriOrVar
 @docs IriOrLiteralOrVar, IsIriOrLiteralOrVar, asIriOrLiteralOrVar
-@docs IriOrVarOrPath, IsIriOrVarOrPath, asIriOrVarOrPath
-@docs IriOrPath, IsIriOrPath, asIriOrPath
+@docs VarOrPath, IsVarOrPath, asVarOrPath
 
 
 ### Utility
 
-@docs Yes, No
+@docs Compatible
 
 
 ## Create
@@ -300,7 +298,7 @@ allowed:
 |               | S P O | S V O | S V O     |        |            |      |
 |---------------|-------|-------|-----------|--------|------------|------|
 | BlankNode     | x   x | x   x | x   x     |        |            |      |
-| Iri           | x x x | x x x | x x x     |        |     x      |  x   |
+| Iri           | x x x | x o x | x x x     |        |     x      |  o   |
 | Literal       |     x |     x |     x     |        |     x      |      |
 | Var           |       | x x x | x x x     |   x    |     x      |      |
 | Path          |       |   x   |           |        |            |  x   |
@@ -317,8 +315,11 @@ combinations:
   - [`BlankNode`](#BlankNode) or [`Iri`](#Iri) or [`Var`](#Var)
   - [`Iri`](#Iri) or [`Literal`](#Literal) or [`Var`](#Var)
   - [`Iri`](#Iri) or [`Var`](#Var)
-  - [`Iri`](#Iri) or [`Var`](#Var) or [`Path`](#Path)
-  - [`Iri`](#Iri) or [`Path`](#Path)
+  - [`Var`](#Var) or [`Path`](#Path) (which includes [`Iri`](#Iri))
+  - [`Path`](#Path) (which includes [`Iri`](#Iri))
+
+We consider an IRI to be the same as a predicate path and therefore define
+`VarOrPath` instead of `IriOrVarOrPath`.
 
 -}
 type alias Term compatible =
@@ -328,19 +329,11 @@ type alias Term compatible =
 {-| You can ignore this type, it is only used for implementing the different
 `Term` variants.
 -}
-type Yes
-    = Yes Never
-
-
-{-| You can ignore this type, it is only used for implementing the different
-`Term` variants.
--}
-type No
-    = No Never
+type Compatible
+    = Compatible Never
 
 
 
--- SANDBOX
 -- IRI
 
 
@@ -353,15 +346,15 @@ the idea behind this.
 -}
 type alias Iri =
     Term
-        { isIri : Yes
-        , isBlankNodeOrIri : Yes
-        , isBlankNodeOrIriOrLiteral : Yes
-        , isBlankNodeOrIriOrLiteralOrVar : Yes
-        , isBlankNodeOrIriOrVar : Yes
-        , isIriOrLiteralOrVar : Yes
-        , isIriOrVar : Yes
-        , isIriOrVarOrPath : Yes
-        , isIriOrPath : Yes
+        { iri : Compatible
+        , blankNodeOrIri : Compatible
+        , blankNodeOrIriOrLiteral : Compatible
+        , blankNodeOrIriOrLiteralOrVar : Compatible
+        , blankNodeOrIriOrVar : Compatible
+        , iriOrLiteralOrVar : Compatible
+        , iriOrVar : Compatible
+        , varOrPath : Compatible
+        , path : Compatible
         }
 
 
@@ -373,15 +366,15 @@ idea behind this.
 type alias IsIri compatible =
     Term
         { compatible
-            | isIri : Yes
-            , isBlankNodeOrIri : Yes
-            , isBlankNodeOrIriOrLiteral : Yes
-            , isBlankNodeOrIriOrLiteralOrVar : Yes
-            , isBlankNodeOrIriOrVar : Yes
-            , isIriOrLiteralOrVar : Yes
-            , isIriOrVar : Yes
-            , isIriOrVarOrPath : Yes
-            , isIriOrPath : Yes
+            | iri : Compatible
+            , blankNodeOrIri : Compatible
+            , blankNodeOrIriOrLiteral : Compatible
+            , blankNodeOrIriOrLiteralOrVar : Compatible
+            , blankNodeOrIriOrVar : Compatible
+            , iriOrLiteralOrVar : Compatible
+            , iriOrVar : Compatible
+            , varOrPath : Compatible
+            , path : Compatible
         }
 
 
@@ -408,10 +401,10 @@ explanation of the idea behind this.
 -}
 type alias BlankNode =
     Term
-        { isBlankNodeOrIri : Yes
-        , isBlankNodeOrIriOrLiteral : Yes
-        , isBlankNodeOrIriOrLiteralOrVar : Yes
-        , isBlankNodeOrIriOrVar : Yes
+        { blankNodeOrIri : Compatible
+        , blankNodeOrIriOrLiteral : Compatible
+        , blankNodeOrIriOrLiteralOrVar : Compatible
+        , blankNodeOrIriOrVar : Compatible
         }
 
 
@@ -424,10 +417,10 @@ idea behind this.
 type alias IsBlankNode compatible =
     Term
         { compatible
-            | isBlankNodeOrIri : Yes
-            , isBlankNodeOrIriOrLiteral : Yes
-            , isBlankNodeOrIriOrLiteralOrVar : Yes
-            , isBlankNodeOrIriOrVar : Yes
+            | blankNodeOrIri : Compatible
+            , blankNodeOrIriOrLiteral : Compatible
+            , blankNodeOrIriOrLiteralOrVar : Compatible
+            , blankNodeOrIriOrVar : Compatible
         }
 
 
@@ -452,9 +445,9 @@ explanation of the idea behind this.
 -}
 type alias Literal =
     Term
-        { isBlankNodeOrIriOrLiteral : Yes
-        , isBlankNodeOrIriOrLiteralOrVar : Yes
-        , isIriOrLiteralOrVar : Yes
+        { blankNodeOrIriOrLiteral : Compatible
+        , blankNodeOrIriOrLiteralOrVar : Compatible
+        , iriOrLiteralOrVar : Compatible
         }
 
 
@@ -467,9 +460,9 @@ idea behind this.
 type alias IsLiteral compatible =
     Term
         { compatible
-            | isBlankNodeOrIriOrLiteral : Yes
-            , isBlankNodeOrIriOrLiteralOrVar : Yes
-            , isIriOrLiteralOrVar : Yes
+            | blankNodeOrIriOrLiteral : Compatible
+            , blankNodeOrIriOrLiteralOrVar : Compatible
+            , iriOrLiteralOrVar : Compatible
         }
 
 
@@ -494,12 +487,12 @@ explanation of the idea behind this.
 -}
 type alias Var =
     Term
-        { isVar : Yes
-        , isBlankNodeOrIriOrLiteralOrVar : Yes
-        , isBlankNodeOrIriOrVar : Yes
-        , isIriOrLiteralOrVar : Yes
-        , isIriOrVar : Yes
-        , isIriOrVarOrPath : Yes
+        { isVar : Compatible
+        , blankNodeOrIriOrLiteralOrVar : Compatible
+        , blankNodeOrIriOrVar : Compatible
+        , iriOrLiteralOrVar : Compatible
+        , iriOrVar : Compatible
+        , varOrPath : Compatible
         }
 
 
@@ -512,12 +505,12 @@ behind this.
 type alias IsVar compatible =
     Term
         { compatible
-            | isVar : Yes
-            , isBlankNodeOrIriOrLiteralOrVar : Yes
-            , isBlankNodeOrIriOrVar : Yes
-            , isIriOrLiteralOrVar : Yes
-            , isIriOrVar : Yes
-            , isIriOrVarOrPath : Yes
+            | isVar : Compatible
+            , blankNodeOrIriOrLiteralOrVar : Compatible
+            , blankNodeOrIriOrVar : Compatible
+            , iriOrLiteralOrVar : Compatible
+            , iriOrVar : Compatible
+            , varOrPath : Compatible
         }
 
 
@@ -542,8 +535,8 @@ of the idea behind this.
 -}
 type alias Path =
     Term
-        { isIriOrVarOrPath : Yes
-        , isIriOrPath : Yes
+        { varOrPath : Compatible
+        , path : Compatible
         }
 
 
@@ -555,8 +548,8 @@ behind this.
 type alias IsPath compatible =
     Term
         { compatible
-            | isIriOrVarOrPath : Yes
-            , isIriOrPath : Yes
+            | varOrPath : Compatible
+            , path : Compatible
         }
 
 
@@ -583,10 +576,10 @@ explanation of the idea behind this.
 -}
 type alias BlankNodeOrIri =
     Term
-        { isBlankNodeOrIri : Yes
-        , isBlankNodeOrIriOrLiteral : Yes
-        , isBlankNodeOrIriOrLiteralOrVar : Yes
-        , isBlankNodeOrIriOrVar : Yes
+        { blankNodeOrIri : Compatible
+        , blankNodeOrIriOrLiteral : Compatible
+        , blankNodeOrIriOrLiteralOrVar : Compatible
+        , blankNodeOrIriOrVar : Compatible
         }
 
 
@@ -600,10 +593,10 @@ behind this.
 type alias IsBlankNodeOrIri compatible =
     Term
         { compatible
-            | isBlankNodeOrIri : Yes
-            , isBlankNodeOrIriOrLiteral : Yes
-            , isBlankNodeOrIriOrLiteralOrVar : Yes
-            , isBlankNodeOrIriOrVar : Yes
+            | blankNodeOrIri : Compatible
+            , blankNodeOrIriOrLiteral : Compatible
+            , blankNodeOrIriOrLiteralOrVar : Compatible
+            , blankNodeOrIriOrVar : Compatible
         }
 
 
@@ -632,8 +625,8 @@ explanation of the idea behind this.
 -}
 type alias BlankNodeOrIriOrLiteral =
     Term
-        { isBlankNodeOrIriOrLiteral : Yes
-        , isBlankNodeOrIriOrLiteralOrVar : Yes
+        { blankNodeOrIriOrLiteral : Compatible
+        , blankNodeOrIriOrLiteralOrVar : Compatible
         }
 
 
@@ -648,8 +641,8 @@ idea behind this.
 type alias IsBlankNodeOrIriOrLiteral compatible =
     Term
         { compatible
-            | isBlankNodeOrIriOrLiteral : Yes
-            , isBlankNodeOrIriOrLiteralOrVar : Yes
+            | blankNodeOrIriOrLiteral : Compatible
+            , blankNodeOrIriOrLiteralOrVar : Compatible
         }
 
 
@@ -671,14 +664,14 @@ asBlankNodeOrIriOrLiteral (Term variant) =
 -}
 type alias BlankNodeOrIriOrLiteralOrVar =
     Term
-        { isBlankNodeOrIriOrLiteralOrVar : Yes
+        { blankNodeOrIriOrLiteralOrVar : Compatible
         }
 
 
 {-| TODO Add documentation
 -}
 type alias IsBlankNodeOrIriOrLiteralOrVar compatible =
-    Term { compatible | isBlankNodeOrIriOrLiteralOrVar : Yes }
+    Term { compatible | blankNodeOrIriOrLiteralOrVar : Compatible }
 
 
 {-| TODO Add documentation
@@ -698,8 +691,8 @@ asBlankNodeOrIriOrLiteralOrVar (Term variant) =
 -}
 type alias BlankNodeOrIriOrVar =
     Term
-        { isBlankNodeOrIriOrLiteralOrVar : Yes
-        , isBlankNodeOrIriOrVar : Yes
+        { blankNodeOrIriOrLiteralOrVar : Compatible
+        , blankNodeOrIriOrVar : Compatible
         }
 
 
@@ -708,8 +701,8 @@ type alias BlankNodeOrIriOrVar =
 type alias IsBlankNodeOrIriOrVar compatible =
     Term
         { compatible
-            | isBlankNodeOrIriOrLiteralOrVar : Yes
-            , isBlankNodeOrIriOrVar : Yes
+            | blankNodeOrIriOrLiteralOrVar : Compatible
+            , blankNodeOrIriOrVar : Compatible
         }
 
 
@@ -728,14 +721,14 @@ asBlankNodeOrIriOrVar (Term variant) =
 -}
 type alias IriOrLiteralOrVar =
     Term
-        { isIriOrLiteralOrVar : Yes
+        { iriOrLiteralOrVar : Compatible
         }
 
 
 {-| TODO Add documentation
 -}
 type alias IsIriOrLiteralOrVar compatible =
-    Term { compatible | isIriOrLiteralOrVar : Yes }
+    Term { compatible | iriOrLiteralOrVar : Compatible }
 
 
 {-| TODO Add documentation
@@ -746,66 +739,27 @@ asIriOrLiteralOrVar (Term variant) =
 
 
 
--- IRI OR VAR OR PATH
+-- VAR OR PATH
 
 
 {-| TODO Add documentation
 -}
-type alias IriOrVarOrPath =
+type alias VarOrPath =
     Term
-        { isIriOrVarOrPath : Yes
+        { varOrPath : Compatible
         }
 
 
 {-| TODO Add documentation
 -}
-type alias IsIriOrVarOrPath compatible =
-    Term { compatible | isIriOrVarOrPath : Yes }
+type alias IsVarOrPath compatible =
+    Term { compatible | varOrPath : Compatible }
 
 
 {-| TODO Add documentation
 -}
-asIriOrVarOrPath : IsIriOrVarOrPath compatible -> IriOrVarOrPath
-asIriOrVarOrPath (Term variant) =
-    Term variant
-
-
-
--- IRI OR PATH
-
-
-{-| An RDF term which can only be a
-[IRI](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-ri), or
-a [property path](https://www.w3.org/TR/sparql11-query/#propertypaths). This
-type will only be used as the return type of functions and if the values need
-to be stored in the model. Take a look at [Term](Rdf#Term) for a general
-explanation of the idea behind this.
--}
-type alias IriOrPath =
-    Term
-        { isIriOrPath : Yes
-        , isIriOrVarOrPath : Yes
-        }
-
-
-{-| This type will only be used as the argument of functions and ensures that
-only [IRI](https://www.w3.org/TR/2014/REC-rdf11-concepts-20140225/#dfn-iri)'s
-or [property path](https://www.w3.org/TR/sparql11-query/#propertypaths)'s are
-passed. Take a look at [Term](Rdf#Term) for a general explanation of the idea
-behind this.
--}
-type alias IsIriOrPath compatible =
-    Term
-        { compatible
-            | isIriOrPath : Yes
-            , isIriOrVarOrPath : Yes
-        }
-
-
-{-| TODO Add documentation
--}
-asIriOrPath : IsIriOrPath compatible -> IriOrPath
-asIriOrPath (Term variant) =
+asVarOrPath : IsVarOrPath compatible -> VarOrPath
+asVarOrPath (Term variant) =
     Term variant
 
 
@@ -898,7 +852,7 @@ varD name =
 {-| Create a sequence [property
 path](https://www.w3.org/TR/sparql11-query/#propertypaths).
 -}
-sequence : IsIriOrPath compatible1 -> List (IsIriOrPath compatible2) -> Path
+sequence : IsPath compatible1 -> List (IsPath compatible2) -> Path
 sequence (Term first) rest =
     Term (Sequence first (List.map toVariant rest))
 
@@ -906,7 +860,7 @@ sequence (Term first) rest =
 {-| Create an alternative [property
 path](https://www.w3.org/TR/sparql11-query/#propertypaths).
 -}
-alternative : IsIriOrPath compatible1 -> List (IsIriOrPath compatible2) -> Path
+alternative : IsPath compatible1 -> List (IsPath compatible2) -> Path
 alternative (Term first) rest =
     Term (Alternative first (List.map toVariant rest))
 
@@ -914,7 +868,7 @@ alternative (Term first) rest =
 {-| Create an inverse [property
 path](https://www.w3.org/TR/sparql11-query/#propertypaths).
 -}
-inverse : IsIriOrPath compatible1 -> Path
+inverse : IsPath compatible1 -> Path
 inverse (Term nested) =
     Term (Inverse nested)
 
@@ -922,7 +876,7 @@ inverse (Term nested) =
 {-| Create a zero or more [property
 path](https://www.w3.org/TR/sparql11-query/#propertypaths).
 -}
-zeroOrMore : IsIriOrPath compatible1 -> Path
+zeroOrMore : IsPath compatible1 -> Path
 zeroOrMore (Term nested) =
     Term (ZeroOrMore nested)
 
@@ -930,7 +884,7 @@ zeroOrMore (Term nested) =
 {-| Create a one or more [property
 path](https://www.w3.org/TR/sparql11-query/#propertypaths).
 -}
-oneOrMore : IsIriOrPath compatible1 -> Path
+oneOrMore : IsPath compatible1 -> Path
 oneOrMore (Term nested) =
     Term (OneOrMore nested)
 
@@ -938,7 +892,7 @@ oneOrMore (Term nested) =
 {-| Create a zero or one [property
 path](https://www.w3.org/TR/sparql11-query/#propertypaths).
 -}
-zeroOrOne : IsIriOrPath compatible1 -> Path
+zeroOrOne : IsPath compatible1 -> Path
 zeroOrOne (Term nested) =
     Term (ZeroOrOne nested)
 
@@ -1800,11 +1754,11 @@ mergeStringOrLangStrings stringOrLangStrings =
 
 {-| TODO Explain properties.
 -}
-normalize : IsIriOrPath compatible -> IriOrPath
+normalize : IsPath compatible -> Path
 normalize ((Term variant) as path) =
     case variant of
         Iri _ ->
-            asIriOrPath path
+            asPath path
 
         Sequence first rest ->
             case rest of
@@ -1823,25 +1777,25 @@ normalize ((Term variant) as path) =
                                         (List.map (Term >> normalize >> toVariant) restFlat)
                                     )
                             )
-                        |> Maybe.withDefault (asIriOrPath path)
+                        |> Maybe.withDefault (asPath path)
 
         Alternative _ _ ->
-            asIriOrPath path
+            asPath path
 
         Inverse _ ->
-            asIriOrPath path
+            asPath path
 
         ZeroOrMore _ ->
-            asIriOrPath path
+            asPath path
 
         OneOrMore _ ->
-            asIriOrPath path
+            asPath path
 
         ZeroOrOne _ ->
-            asIriOrPath path
+            asPath path
 
         _ ->
-            asIriOrPath path
+            asPath path
 
 
 flatten : List Variant -> List Variant
@@ -1860,7 +1814,7 @@ flatten paths =
 
 {-| TODO Add documentation
 -}
-startsWith : IsIriOrPath compatible1 -> IsPath compatible2 -> Bool
+startsWith : IsPath compatible1 -> IsPath compatible2 -> Bool
 startsWith a b =
     startsWithHelp (normalize a) (normalize b)
 
@@ -1905,14 +1859,14 @@ startsWithHelp (Term a) (Term b) =
 
 {-| TODO Add documentation
 -}
-rightOf : IsIriOrPath compatible1 -> IsIriOrPath compatible2 -> Maybe IriOrPath
+rightOf : IsPath compatible1 -> IsPath compatible2 -> Maybe Path
 rightOf a b =
     rightOfHelp (normalize a) (normalize b)
 
 
 {-| TODO Add documentation
 -}
-lastPredicatePath : IsIriOrPath compatible -> Maybe Iri
+lastPredicatePath : IsPath compatible -> Maybe Iri
 lastPredicatePath (Term variant) =
     case variant of
         Iri _ ->

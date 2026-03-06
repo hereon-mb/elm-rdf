@@ -1,7 +1,7 @@
 module Rdf.EncodeTest exposing (suite)
 
 import Expect exposing (Expectation)
-import Rdf exposing (IriOrPath)
+import Rdf exposing (Path)
 import Rdf.Encode as Encode exposing (GraphEncoder)
 import Rdf.Graph as Graph
 import Test exposing (Test, describe, test)
@@ -155,9 +155,9 @@ base name =
     Rdf.iri ("http://example.org/" ++ name)
 
 
-hasValue : IriOrPath
+hasValue : Path
 hasValue =
-    Rdf.asIriOrPath (base "hasValue")
+    Rdf.asPath (base "hasValue")
 
 
 valueValue : Rdf.Literal
@@ -165,14 +165,14 @@ valueValue =
     Rdf.integer 1
 
 
-hasNested : IriOrPath
+hasNested : Path
 hasNested =
-    Rdf.asIriOrPath (base "hasNested")
+    Rdf.asPath (base "hasNested")
 
 
-hasUnit : IriOrPath
+hasUnit : Path
 hasUnit =
-    Rdf.asIriOrPath (base "hasUnit")
+    Rdf.asPath (base "hasUnit")
 
 
 valueUnit : Rdf.Iri
@@ -180,9 +180,9 @@ valueUnit =
     base "meter"
 
 
-hasConstant : IriOrPath
+hasConstant : Path
 hasConstant =
-    Rdf.asIriOrPath (base "hasConstant")
+    Rdf.asPath (base "hasConstant")
 
 
 valueConstant : Rdf.Literal

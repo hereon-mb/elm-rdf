@@ -118,12 +118,12 @@ import Rdf
         ( BlankNodeOrIri
         , BlankNodeOrIriOrLiteral
         , Iri
-        , IriOrPath
         , IsBlankNodeOrIri
         , IsBlankNodeOrIriOrLiteral
         , IsIri
-        , IsIriOrPath
+        , IsPath
         , Literal
+        , Path
         , Triple
         )
 import Rdf.Namespaces as Rdf exposing (rdf)
@@ -305,10 +305,10 @@ type Problem
     | ExpectedInt String
     | ExpectedFloat String
     | ExpectedLiteralDatatype Iri Iri
-    | UnknownProperty BlankNodeOrIri IriOrPath
-    | PropertyPresent BlankNodeOrIri IriOrPath
+    | UnknownProperty BlankNodeOrIri Path
+    | PropertyPresent BlankNodeOrIri Path
     | NoProperty BlankNodeOrIri
-    | AtPropertyPath IriOrPath Error
+    | AtPropertyPath Path Error
     | UnexpectedEmptyList
     | CustomError String
     | Failure String
@@ -1093,7 +1093,7 @@ anyLiteral =
 
 {-| TODO
 -}
-property : IsIriOrPath compatible -> Decoder a -> Decoder a
+property : IsPath compatible -> Decoder a -> Decoder a
 property path (Decoder f) =
     let
         expectBlankNodeOrIri :
@@ -1122,7 +1122,7 @@ property path (Decoder f) =
                     case getObjectsAt focusNode path state.graph of
                         [] ->
                             Err
-                                { error = UnknownProperty focusNode (Rdf.asIriOrPath path)
+                                { error = UnknownProperty focusNode (Rdf.asPath path)
                                 , contextStack = state.context
                                 }
 
@@ -1138,7 +1138,7 @@ property path (Decoder f) =
                         >> Result.combine
                         >> Result.mapError
                             (\errorNested ->
-                                { error = AtPropertyPath (Rdf.asIriOrPath path) errorNested
+                                { error = AtPropertyPath (Rdf.asPath path) errorNested
                                 , contextStack = state.context
                                 }
                             )
@@ -1150,7 +1150,7 @@ property path (Decoder f) =
 
 {-| TODO
 -}
-noProperty : IsIriOrPath compatible -> Decoder ()
+noProperty : IsPath compatible -> Decoder ()
 noProperty path =
     Decoder
         (\state ->
@@ -1190,7 +1190,7 @@ noProperty path =
                                                     { error =
                                                         PropertyPresent
                                                             focusNode
-                                                            (Rdf.asIriOrPath path)
+                                                            (Rdf.asPath path)
                                                     , contextStack = state.context
                                                     }
                                     )
@@ -1521,7 +1521,7 @@ required iriPredicate decoderA decoderF =
     -->     }
 
 -}
-requiredAt : IsIriOrPath compatible -> Decoder a -> Decoder (a -> b) -> Decoder b
+requiredAt : IsPath compatible -> Decoder a -> Decoder (a -> b) -> Decoder b
 requiredAt path decoderA decoderF =
     map2 (\f a -> f a) decoderF (property path decoderA)
 
@@ -1613,7 +1613,7 @@ optional iriPredicate decoderA defaultA decoderF =
     -->     }
 
 -}
-optionalAt : IsIriOrPath compatible -> Decoder a -> a -> Decoder (a -> b) -> Decoder b
+optionalAt : IsPath compatible -> Decoder a -> a -> Decoder (a -> b) -> Decoder b
 optionalAt path decoderA defaultA decoderF =
     map2 (\f a -> f a)
         decoderF
@@ -1755,7 +1755,7 @@ getSubjects (Graph data) =
 
 getObjectsAt :
     IsBlankNodeOrIri compatible1
-    -> IsIriOrPath compatible2
+    -> IsPath compatible2
     -> Graph
     -> List BlankNodeOrIriOrLiteral
 getObjectsAt nodeFocus path (Graph data) =
@@ -1773,7 +1773,7 @@ type alias GraphData rest =
 
 followPropertyPath :
     GraphData rest
-    -> IsIriOrPath compatible1
+    -> IsPath compatible1
     -> IsBlankNodeOrIri compatible2
     -> List BlankNodeOrIriOrLiteral
 followPropertyPath data ((Term variant) as path) nodeFocusCompatible =

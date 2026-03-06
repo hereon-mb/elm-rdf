@@ -38,15 +38,15 @@ import Rdf
         , BlankNodeOrIriOrVar
         , Iri
         , IriOrLiteralOrVar
-        , IriOrVarOrPath
         , IsBlankNodeOrIriOrLiteral
         , IsBlankNodeOrIriOrLiteralOrVar
         , IsBlankNodeOrIriOrVar
         , IsIriOrLiteralOrVar
-        , IsIriOrPath
-        , IsIriOrVarOrPath
+        , IsPath
         , IsVar
+        , IsVarOrPath
         , Var
+        , VarOrPath
         )
 import Rdf.Namespaces exposing (xsd)
 
@@ -284,7 +284,7 @@ type GroupGraphPattern
 -}
 type alias Triple =
     { subject : BlankNodeOrIriOrVar
-    , predicate : IriOrVarOrPath
+    , predicate : VarOrPath
     , object : BlankNodeOrIriOrLiteralOrVar
     }
 
@@ -407,12 +407,12 @@ isIri =
 -}
 triple :
     IsBlankNodeOrIriOrVar compatible1
-    -> IsIriOrVarOrPath compatible2
+    -> IsVarOrPath compatible2
     -> IsBlankNodeOrIriOrLiteralOrVar compatible3
     -> Triple
 triple subject predicate object =
     { subject = Rdf.asBlankNodeOrIriOrVar subject
-    , predicate = Rdf.asIriOrVarOrPath predicate
+    , predicate = Rdf.asVarOrPath predicate
     , object = Rdf.asBlankNodeOrIriOrLiteralOrVar object
     }
 
@@ -422,7 +422,7 @@ triple subject predicate object =
 triplesAlong :
     String
     -> IsBlankNodeOrIriOrVar compatible1
-    -> IsIriOrPath compatible2
+    -> IsPath compatible2
     -> IsBlankNodeOrIriOrLiteralOrVar compatible3
     -> List Triple
 triplesAlong id subject path object =
@@ -433,7 +433,7 @@ triplesAlongHelp :
     Int
     -> String
     -> IsBlankNodeOrIriOrVar compatible1
-    -> IsIriOrPath compatible2
+    -> IsPath compatible2
     -> IsBlankNodeOrIriOrLiteralOrVar compatible3
     -> ( Int, List Triple )
 triplesAlongHelp seed id subject (Term variant) object =

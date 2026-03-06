@@ -2,7 +2,7 @@ module PropertyPathTest exposing (normalize1, normalize2, normalize3, normalize4
 
 import Expect
 import List.NonEmpty as NonEmpty exposing (NonEmpty)
-import Rdf exposing (IriOrPath)
+import Rdf exposing (Path)
 import Rdf.Predicate as Predicate exposing (Predicate(..))
 import Test exposing (Test, test)
 
@@ -81,7 +81,7 @@ normalize5 =
         )
 
 
-normalizeHelp : String -> IriOrPath -> NonEmpty Predicate -> Test
+normalizeHelp : String -> Path -> NonEmpty Predicate -> Test
 normalizeHelp label propertyPath expected =
     test label <|
         \_ ->

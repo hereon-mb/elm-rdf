@@ -13,7 +13,7 @@ module Rdf.Predicate exposing
 import Internal.Term as Internal exposing (Term(..))
 import List.NonEmpty as NonEmpty exposing (NonEmpty)
 import Maybe.Extra as Maybe
-import Rdf exposing (Iri, IsIriOrPath)
+import Rdf exposing (Iri, IsPath)
 
 
 {-| TODO Add documentation
@@ -41,7 +41,7 @@ But since we use the super-class `PropertyPath` everywhere, we have to special
 case the impossible variants, cf. `property` which is a no-op if it encounters
 a such special property path.
 -}
-fromPropertyPath : IsIriOrPath compatible -> Maybe (NonEmpty Predicate)
+fromPropertyPath : IsPath compatible -> Maybe (NonEmpty Predicate)
 fromPropertyPath (Term variant) =
     case variant of
         (Internal.Iri _) as x ->

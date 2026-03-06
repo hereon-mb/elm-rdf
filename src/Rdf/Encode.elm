@@ -93,7 +93,7 @@ typing `Node`s.
 -}
 
 import List.NonEmpty as NonEmpty
-import Rdf exposing (IsBlankNodeOrIriOrLiteral, IsIriOrPath, Literal)
+import Rdf exposing (IsBlankNodeOrIriOrLiteral, IsPath, Literal)
 import Rdf.Encode.Bunch as Bunch
 import Rdf.Graph as Rdf exposing (Graph, Seed)
 import Rdf.Predicate as Predicate
@@ -236,7 +236,7 @@ nodeHelp propertyEs subject seed =
 {-| TODO
 -}
 bunch :
-    List ( IsIriOrPath compatible, IsGraphOrLiteralEncoder object )
+    List ( IsPath compatible, IsGraphOrLiteralEncoder object )
     -> List PropertyEncoder
 bunch =
     List.filterMap
@@ -282,7 +282,7 @@ encoderFromPredicate p encoder =
 {-| TODO
 -}
 property :
-    IsIriOrPath compatible
+    IsPath compatible
     -> IsGraphOrLiteralEncoder object
     -> PropertyEncoder
 property propertyPath encoder =
