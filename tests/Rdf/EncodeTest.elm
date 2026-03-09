@@ -10,49 +10,21 @@ import Test exposing (Test, describe, test)
 suite : Test
 suite =
     describe "Rdf.Encode"
-        [ bunchLeaf
-        , from
+        [ fromNode
         , fromBlankNode
         ]
 
 
-bunchLeaf : Test
-bunchLeaf =
-    test "bunch leaf" <|
-        \_ ->
-            Encode.node (Rdf.asBlankNodeOrIri (base "root"))
-                (Encode.bunch
-                    [ ( hasValue, Encode.literal valueValue )
-                    , ( Rdf.sequence hasNested [ hasUnit ]
-                      , Encode.iri valueUnit
-                      )
-                    , ( Rdf.sequence hasNested [ hasConstant ]
-                      , Encode.literal valueConstant
-                      )
-                    ]
-                )
-                |> expectGraph
-                    """
-                    <root>
-                        <hasValue> "1"^^xsd:integer ;
-                        <hasNested> [
-                            <hasUnit> <meter> ;
-                            <hasConstant> "something" ;
-                        ] ;
-                     .
-                    """
-
-
-from : Test
-from =
-    describe "from"
+fromNode : Test
+fromNode =
+    describe "fromNode"
         [ describe "with predicate"
             [ test "nested once inside node" <|
                 \_ ->
                     Encode.node (Rdf.asBlankNodeOrIri (base "root"))
-                        [ Encode.from (Rdf.asBlankNodeOrIri (base "other"))
-                            [ Encode.predicate (base "hasValue")
-                                (Encode.literal valueValue)
+                        [ Encode.fromNode (Rdf.asBlankNodeOrIri (base "other"))
+                            [ Encode.property (base "hasValue")
+                                (Encode.term valueValue)
                             ]
                         ]
                         |> expectGraph
@@ -71,8 +43,8 @@ fromBlankNode =
                 \_ ->
                     Encode.node (Rdf.asBlankNodeOrIri (base "root"))
                         [ Encode.fromBlankNode
-                            [ Encode.predicate (base "hasValue")
-                                (Encode.literal valueValue)
+                            [ Encode.property (base "hasValue")
+                                (Encode.term valueValue)
                             ]
                         ]
                         |> expectGraph
@@ -83,12 +55,12 @@ fromBlankNode =
                 \_ ->
                     Encode.node (Rdf.asBlankNodeOrIri (base "root"))
                         [ Encode.fromBlankNode
-                            [ Encode.predicate (base "hasValue")
-                                (Encode.literal valueValue)
+                            [ Encode.property (base "hasValue")
+                                (Encode.term valueValue)
                             ]
                         , Encode.fromBlankNode
-                            [ Encode.predicate (base "hasValue")
-                                (Encode.literal valueValue)
+                            [ Encode.property (base "hasValue")
+                                (Encode.term valueValue)
                             ]
                         ]
                         |> expectGraph
@@ -102,10 +74,10 @@ fromBlankNode =
                 \_ ->
                     Encode.node (Rdf.asBlankNodeOrIri (base "root"))
                         [ Encode.fromBlankNode
-                            [ Encode.predicate (base "hasValueA")
-                                (Encode.literal valueValue)
-                            , Encode.predicate (base "hasValueB")
-                                (Encode.literal valueValue)
+                            [ Encode.property (base "hasValueA")
+                                (Encode.term valueValue)
+                            , Encode.property (base "hasValueB")
+                                (Encode.term valueValue)
                             ]
                         ]
                         |> expectGraph
@@ -122,7 +94,7 @@ fromBlankNode =
                     Encode.node (Rdf.asBlankNodeOrIri (base "root"))
                         [ Encode.fromBlankNode
                             [ Encode.property hasValue
-                                (Encode.literal valueValue)
+                                (Encode.term valueValue)
                             ]
                         ]
                         |> expectGraph
@@ -134,11 +106,11 @@ fromBlankNode =
                     Encode.node (Rdf.asBlankNodeOrIri (base "root"))
                         [ Encode.fromBlankNode
                             [ Encode.property hasValue
-                                (Encode.literal valueValue)
+                                (Encode.term valueValue)
                             ]
                         , Encode.fromBlankNode
                             [ Encode.property hasValue
-                                (Encode.literal valueValue)
+                                (Encode.term valueValue)
                             ]
                         ]
                         |> expectGraph
@@ -163,31 +135,6 @@ hasValue =
 valueValue : Rdf.Literal
 valueValue =
     Rdf.integer 1
-
-
-hasNested : Path
-hasNested =
-    Rdf.asPath (base "hasNested")
-
-
-hasUnit : Path
-hasUnit =
-    Rdf.asPath (base "hasUnit")
-
-
-valueUnit : Rdf.Iri
-valueUnit =
-    base "meter"
-
-
-hasConstant : Path
-hasConstant =
-    Rdf.asPath (base "hasConstant")
-
-
-valueConstant : Rdf.Literal
-valueConstant =
-    Rdf.string "something"
 
 
 expectGraph : String -> GraphEncoder -> Expectation

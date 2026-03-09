@@ -1,135 +1,91 @@
 module Rdf.Encode exposing
     ( Encoder
     , encode
-    , IsGraphEncoder, IsPropertyEncoder, IsLiteralEncoder, IsGraphOrLiteralEncoder
-    , GraphEncoder, PropertyEncoder, LiteralEncoder
-    , Yes, No
-    , Subject, Predicate, Object
-    , blankNode
-    , node
-    , predicate
+    , node, blankNode
+    , fromNode, fromBlankNode
     , property
-    , bunch
-    , iri
-    , literal
-    , object
-    , from, fromBlankNode
+    , term
+    , GraphEncoder, IsGraphEncoder
+    , PropertyEncoder, IsPropertyEncoder
+    , TermEncoder, IsTermEncoder
+    , GraphOrTermEncoder, IsGraphOrTermEncoder
+    , Compatible
     )
 
-{-| A domain-specific language for encoding `Graph`s.
+{-| Turn elm values into `Graph`'s. This is what
+[Json.Encode](https://package.elm-lang.org/packages/elm/json/latest/Json-Encode)
+is for JSON values. Since generating RDF graphs potentially requires minting
+(local) names for blank nodes, you first have to create an
+[`Encoder`](#Encoder) and then turn this into an `Graph` by feeding it into
+[`encode`](#encode) with a `Seed`.
 
 
-# Introduction
-
-The minimal motivation for this module is to encode the following example in an
-ergonomic DSL. Note that in this example, blank nodes are nested.
-
-```turtle
-[
-   a polylab:CapillaryConstant ;
-   om:hasValue [
-     om:hasNumericalValue "3.14" ;
-     om:hasUnit polylab:squareMilliMeterPerSecondSquare ;
-   ]
-]
-```
-
-This module proposes the following DSL to solve the problem.
-
-    blankNode
-        [ property a (polylab "CapillaryConstant"
-        , property (om "hasValue")
-            (blankNode
-                [ property (om "hasNumericalValue") (Rdf.string "3.14")
-                , property (om "hasUnit") (polylab "squareMilliMeterPerSecndSquare")
-                ]
-            )
-        ]
-
-The following aspects of the DSL are note-worthy:
-
-  - blank node generation happens transparently
-
-  - blank nodes may appear as root nodes (subjects) as well as arguments to
-    `property` (object nodes)
-
-The following are deliberate limitations of the current implementation:
-
-  - only one node can be encoded (easily solvable)
-
-  - blank nodes cannot freely refer to each other (unclear if solvable)
-
-Implementation-wise, the only challenge is the fact that blank nodes can be
-subjects as well as objects. We deploy the same technique as `RDF` does for
-typing `Node`s.
-
-
-# Interface
+# Encoding
 
 @docs Encoder
 @docs encode
 
-@docs IsGraphEncoder, IsPropertyEncoder, IsLiteralEncoder, IsGraphOrLiteralEncoder
-@docs GraphEncoder, PropertyEncoder, LiteralEncoder
-@docs Yes, No
 
-@docs Subject, Predicate, Object
+# Primitives
 
-@docs blankNode
-@docs node
-@docs predicate
+@docs node, blankNode
+@docs fromNode, fromBlankNode
 @docs property
-@docs bunch
-
-@docs iri
-@docs literal
-@docs object
+@docs term
 
 
-## Experimental
+# Types
 
-@docs from, fromBlankNode
+@docs GraphEncoder, IsGraphEncoder
+@docs PropertyEncoder, IsPropertyEncoder
+@docs TermEncoder, IsTermEncoder
+@docs GraphOrTermEncoder, IsGraphOrTermEncoder
+
+
+## Utility
+
+@docs Compatible
 
 -}
 
-import List.NonEmpty as NonEmpty
-import Rdf exposing (IsBlankNodeOrIriOrLiteral, IsPath, Literal)
-import Rdf.Encode.Bunch as Bunch
+import Rdf
+    exposing
+        ( BlankNodeOrIri
+        , Iri
+        , IsBlankNodeOrIri
+        , IsBlankNodeOrIriOrLiteral
+        , IsIri
+        , IsPath
+        )
 import Rdf.Graph as Rdf exposing (Graph, Seed)
 import Rdf.Predicate as Predicate
 
 
-{-| TODO
+
+-- ENCODING
+
+
+{-| A value which knows how to encode an Elm value into an RDF graph.
+
+The `compatible` type variable is used to ensure that certain instances of an
+`Encoder` can only be used in the right context.
+
 -}
 type Encoder compatible
     = Encoder EncoderInternal
 
 
 type EncoderInternal
-    = GraphEncoder (Seed -> ( Subject, ( Graph, Seed ) ))
-    | PropertyEncoder (Seed -> Subject -> ( Graph, Seed ))
-    | LiteralEncoder (Seed -> Subject -> Predicate -> ( Graph, Seed ))
+    = GraphEncoder (Seed -> ( BlankNodeOrIri, ( Graph, Seed ) ))
+    | PropertyEncoder (Seed -> BlankNodeOrIri -> ( Graph, Seed ))
+    | TermEncoder (Seed -> BlankNodeOrIri -> Iri -> ( Graph, Seed ))
 
 
-{-| TODO
--}
-type alias Predicate =
-    Rdf.Iri
-
-
-{-| TODO
--}
-type alias Subject =
-    Rdf.BlankNodeOrIri
-
-
-{-| TODO
--}
-type alias Object =
-    Rdf.BlankNodeOrIriOrLiteral
-
-
-{-| TODO
+{-| Run an [`Encoder`](#Encoder). You have to provide a `Seed` which is used
+for minting unique blank node identifiers. The function `encode` returns the
+RDF graph as well as an updated `Seed` which you should use for further
+encoding or parsing of RDF graphs to ensure you don't get blank node identifier
+clashes.
 -}
 encode : Seed -> IsGraphEncoder graph -> ( Graph, Seed )
 encode seed (Encoder encoder) =
@@ -140,11 +96,24 @@ encode seed (Encoder encoder) =
         PropertyEncoder _ ->
             ( Rdf.emptyGraph, seed )
 
-        LiteralEncoder _ ->
+        TermEncoder _ ->
             ( Rdf.emptyGraph, seed )
 
 
-{-| TODO
+
+-- PRIMITIVES
+
+
+{-| Encode a node, for which we already have a name, alongside some properties
+where the node is the subject.
+-}
+node : IsBlankNodeOrIri compatible -> List PropertyEncoder -> GraphEncoder
+node subject propertyEs =
+    Encoder (GraphEncoder (\seed -> nodeHelp propertyEs subject seed))
+
+
+{-| Encode a new blank node alongside some properties where the node is the
+subject. This will mint a new blank node identifier under the hood.
 -}
 blankNode : List PropertyEncoder -> GraphEncoder
 blankNode propertyEs =
@@ -161,22 +130,18 @@ blankNode propertyEs =
         )
 
 
-{-| TODO
+{-| This works like [`node`](#node) but returns a `PropertyEncoder`. You can
+use this if you are deep in a tree of encoders and have to encode
+a different/detached part of the graph.
 -}
-from :
-    Rdf.IsBlankNodeOrIri compatible
-    -> List PropertyEncoder
-    -> PropertyEncoder
-from subject propertyEs =
-    Encoder
-        (GraphEncoder
-            (\seed ->
-                nodeHelp propertyEs subject seed
-            )
-        )
+fromNode : IsBlankNodeOrIri compatible -> List PropertyEncoder -> PropertyEncoder
+fromNode subject propertyEs =
+    Encoder (GraphEncoder (\seed -> nodeHelp propertyEs subject seed))
 
 
-{-| TODO
+{-| This works like [`blankNode`](#blankNode) but returns a `PropertyEncoder`.
+You can use this if you are deep in a tree of encoders and have to encode
+a different/detached part of the graph.
 -}
 fromBlankNode : List PropertyEncoder -> PropertyEncoder
 fromBlankNode propertyEs =
@@ -193,18 +158,11 @@ fromBlankNode propertyEs =
         )
 
 
-{-| TODO
--}
-node : Rdf.IsBlankNodeOrIri compatible -> List PropertyEncoder -> GraphEncoder
-node subject propertyEs =
-    Encoder (GraphEncoder (\seed -> nodeHelp propertyEs subject seed))
-
-
 nodeHelp :
     List PropertyEncoder
-    -> Rdf.IsBlankNodeOrIri compatible
+    -> IsBlankNodeOrIri compatible
     -> Seed
-    -> ( Subject, ( Graph, Seed ) )
+    -> ( BlankNodeOrIri, ( Graph, Seed ) )
 nodeHelp propertyEs subject seed =
     ( Rdf.asBlankNodeOrIri subject
     , Tuple.mapFirst (List.foldl Rdf.union Rdf.emptyGraph) <|
@@ -225,7 +183,7 @@ nodeHelp propertyEs subject seed =
                         in
                         ( graph :: graphs, seedNextNext )
 
-                    LiteralEncoder _ ->
+                    TermEncoder _ ->
                         ( graphs, seedNext )
             )
             ( [], seed )
@@ -233,58 +191,10 @@ nodeHelp propertyEs subject seed =
     )
 
 
-{-| TODO
+{-| Encode a property by providing an IRI of property path and an object. The
+current focus node will be the subject.
 -}
-bunch :
-    List ( IsPath compatible, IsGraphOrLiteralEncoder object )
-    -> List PropertyEncoder
-bunch =
-    List.filterMap
-        (\( propertyPath, encoder ) ->
-            propertyPath
-                |> Predicate.fromPropertyPath
-                |> Maybe.map (\p -> ( p, encoder ))
-        )
-        >> Bunch.reduce
-        >> List.map encoderFromTree
-
-
-encoderFromTree :
-    Bunch.Tree
-        Predicate.Predicate
-        ( Predicate.Predicate, IsGraphOrLiteralEncoder object )
-    -> PropertyEncoder
-encoderFromTree tree =
-    case tree of
-        Bunch.Leaf ( p, encoder ) ->
-            encoderFromPredicate p encoder
-
-        Bunch.Node p trees ->
-            NonEmpty.toList trees
-                |> List.map encoderFromTree
-                |> blankNode
-                |> encoderFromPredicate p
-
-
-encoderFromPredicate :
-    Predicate.Predicate
-    -> IsGraphOrLiteralEncoder object
-    -> PropertyEncoder
-encoderFromPredicate p encoder =
-    case p of
-        Predicate.Predicate predicate_ ->
-            predicate predicate_ encoder
-
-        Predicate.Inverse predicate_ ->
-            inverse predicate_ encoder
-
-
-{-| TODO
--}
-property :
-    IsPath compatible
-    -> IsGraphOrLiteralEncoder object
-    -> PropertyEncoder
+property : IsPath compatible -> IsGraphOrTermEncoder object -> PropertyEncoder
 property propertyPath encoder =
     case Predicate.fromPropertyPath propertyPath of
         Just ( first, rest ) ->
@@ -310,15 +220,23 @@ property propertyPath encoder =
                 )
 
 
-{-| TODO
--}
-predicate :
-    Rdf.IsIri compatible
-    -> IsGraphOrLiteralEncoder object
+encoderFromPredicate :
+    Predicate.Predicate
+    -> IsGraphOrTermEncoder object
     -> PropertyEncoder
+encoderFromPredicate p encoder =
+    case p of
+        Predicate.Predicate predicate_ ->
+            predicate predicate_ encoder
+
+        Predicate.Inverse predicate_ ->
+            inverse predicate_ encoder
+
+
+predicate : IsIri compatible -> IsGraphOrTermEncoder object -> PropertyEncoder
 predicate p (Encoder encoder) =
     let
-        encoderNew : Seed -> Subject -> ( Graph, Seed )
+        encoderNew : Seed -> IsBlankNodeOrIri compatible2 -> ( Graph, Seed )
         encoderNew seed subject =
             case encoder of
                 GraphEncoder f ->
@@ -337,18 +255,22 @@ predicate p (Encoder encoder) =
                 PropertyEncoder _ ->
                     ( Rdf.emptyGraph, seed )
 
-                LiteralEncoder f ->
-                    f seed subject (Rdf.asIri p)
+                TermEncoder f ->
+                    f seed (Rdf.asBlankNodeOrIri subject) (Rdf.asIri p)
     in
     Encoder (PropertyEncoder encoderNew)
 
 
-{-| TODO
--}
-inverse : Predicate -> IsGraphOrLiteralEncoder object -> PropertyEncoder
+inverse :
+    IsIri compatible1
+    -> IsGraphOrTermEncoder compatible2
+    -> PropertyEncoder
 inverse p (Encoder encoder) =
     let
-        encoderNew : Seed -> IsBlankNodeOrIriOrLiteral compatible -> ( Graph, Seed )
+        encoderNew :
+            Seed
+            -> IsBlankNodeOrIriOrLiteral compatible
+            -> ( Graph, Seed )
         encoderNew seed subject =
             case encoder of
                 GraphEncoder f ->
@@ -364,7 +286,7 @@ inverse p (Encoder encoder) =
                     , seedUpdated
                     )
 
-                LiteralEncoder _ ->
+                TermEncoder _ ->
                     -- Since RDF Literals can never be the subject of a Triple,
                     -- this case should not happen
                     ( Rdf.emptyGraph, seed )
@@ -375,99 +297,124 @@ inverse p (Encoder encoder) =
     Encoder (PropertyEncoder encoderNew)
 
 
-{-| TODO
+{-| Encode a single RDF term.
+
+    import Rdf exposing (iri)
+    import Rdf.Namespaces exposing (a)
+    import Rdf.Graph exposing (initialSeed, serializeTurtle)
+
+    blankNode
+        [ property a (term (iri "http://example.org#Person")) ]
+        |> encode initialSeed
+        |> Tuple.first
+        |> serializeTurtle
+        |> String.lines
+    --> [ "_:2273e9c9-fa2d-4c28-ae87-947ad36cbecd"
+    --> , "  a <http://example.org#Person> ."
+    --> ]
+
 -}
-object : Rdf.IsBlankNodeOrIriOrLiteral compatible -> LiteralEncoder
-object object_ =
+term : IsBlankNodeOrIriOrLiteral compatible -> TermEncoder
+term t =
     Encoder
-        (LiteralEncoder
+        (TermEncoder
             (\seed subject predicate_ ->
-                ( Rdf.singleton subject predicate_ object_, seed )
+                ( Rdf.singleton subject predicate_ t, seed )
             )
         )
 
 
-{-| TODO
+
+-- TYPES
+
+
+{-| You can ignore this type, it is only used for implementing the different
+`Encoder` variants.
 -}
-literal : Literal -> LiteralEncoder
-literal =
-    object << Rdf.asBlankNodeOrIriOrLiteral
+type Compatible
+    = Compatible Never
 
 
-{-| TODO
--}
-iri : Rdf.Iri -> LiteralEncoder
-iri =
-    object << Rdf.asBlankNodeOrIriOrLiteral
+
+-- GRAPH ENCODER
 
 
-{-| TODO
--}
-type alias IsGraphEncoder compatible =
-    Encoder { compatible | isGraph : Yes }
-
-
-{-| TODO
+{-| An `Encoder` which can be fed into `encode` to produce an RDF graph.
 -}
 type alias GraphEncoder =
     Encoder
-        { isGraph : Yes
-        , isProperty : No
-        , isLiteral : No
-        , isGraphOrLiteral : Yes
+        { graph : Compatible
+        , graphOrTerm : Compatible
         }
 
 
-{-| TODO
+{-| This type will only be used as the argument of functions.
 -}
-type alias IsPropertyEncoder compatible =
-    Encoder { compatible | isProperty : Yes }
+type alias IsGraphEncoder compatible =
+    Encoder
+        { compatible
+            | graph : Compatible
+            , graphOrTerm : Compatible
+        }
 
 
-{-| TODO
+
+-- PROPERTY ENCODER
+
+
+{-| An `Encoder` which encodes an RDF property.
 -}
 type alias PropertyEncoder =
     Encoder
-        { isGraph : No
-        , isProperty : Yes
-        , isLiteral : No
-        , isGraphOrLiteral : No
+        { property : Compatible
         }
 
 
-{-| TODO
+{-| This type will only be used as the argument of functions.
 -}
-type alias IsLiteralEncoder compatible =
-    Encoder { compatible | isLiteral : Yes }
+type alias IsPropertyEncoder compatible =
+    Encoder { compatible | property : Compatible }
 
 
-{-| TODO
+
+-- LITERAL ENCODER
+
+
+{-| An `Encoder` which encodes an RDF term.
 -}
-type alias LiteralEncoder =
+type alias TermEncoder =
     Encoder
-        { isGraph : No
-        , isProperty : No
-        , isLiteral : Yes
-        , isGraphOrLiteral : Yes
+        { term : Compatible
+        , graphOrTerm : Compatible
         }
 
 
-{-| TODO
+{-| This type will only be used as the argument of functions.
 -}
-type alias IsGraphOrLiteralEncoder compatible =
-    Encoder { compatible | isGraphOrLiteral : Yes }
+type alias IsTermEncoder compatible =
+    Encoder
+        { compatible
+            | term : Compatible
+            , graphOrTerm : Compatible
+        }
 
 
-{-| TODO
+
+-- GRAPH OR LITERAL ENCODER
+
+
+{-| An `Encoder` which encodes an RDF graph or an RDf term.
 -}
-type Yes
-    = Yes Never
+type alias IsGraphOrTermEncoder compatible =
+    Encoder { compatible | graphOrTerm : Compatible }
 
 
-{-| TODO
+{-| This type will only be used as the argument of functions.
 -}
-type No
-    = No Never
+type alias GraphOrTermEncoder =
+    Encoder
+        { graphOrTerm : Compatible
+        }
 
 
 forgetCompatible : Encoder compatible1 -> Encoder compatible2
