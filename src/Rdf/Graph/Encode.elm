@@ -94,10 +94,10 @@ encode seed (Encoder encoder) =
             Tuple.second (f seed)
 
         PropertyEncoder _ ->
-            ( Rdf.emptyGraph, seed )
+            ( Rdf.empty, seed )
 
         TermEncoder _ ->
-            ( Rdf.emptyGraph, seed )
+            ( Rdf.empty, seed )
 
 
 
@@ -165,7 +165,7 @@ nodeHelp :
     -> ( BlankNodeOrIri, ( Graph, Seed ) )
 nodeHelp propertyEs subject seed =
     ( Rdf.asBlankNodeOrIri subject
-    , Tuple.mapFirst (List.foldl Rdf.union Rdf.emptyGraph) <|
+    , Tuple.mapFirst (List.foldl Rdf.union Rdf.empty) <|
         List.foldl
             (\(Encoder propertyE) ( graphs, seedNext ) ->
                 case propertyE of
@@ -215,7 +215,7 @@ property propertyPath encoder =
                     (\seed _ ->
                         -- XXX `propertyPath` contains non-`Iri` components, we
                         -- just give up..
-                        ( Rdf.emptyGraph, seed )
+                        ( Rdf.empty, seed )
                     )
                 )
 
@@ -253,7 +253,7 @@ predicate p (Encoder encoder) =
                     )
 
                 PropertyEncoder _ ->
-                    ( Rdf.emptyGraph, seed )
+                    ( Rdf.empty, seed )
 
                 TermEncoder f ->
                     f seed (Rdf.asBlankNodeOrIri subject) (Rdf.asIri p)
@@ -289,10 +289,10 @@ inverse p (Encoder encoder) =
                 TermEncoder _ ->
                     -- Since RDF Literals can never be the subject of a Triple,
                     -- this case should not happen
-                    ( Rdf.emptyGraph, seed )
+                    ( Rdf.empty, seed )
 
                 PropertyEncoder _ ->
-                    ( Rdf.emptyGraph, seed )
+                    ( Rdf.empty, seed )
     in
     Encoder (PropertyEncoder encoderNew)
 

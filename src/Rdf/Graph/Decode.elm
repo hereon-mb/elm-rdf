@@ -168,7 +168,7 @@ type alias State =
 {-| Decode an [IRI](https://www.w3.org/TR/rdf11-concepts/#section-IRIs).
 
     import Rdf exposing (a)
-    import Rdf.Graph as Rdf exposing (Graph)
+    import Rdf.Graph as Graph exposing (Graph)
 
     graph : Graph
     graph =
@@ -176,8 +176,8 @@ type alias State =
         @base <http://example.org/> .
         <alice> a <#Person> .
         """
-            |> Rdf.parse
-            |> Result.withDefault Rdf.emptyGraph
+            |> Graph.parse
+            |> Result.withDefault Graph.empty
 
     decode
         (from
@@ -280,7 +280,7 @@ Node](https://www.w3.org/TR/rdf11-concepts/#section-blank-nodes) or
 [IRI](https://www.w3.org/TR/rdf11-concepts/#section-IRIs).
 
     import Rdf exposing (a)
-    import Rdf.Graph as Rdf exposing (Graph)
+    import Rdf.Graph as Graph exposing (Graph)
 
     graph : Graph
     graph =
@@ -288,8 +288,8 @@ Node](https://www.w3.org/TR/rdf11-concepts/#section-blank-nodes) or
         @base <http://example.org/> .
         <alice> <#knows> <bob> .
         """
-            |> Rdf.parse
-            |> Result.withDefault Rdf.emptyGraph
+            |> Graph.parse
+            |> Result.withDefault Graph.empty
 
     decode
         (from
@@ -361,7 +361,7 @@ blankNodeOrIriOrLiteral =
 {-| Decode a Literal of type `xsd:string` into a `String`.
 
     import Rdf exposing (a)
-    import Rdf.Graph as Rdf exposing (Graph)
+    import Rdf.Graph as Graph exposing (Graph)
 
     graph : Graph
     graph =
@@ -369,8 +369,8 @@ blankNodeOrIriOrLiteral =
         @base <http://example.org/> .
         <alice> <#name> "Alice Wonderland" .
         """
-            |> Rdf.parse
-            |> Result.withDefault Rdf.emptyGraph
+            |> Graph.parse
+            |> Result.withDefault Graph.empty
 
     decode
         (from
@@ -439,7 +439,7 @@ stringOrLangString =
 {-| Decode a Literal of type `xsd:boolean` into a `Bool`.
 
     import Rdf exposing (a)
-    import Rdf.Graph as Rdf exposing (Graph)
+    import Rdf.Graph as Graph exposing (Graph)
 
     graph : Graph
     graph =
@@ -447,8 +447,8 @@ stringOrLangString =
         @base <http://example.org/> .
         <alice> <#isAdmin> true .
         """
-            |> Rdf.parse
-            |> Result.withDefault Rdf.emptyGraph
+            |> Graph.parse
+            |> Result.withDefault Graph.empty
 
     decode
         (from
@@ -497,7 +497,7 @@ decimal =
 {-| Decode a Literal of type `xsd:integer` or `xsd:int` into a `Int`.
 
     import Rdf exposing (a)
-    import Rdf.Graph as Rdf exposing (Graph)
+    import Rdf.Graph as Graph exposing (Graph)
 
     graph : Graph
     graph =
@@ -505,8 +505,8 @@ decimal =
         @base <http://example.org/> .
         <question> <#hasAnswer> 42 .
         """
-            |> Rdf.parse
-            |> Result.withDefault Rdf.emptyGraph
+            |> Graph.parse
+            |> Result.withDefault Graph.empty
 
     decode
         (from
@@ -540,7 +540,7 @@ int =
 {-| Decode a Literal of type `xsd:double` or `xsd:float` into a `Float`.
 
     import Rdf exposing (a)
-    import Rdf.Graph as Rdf exposing (Graph)
+    import Rdf.Graph as Graph exposing (Graph)
 
     graph : Graph
     graph =
@@ -548,8 +548,8 @@ int =
         @base <http://example.org/> .
         <question> <#hasAnswer> 314E-2 .
         """
-            |> Rdf.parse
-            |> Result.withDefault Rdf.emptyGraph
+            |> Graph.parse
+            |> Result.withDefault Graph.empty
 
     decode
         (from
@@ -594,7 +594,7 @@ number =
 {-| Decode a Literal of type `xsd:date` into a `Time.Posix`.
 
     import Rdf exposing (a)
-    import Rdf.Graph as Rdf exposing (Graph)
+    import Rdf.Graph as Graph exposing (Graph)
     import Time
 
     graph : Graph
@@ -604,8 +604,8 @@ number =
         @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
         <alice> <#birthDate> "1970-01-01"^^xsd:date .
         """
-            |> Rdf.parse
-            |> Result.withDefault Rdf.emptyGraph
+            |> Graph.parse
+            |> Result.withDefault Graph.empty
 
     decode
         (from
@@ -633,7 +633,7 @@ date =
 {-| Decode a Literal of type `xsd:date` into a `Time.Posix`.
 
     import Rdf exposing (a)
-    import Rdf.Graph as Rdf exposing (Graph)
+    import Rdf.Graph as Graph exposing (Graph)
     import Time
 
     graph : Graph
@@ -643,8 +643,8 @@ date =
         @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
         <alice> <#birthTime> "1970-01-01T00:00:00"^^xsd:dateTime .
         """
-            |> Rdf.parse
-            |> Result.withDefault Rdf.emptyGraph
+            |> Graph.parse
+            |> Result.withDefault Graph.empty
 
     decode
         (from
@@ -829,7 +829,7 @@ collections](https://www.w3.org/TR/rdf-schema/#ch_collectionvocab) into
 a `List`.
 
     import Rdf exposing (a)
-    import Rdf.Graph as Rdf exposing (Graph)
+    import Rdf.Graph as Graph exposing (Graph)
 
     graph : Graph
     graph =
@@ -840,8 +840,8 @@ a `List`.
             <cindi>
         ) .
         """
-            |> Rdf.parse
-            |> Result.withDefault Rdf.emptyGraph
+            |> Graph.parse
+            |> Result.withDefault Graph.empty
 
     decode
         (from
@@ -1435,7 +1435,7 @@ lazy f =
 {-| Decode a required property.
 
     import Rdf exposing (a)
-    import Rdf.Graph as Rdf exposing (Graph)
+    import Rdf.Graph as Graph exposing (Graph)
     import Time
 
     graph : Graph
@@ -1445,8 +1445,8 @@ lazy f =
         @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
         <alice> <#knows> [ <#name> "Bob Builder" ] .
         """
-            |> Rdf.parse
-            |> Result.withDefault Rdf.emptyGraph
+            |> Graph.parse
+            |> Result.withDefault Graph.empty
 
     type alias Person =
         { name : String
@@ -1478,7 +1478,7 @@ required path decoderA decoderF =
 {-| Decode an optional property.
 
     import Rdf exposing (a)
-    import Rdf.Graph as Rdf exposing (Graph)
+    import Rdf.Graph as Graph exposing (Graph)
     import Time
 
     graph : Graph
@@ -1488,8 +1488,8 @@ required path decoderA decoderF =
         @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
         <alice> <#name> "Alice Wonderland" .
         """
-            |> Rdf.parse
-            |> Result.withDefault Rdf.emptyGraph
+            |> Graph.parse
+            |> Result.withDefault Graph.empty
 
     type alias Person =
         { name : String
@@ -1529,7 +1529,7 @@ optional path decoderA defaultA decoderF =
 pipeline. `harcoded` does not look at the RDF graph at all.
 
     import Rdf exposing (a)
-    import Rdf.Graph as Rdf exposing (Graph)
+    import Rdf.Graph as Graph exposing (Graph)
 
     graph : Graph
     graph =
@@ -1537,8 +1537,8 @@ pipeline. `harcoded` does not look at the RDF graph at all.
         @base <http://example.org/> .
         <alice> <#name> "Alice Wonderland" .
         """
-            |> Rdf.parse
-            |> Result.withDefault Rdf.emptyGraph
+            |> Graph.parse
+            |> Result.withDefault Graph.empty
 
     type alias Person =
         { name : String

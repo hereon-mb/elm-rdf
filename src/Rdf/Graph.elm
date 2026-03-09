@@ -1,47 +1,74 @@
 module Rdf.Graph exposing
     ( Graph
-    , union
-    , isEmpty
-    , emptyGraph, singleton
-    , decoder, decoderSafe, encode
-    , parse, parseSafe, Error(..), errorToString
-    , serialize, serializeTurtle
-    , fromTriples
+    , empty, singleton
+    , fromTriples, fromTriplesSafe
     , Seed, initialSeed, seedGenerator
-    , insert, insertAt, generateBlankNode
-    , setBase, clearBase, addPrefix, addPrefixes, clearPrefixes
+    , parse, parseSafe, Error(..), errorToString
+    , decoder, decoderSafe, encode
+    , isEmpty
+    , insert, insertProperty, generateBlankNode
     , mintBlankNodes
-    , getBase, getPrefixes
+    , getBase, setBase, clearBase
+    , getPrefixes, addPrefix, addPrefixes, clearPrefixes
+    , union
+    , serialize, serializeTurtle
     )
 
-{-|
+{-| This module defines the [`Graph`](#Graph) type which models an RDF graph,
+and helper functions for building, updating, parsing, serializing these. Take
+a look at the `Rdf.Graph.Decode` module if you want to extract Elm values from
+a `Graph`. On the other hand, the `Rdf.Graph.Encode` module deals with
+conveniently building `Graph`'s.
 
 @docs Graph
-@docs union
+
+
+# Build
+
+@docs empty, singleton
+@docs fromTriples, fromTriplesSafe
+
+
+## Seeds
+
+@docs Seed, initialSeed, seedGenerator
+
+
+## Turtle and N-Triples format
+
+@docs parse, parseSafe, Error, errorToString
+
+
+## RDFJS
+
+@docs decoder, decoderSafe, encode
+
+
+# Query
 
 @docs isEmpty
 
 
-## Create
+# Transform
 
-@docs emptyGraph, singleton
-@docs decoder, decoderSafe, encode
-@docs parse, parseSafe, Error, errorToString
-@docs serialize, serializeTurtle
-@docs fromTriples
-
-
-## Update
-
-@docs Seed, initialSeed, seedGenerator
-@docs insert, insertAt, generateBlankNode
-@docs setBase, clearBase, addPrefix, addPrefixes, clearPrefixes
+@docs insert, insertProperty, generateBlankNode
 @docs mintBlankNodes
 
 
-## Info
+## Base and prefixes
 
-@docs getBase, getPrefixes
+@docs getBase, setBase, clearBase
+@docs getPrefixes, addPrefix, addPrefixes, clearPrefixes
+
+
+# Combine
+
+@docs union
+
+
+# Export
+
+@docs serialize, serializeTurtle
 
 -}
 
@@ -84,62 +111,21 @@ import Tuple.Extra as Tuple
 import UUID
 
 
-{-| FIXME Add documention
+{-| This type represents an [RDF
+Graph](https://www.w3.org/TR/rdf11-concepts/#section-rdf-graph).
 -}
 type alias Graph =
     Internal.Graph
 
 
-{-| FIXME Input graphs are expected to be disjoint on blank nodes. Otherwise, behavior is undefined.
+
+-- BUILD
+
+
+{-| Create an empty RDF graph.
 -}
-union : Graph -> Graph -> Graph
-union (Graph g) (Graph h) =
-    let
-        merge :
-            Dict String (Dict String (List Triple))
-            -> Dict String (Dict String (List Triple))
-            -> Dict String (Dict String (List Triple))
-        merge dictLeft dictRight =
-            Dict.merge
-                Dict.insert
-                (\keyOuter valueLeftOuter valueRightOuter ->
-                    Dict.insert keyOuter
-                        (Dict.merge Dict.insert
-                            (\keyInner valueLeftInnter valueRightInner ->
-                                Dict.insert keyInner
-                                    (List.append valueLeftInnter valueRightInner)
-                            )
-                            Dict.insert
-                            valueLeftOuter
-                            valueRightOuter
-                            Dict.empty
-                        )
-                )
-                Dict.insert
-                dictLeft
-                dictRight
-                Dict.empty
-    in
-    Graph
-        { g
-            | triples = g.triples ++ h.triples
-            , subjects = g.subjects ++ h.subjects
-            , objects = g.objects ++ h.objects
-            , bySubjectByPredicate = merge g.bySubjectByPredicate h.bySubjectByPredicate
-            , byPredicateBySubject = merge g.byPredicateBySubject h.byPredicateBySubject
-        }
-
-
-{-| TODO Add documentation
--}
-type Seed
-    = Seed UUID.Seeds
-
-
-{-| TODO Add documentation
--}
-emptyGraph : Graph
-emptyGraph =
+empty : Graph
+empty =
     Graph
         { base = Nothing
         , prefixes = Dict.empty
@@ -151,7 +137,7 @@ emptyGraph =
         }
 
 
-{-| TODO Add documentation
+{-| Create an RDF graph which only contains one triple.
 -}
 singleton :
     IsBlankNodeOrIri compatible1
@@ -167,63 +153,105 @@ singleton subject predicate object =
         ]
 
 
-{-| TODO Add documentation
+{-| Convert a list of RDF triples into an RDF graph.
 -}
-setBase : String -> Graph -> Graph
-setBase base (Graph data) =
-    Graph { data | base = Just base }
+fromTriples : List Triple -> Graph
+fromTriples triples =
+    Graph
+        { base = Nothing
+        , prefixes = Dict.empty
+        , triples = triples
+        , subjects = List.map .subject triples
+        , objects = List.map .object triples
+        , bySubjectByPredicate =
+            triples
+                |> List.map annotateWithIriSubject
+                |> groupByTupleFirst
+                |> List.map
+                    (\( ( iriSubject, tripleFirst ), rest ) ->
+                        ( iriSubject
+                        , (tripleFirst :: List.map Tuple.second rest)
+                            |> List.map annotateWithIriPredicate
+                            |> groupByTupleFirst
+                            |> dictFromGroups
+                        )
+                    )
+                |> Dict.fromList
+        , byPredicateBySubject =
+            triples
+                |> List.map annotateWithIriPredicate
+                |> groupByTupleFirst
+                |> List.map
+                    (\( ( iriPredicate, tripleFirst ), rest ) ->
+                        ( iriPredicate
+                        , (tripleFirst :: List.map Tuple.second rest)
+                            |> List.map annotateWithIriSubject
+                            |> groupByTupleFirst
+                            |> dictFromGroups
+                        )
+                    )
+                |> Dict.fromList
+        }
 
 
-{-| TODO Add documentation
+annotateWithIriSubject : Triple -> ( String, Triple )
+annotateWithIriSubject triple =
+    ( Rdf.serialize triple.subject, triple )
+
+
+annotateWithIriPredicate : Triple -> ( String, Triple )
+annotateWithIriPredicate triple =
+    ( Rdf.serialize triple.predicate, triple )
+
+
+groupByTupleFirst :
+    List ( comparable, a )
+    -> List ( ( comparable, a ), List ( comparable, a ) )
+groupByTupleFirst =
+    List.sortBy Tuple.first
+        >> List.groupWhile (\( left, _ ) ( right, _ ) -> left == right)
+
+
+dictFromGroups : List ( ( comparable, a ), List ( comparable, a ) ) -> Dict comparable (List a)
+dictFromGroups =
+    List.map
+        (\( ( key, first ), rest ) ->
+            ( key
+            , first :: List.map Tuple.second rest
+            )
+        )
+        >> Dict.fromList
+
+
+{-| Like [`fromTriples`](#fromTriples), this converts a list of RDF triples
+into an RDF graph, while also minting new blank node identifiers using the
+provided [`Seed`](#Seed). This can be useful if you plan to merge multiple
+graphs with [`union`](#union) and need to ensure that there are no identifiers
+used twice.
 -}
-getBase : Graph -> Maybe String
-getBase (Graph data) =
-    data.base
+fromTriplesSafe : Seed -> List Triple -> ( Graph, Seed )
+fromTriplesSafe seed triples =
+    triples
+        |> renameBlankNodes seed
+        |> Tuple.mapFirst fromTriples
 
 
-{-| TODO Add documentation
+
+-- SEEDS
+
+
+{-| A `Seed` is used to mint unique blank node identifiers. Functions like
+[`parseSafe`](#parseSafe), [`fromTriplesSafe`](#fromTriplesSafe), or
+[`generateBlankNode`](#generateBlankNode) take a `Seed` and then return an
+updated one. You should always use the returned `Seed` in subsequent calls to
+ensure that you don't get blank node identifier collisions.
 -}
-clearBase : Graph -> Graph
-clearBase (Graph data) =
-    Graph { data | base = Nothing }
+type Seed
+    = Seed UUID.Seeds
 
 
-{-| TODO Add documentation
--}
-addPrefix : String -> String -> Graph -> Graph
-addPrefix prefix value (Graph data) =
-    Graph { data | prefixes = Dict.insert prefix value data.prefixes }
-
-
-{-| TODO Add documentation
--}
-addPrefixes : Dict String String -> Graph -> Graph
-addPrefixes prefixes (Graph data) =
-    Graph { data | prefixes = Dict.union prefixes data.prefixes }
-
-
-{-| TODO Add documentation
--}
-clearPrefixes : Graph -> Graph
-clearPrefixes (Graph data) =
-    Graph { data | prefixes = Dict.empty }
-
-
-{-| TODO Add documentation
--}
-getPrefixes : Graph -> Dict String String
-getPrefixes (Graph data) =
-    data.prefixes
-
-
-{-| TODO Add documentation
--}
-isEmpty : Graph -> Bool
-isEmpty (Graph data) =
-    List.isEmpty data.triples
-
-
-{-| TODO Add documentation
+{-| A fixed [`Seed`](#Seed). This is useful for tests. For actual application
+code, take a look at [`seedGenerator`](#seedGenerator).
 -}
 initialSeed : Seed
 initialSeed =
@@ -235,7 +263,7 @@ initialSeed =
         }
 
 
-{-| TODO Add documentation
+{-| A `Random.Generator` for generating a random [`Seed`](#Seed).
 -}
 seedGenerator : Random.Generator Seed
 seedGenerator =
@@ -254,7 +282,839 @@ seedGenerator =
         Random.independentSeed
 
 
-{-| TODO Add documentation
+
+-- TURTLE AND N-TRIPLES FORMAT
+
+
+{-| Parse a [Turtle](https://www.w3.org/TR/turtle/) or
+[N-Triples](https://www.w3.org/TR/n-triples/) file and put all RDF triples into
+a [`Graph`](#Graph). This function will keep blank node identifiers and only
+mint new ones if they are not given in the original.
+
+**Important:** For minting the [`initialSeed`](#initialSeed) is being used.
+Therefore, you will probably get identificer clashes when parsing multiple
+graphs and combining them later. It is usually better to use
+[`parseSafe`](#parseSafe) instead.
+
+-}
+parse : String -> Result Error Graph
+parse raw =
+    raw
+        |> Turtle.parse
+        |> Result.mapError ErrorParser
+        |> Result.andThen (collectTriples initialSeed)
+        |> Result.map
+            (\state ->
+                List.foldl (Tuple.apply addPrefix)
+                    (state.triples
+                        |> fromTriples
+                        |> (case state.base of
+                                Nothing ->
+                                    identity
+
+                                Just base ->
+                                    setBase base
+                           )
+                    )
+                    (Dict.toList state.prefixes)
+            )
+
+
+{-| Parse a [Turtle](https://www.w3.org/TR/turtle/) or
+[N-Triples](https://www.w3.org/TR/n-triples/) file and put all RDF triples into
+a [`Graph`](#Graph). This function will keep blank node identifiers and only
+mint new ones if they are not given in the original. For minting it uses the
+provided [`Seed`](#Seed). Make sure to reuse the returned [`Seed`](#Seed) in
+subsequent calls to avoid blank node identifier collisions.
+-}
+parseSafe : Seed -> String -> Result Error ( Graph, Seed )
+parseSafe seed raw =
+    raw
+        |> Turtle.parse
+        |> Result.mapError ErrorParser
+        |> Result.andThen (collectTriples seed)
+        |> Result.map
+            (\state ->
+                ( List.foldl (Tuple.apply addPrefix)
+                    (state.triples
+                        |> fromTriples
+                        |> (case state.base of
+                                Nothing ->
+                                    identity
+
+                                Just base ->
+                                    setBase base
+                           )
+                    )
+                    (Dict.toList state.prefixes)
+                , state.seed
+                )
+            )
+
+
+{-| You get one of these if parsing fails.
+-}
+type Error
+    = ErrorParser (List Parser.DeadEnd)
+    | MissingSubject
+    | MissingPredicate
+    | MissingBase
+    | CouldNotResolvePrefixedName String String
+
+
+{-| Turn a [`Error`](#Error) into a more human friendly error message.
+-}
+errorToString : String -> Error -> String
+errorToString raw error =
+    case error of
+        ErrorParser deadEnds ->
+            "I ran into a syntax error: I "
+                ++ deadEndsToString raw deadEnds
+
+        MissingSubject ->
+            "I tried to create a triple, but no subject was set.  This is likely a bug in the turtle parser."
+
+        MissingPredicate ->
+            "I tried to create a triple, but no predicate was set.  This is likely a bug in the turtle parser."
+
+        MissingBase ->
+            "I tried to resolve an IRI of the form <name>, but no base was set for the document."
+
+        CouldNotResolvePrefixedName prefix name ->
+            "I tried to resolve "
+                ++ prefix
+                ++ ":"
+                ++ name
+                ++ ", but the prefix "
+                ++ prefix
+                ++ ": was not set."
+
+
+deadEndsToString : String -> List Parser.DeadEnd -> String
+deadEndsToString raw deadEnds =
+    let
+        lines : List String
+        lines =
+            String.lines raw
+    in
+    [ deadEnds
+        |> List.map deadEndToString
+        |> String.join ", "
+    , ":\n\n"
+    , deadEnds
+        |> List.filterMap (deadEndToCode lines)
+        |> String.join "\n"
+    ]
+        |> String.concat
+
+
+deadEndToString : Parser.DeadEnd -> String
+deadEndToString { row, col, problem } =
+    let
+        position : String
+        position =
+            [ "row "
+            , String.fromInt row
+            , " column "
+            , String.fromInt col
+            ]
+                |> String.concat
+    in
+    case problem of
+        Parser.Expecting expect ->
+            "expected '" ++ expect ++ "' at " ++ position
+
+        Parser.ExpectingInt ->
+            "expected an integer at " ++ position
+
+        Parser.ExpectingHex ->
+            "expected a hex at " ++ position
+
+        Parser.ExpectingOctal ->
+            "expected an octal at " ++ position
+
+        Parser.ExpectingBinary ->
+            "expected a binary at " ++ position
+
+        Parser.ExpectingFloat ->
+            "expected a float at " ++ position
+
+        Parser.ExpectingNumber ->
+            "expected a number at " ++ position
+
+        Parser.ExpectingVariable ->
+            "expected a variable at " ++ position
+
+        Parser.ExpectingSymbol expect ->
+            "expected the symbol '" ++ expect ++ "' at " ++ position
+
+        Parser.ExpectingKeyword expect ->
+            "expected the keyword '" ++ expect ++ "' at " ++ position
+
+        Parser.ExpectingEnd ->
+            "expected the end of the document at " ++ position
+
+        Parser.UnexpectedChar ->
+            "ran into an unexpected character at " ++ position
+
+        Parser.Problem text ->
+            text ++ " at " ++ position
+
+        Parser.BadRepeat ->
+            "bad repetition at " ++ position
+
+
+deadEndToCode : List String -> Parser.DeadEnd -> Maybe String
+deadEndToCode lines { row } =
+    [ List.getAt (row - 3) lines
+        |> Maybe.map (\line -> "  " ++ line)
+    , List.getAt (row - 2) lines
+        |> Maybe.map (\line -> "  " ++ line)
+    , List.getAt (row - 1) lines
+        |> Maybe.map (\line -> "> " ++ line)
+    ]
+        |> List.filterMap identity
+        |> String.join "\n"
+        |> Just
+
+
+type alias State =
+    { base : Maybe String
+    , prefixes : Dict String String
+    , triples : List Triple
+    , subjects : List BlankNodeOrIri
+    , predicates : List Iri
+    , seed : Seed
+    , blankNodes : Dict String BlankNode
+    }
+
+
+stateInitial : Seed -> State
+stateInitial seed =
+    { base = Nothing
+    , prefixes = Dict.empty
+    , triples = []
+    , subjects = []
+    , predicates = []
+    , seed = seed
+    , blankNodes = Dict.empty
+    }
+
+
+collectTriples : Seed -> List Turtle.Statement -> Result Error State
+collectTriples seed statements =
+    List.foldl
+        (\statement ->
+            Result.andThen (collectTriplesStep statement)
+        )
+        (Ok (stateInitial seed))
+        statements
+
+
+collectTriplesStep : Turtle.Statement -> State -> Result Error State
+collectTriplesStep statement state =
+    case statement of
+        Turtle.DirectivePrefixId prefix value ->
+            Ok { state | prefixes = Dict.insert prefix value state.prefixes }
+
+        Turtle.DirectiveBase base ->
+            Ok { state | base = Just base }
+
+        Turtle.DirectiveSparqlPrefix prefix value ->
+            Ok { state | prefixes = Dict.insert prefix value state.prefixes }
+
+        Turtle.DirectiveSparqlBase base ->
+            Ok { state | base = Just base }
+
+        Turtle.Triples (Turtle.TriplesSubject subject predicateObjectList) ->
+            collectTriplesSubject subject predicateObjectList state
+
+        Turtle.Triples (Turtle.TriplesBlankNodePropertyList predicateObjectListSubject predicateObjectList) ->
+            let
+                ( node, seed ) =
+                    generateBlankNode state.seed
+            in
+            (predicateObjectListSubject ++ predicateObjectList)
+                |> List.foldl
+                    (\predicateObject ->
+                        Result.andThen
+                            (collectPredicateObjectList predicateObject)
+                    )
+                    (Ok
+                        { state
+                            | subjects = asBlankNodeOrIri node :: state.subjects
+                            , seed = seed
+                        }
+                    )
+                |> Result.map dropSubject
+
+
+collectTriplesSubject :
+    Turtle.Subject
+    -> List Turtle.PredicateObjectList
+    -> State
+    -> Result Error State
+collectTriplesSubject subject predicateObjectList state =
+    case subject of
+        Turtle.SubjectIri iri ->
+            case resolveIri state iri of
+                Err error ->
+                    Err error
+
+                Ok url ->
+                    predicateObjectList
+                        |> List.foldl
+                            (\predicateObject ->
+                                Result.andThen (collectPredicateObjectList predicateObject)
+                            )
+                            (Ok
+                                { state
+                                    | subjects =
+                                        asBlankNodeOrIri (Rdf.iri url)
+                                            :: state.subjects
+                                }
+                            )
+                        |> Result.map dropSubject
+
+        Turtle.SubjectBlankNode (Turtle.BlankNodeLabel label) ->
+            case Dict.get label state.blankNodes of
+                Nothing ->
+                    let
+                        ( node, seed ) =
+                            generateBlankNode state.seed
+                    in
+                    predicateObjectList
+                        |> List.foldl
+                            (\predicateObject ->
+                                Result.andThen
+                                    (collectPredicateObjectList predicateObject)
+                            )
+                            (Ok
+                                { state
+                                    | subjects =
+                                        asBlankNodeOrIri node
+                                            :: state.subjects
+                                    , seed = seed
+                                    , blankNodes =
+                                        Dict.insert label
+                                            node
+                                            state.blankNodes
+                                }
+                            )
+                        |> Result.map dropSubject
+
+                Just node ->
+                    predicateObjectList
+                        |> List.foldl
+                            (\predicateObject ->
+                                Result.andThen
+                                    (collectPredicateObjectList predicateObject)
+                            )
+                            (Ok
+                                { state
+                                    | subjects =
+                                        asBlankNodeOrIri node
+                                            :: state.subjects
+                                }
+                            )
+                        |> Result.map dropSubject
+
+        Turtle.SubjectBlankNode Turtle.Anon ->
+            let
+                ( node, seed ) =
+                    generateBlankNode state.seed
+            in
+            predicateObjectList
+                |> List.foldl
+                    (\predicateObject ->
+                        Result.andThen
+                            (collectPredicateObjectList predicateObject)
+                    )
+                    (Ok
+                        { state
+                            | subjects = asBlankNodeOrIri node :: state.subjects
+                            , seed = seed
+                        }
+                    )
+                |> Result.map dropSubject
+
+        Turtle.SubjectCollection objects ->
+            if List.isEmpty objects then
+                predicateObjectList
+                    |> List.foldl
+                        (\predicateObject ->
+                            Result.andThen
+                                (collectPredicateObjectList predicateObject)
+                        )
+                        (Ok
+                            { state
+                                | subjects =
+                                    asBlankNodeOrIri (rdf "nil")
+                                        :: state.subjects
+                            }
+                        )
+                    |> Result.map dropSubject
+
+            else
+                let
+                    ( node, seed ) =
+                        generateBlankNode state.seed
+                in
+                predicateObjectList
+                    |> List.foldl
+                        (\predicateObject ->
+                            Result.andThen
+                                (collectPredicateObjectList predicateObject)
+                        )
+                        (Ok
+                            { state
+                                | subjects =
+                                    asBlankNodeOrIri node
+                                        :: state.subjects
+                                , seed = seed
+                            }
+                        )
+                    |> Result.andThen (addCollection node objects)
+                    |> Result.map dropSubject
+
+
+collectPredicateObjectList :
+    Turtle.PredicateObjectList
+    -> State
+    -> Result Error State
+collectPredicateObjectList { verb, objects } state =
+    let
+        predicate : Result Error String
+        predicate =
+            case verb of
+                Turtle.Predicate iri ->
+                    resolveIri state iri
+
+                Turtle.A ->
+                    Ok "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
+    in
+    case predicate of
+        Err error ->
+            Err error
+
+        Ok url ->
+            objects
+                |> List.foldl (Result.andThen << collectObject)
+                    (Ok { state | predicates = Rdf.iri url :: state.predicates })
+                |> Result.map dropPredicate
+
+
+collectObject : Turtle.Object -> State -> Result Error State
+collectObject object state =
+    case object of
+        Turtle.ObjectIri iri ->
+            resolveIri state iri
+                |> Result.andThen
+                    (\url ->
+                        addTriple
+                            (asBlankNodeOrIriOrLiteral (Rdf.iri url))
+                            state
+                    )
+
+        Turtle.ObjectBlankNode (Turtle.BlankNodeLabel label) ->
+            case Dict.get label state.blankNodes of
+                Nothing ->
+                    let
+                        ( node, seed ) =
+                            generateBlankNode state.seed
+                    in
+                    addTriple (asBlankNodeOrIriOrLiteral node)
+                        { state
+                            | seed = seed
+                            , blankNodes =
+                                Dict.insert label
+                                    node
+                                    state.blankNodes
+                        }
+
+                Just node ->
+                    addTriple (asBlankNodeOrIriOrLiteral node) state
+
+        Turtle.ObjectBlankNode Turtle.Anon ->
+            let
+                ( node, seed ) =
+                    generateBlankNode state.seed
+            in
+            addTriple (asBlankNodeOrIriOrLiteral node) { state | seed = seed }
+
+        Turtle.ObjectCollection objects ->
+            if List.isEmpty objects then
+                addTriple (asBlankNodeOrIriOrLiteral (rdf "nil")) state
+
+            else
+                let
+                    ( nodeFirst, seedFirst ) =
+                        generateBlankNode state.seed
+                in
+                { state | seed = seedFirst }
+                    |> addTriple (asBlankNodeOrIriOrLiteral nodeFirst)
+                    |> Result.andThen (addCollection nodeFirst objects)
+
+        Turtle.ObjectBlankNodePropertyList predicateObjects ->
+            let
+                ( node, seed ) =
+                    generateBlankNode state.seed
+            in
+            predicateObjects
+                |> List.foldl (Result.andThen << collectPredicateObjectList)
+                    (Ok
+                        { state
+                            | subjects = asBlankNodeOrIri node :: state.subjects
+                            , seed = seed
+                        }
+                    )
+                |> Result.map dropSubject
+                |> Result.andThen (addTriple (asBlankNodeOrIriOrLiteral node))
+
+        Turtle.ObjectLiteral (Turtle.LiteralString value) ->
+            addTriple (asBlankNodeOrIriOrLiteral (Rdf.string value)) state
+
+        Turtle.ObjectLiteral (Turtle.LiteralLangString value lang) ->
+            addTriple
+                (asBlankNodeOrIriOrLiteral (Rdf.langString lang value))
+                state
+
+        Turtle.ObjectLiteral (Turtle.LiteralTyped value datatype) ->
+            resolveIri state datatype
+                |> Result.andThen
+                    (\url ->
+                        addTriple
+                            (asBlankNodeOrIriOrLiteral
+                                (Rdf.literal (Rdf.iri url) value)
+                            )
+                            state
+                    )
+
+        Turtle.ObjectLiteral (Turtle.LiteralInteger value) ->
+            addTriple
+                (asBlankNodeOrIriOrLiteral (Rdf.integer value))
+                state
+
+        Turtle.ObjectLiteral (Turtle.LiteralDecimal value) ->
+            addTriple
+                (asBlankNodeOrIriOrLiteral (Rdf.literal (xsd "decimal") value))
+                state
+
+        Turtle.ObjectLiteral (Turtle.LiteralDouble value) ->
+            addTriple
+                (asBlankNodeOrIriOrLiteral
+                    (Rdf.literal (xsd "double") (String.fromFloat value))
+                )
+                state
+
+        Turtle.ObjectLiteral Turtle.LiteralTrue ->
+            addTriple (asBlankNodeOrIriOrLiteral (Rdf.boolean True)) state
+
+        Turtle.ObjectLiteral Turtle.LiteralFalse ->
+            addTriple (asBlankNodeOrIriOrLiteral (Rdf.boolean False)) state
+
+
+addTriple : BlankNodeOrIriOrLiteral -> State -> Result Error State
+addTriple object state =
+    Result.map3 Triple
+        (Result.fromMaybe MissingSubject (List.head state.subjects))
+        (Result.fromMaybe MissingPredicate (List.head state.predicates))
+        (Ok object)
+        |> Result.map (\triple -> { state | triples = triple :: state.triples })
+
+
+addCollection : BlankNode -> List Turtle.Object -> State -> Result Error State
+addCollection nodeFirst objects state =
+    case List.reverse objects of
+        [] ->
+            addTriple (asBlankNodeOrIriOrLiteral (rdf "nil")) state
+
+        last :: rest ->
+            rest
+                |> List.reverse
+                |> List.foldl
+                    (\obj result ->
+                        result
+                            |> Result.andThen
+                                (\( nodePrevious, stateNext ) ->
+                                    let
+                                        ( nodeNext, seedNext ) =
+                                            generateBlankNode stateNext.seed
+                                    in
+                                    { stateNext
+                                        | subjects =
+                                            asBlankNodeOrIri nodePrevious
+                                                :: stateNext.subjects
+                                        , predicates =
+                                            rdf "first"
+                                                :: stateNext.predicates
+                                        , seed = seedNext
+                                    }
+                                        |> collectObject obj
+                                        |> Result.map dropPredicate
+                                        |> Result.map
+                                            (\stateNextNext ->
+                                                { stateNextNext
+                                                    | predicates =
+                                                        rdf "rest"
+                                                            :: stateNextNext.predicates
+                                                }
+                                            )
+                                        |> Result.andThen
+                                            (addTriple
+                                                (asBlankNodeOrIriOrLiteral nodeNext)
+                                            )
+                                        |> Result.map dropPredicate
+                                        |> Result.map dropSubject
+                                        |> Result.map (Tuple.pair nodeNext)
+                                )
+                    )
+                    (Ok ( nodeFirst, state ))
+                |> Result.andThen
+                    (\( nodePrevious, stateNext ) ->
+                        { stateNext
+                            | subjects =
+                                asBlankNodeOrIri nodePrevious
+                                    :: stateNext.subjects
+                            , predicates =
+                                rdf "first"
+                                    :: stateNext.predicates
+                        }
+                            |> collectObject last
+                            |> Result.map dropPredicate
+                            |> Result.map
+                                (\stateNextNext ->
+                                    { stateNextNext
+                                        | predicates =
+                                            rdf "rest"
+                                                :: stateNextNext.predicates
+                                    }
+                                )
+                            |> Result.andThen
+                                (addTriple
+                                    (asBlankNodeOrIriOrLiteral (rdf "nil"))
+                                )
+                            |> Result.map dropPredicate
+                            |> Result.map dropSubject
+                    )
+
+
+resolveIri : State -> Turtle.Iri -> Result Error String
+resolveIri state iri =
+    case iri of
+        Turtle.IriRef url ->
+            if Regex.contains regexScheme url then
+                Ok url
+
+            else
+                case state.base of
+                    Nothing ->
+                        Err MissingBase
+
+                    Just base ->
+                        Ok (base ++ url)
+
+        Turtle.PrefixedName prefix name ->
+            Dict.get prefix state.prefixes
+                |> Maybe.map (\url -> url ++ name)
+                |> Result.fromMaybe (CouldNotResolvePrefixedName prefix name)
+
+
+regexScheme : Regex
+regexScheme =
+    "^[a-z][a-z0-9+-.]*:"
+        |> Regex.fromStringWith
+            { caseInsensitive = True
+            , multiline = False
+            }
+        |> Maybe.withDefault Regex.never
+
+
+dropSubject : State -> State
+dropSubject state =
+    { state
+        | subjects =
+            state.subjects
+                |> List.tail
+                |> Maybe.withDefault []
+    }
+
+
+dropPredicate : State -> State
+dropPredicate state =
+    { state
+        | predicates =
+            state.predicates
+                |> List.tail
+                |> Maybe.withDefault []
+    }
+
+
+type alias Step =
+    { seed : Seed
+    , blankNodes : Dict String BlankNode
+    , triples : List Triple
+    }
+
+
+stepInitial : Seed -> Step
+stepInitial seed =
+    { seed = seed
+    , blankNodes = Dict.empty
+    , triples = []
+    }
+
+
+renameBlankNodes : Seed -> List Triple -> ( List Triple, Seed )
+renameBlankNodes seed triples =
+    let
+        stepFinal : Step
+        stepFinal =
+            renameBlankNodesHelp triples (stepInitial seed)
+    in
+    ( stepFinal.triples
+    , stepFinal.seed
+    )
+
+
+renameBlankNodesHelp : List Triple -> Step -> Step
+renameBlankNodesHelp triples step =
+    case triples of
+        [] ->
+            step
+
+        triple :: rest ->
+            case triple.subject of
+                Term (BlankNode labelSubject) ->
+                    let
+                        ( stepAfterSubject, nodeSubject ) =
+                            remintBlankNode labelSubject step
+                    in
+                    case triple.object of
+                        Term (BlankNode labelObject) ->
+                            let
+                                ( stepAfterObject, nodeObject ) =
+                                    remintBlankNode labelObject stepAfterSubject
+                            in
+                            renameBlankNodesHelp rest
+                                { stepAfterObject
+                                    | triples =
+                                        { subject =
+                                            Rdf.asBlankNodeOrIri nodeSubject
+                                        , predicate = triple.predicate
+                                        , object =
+                                            Rdf.asBlankNodeOrIriOrLiteral nodeObject
+                                        }
+                                            :: stepAfterObject.triples
+                                }
+
+                        _ ->
+                            renameBlankNodesHelp rest
+                                { stepAfterSubject
+                                    | triples =
+                                        { subject =
+                                            Rdf.asBlankNodeOrIri nodeSubject
+                                        , predicate = triple.predicate
+                                        , object = triple.object
+                                        }
+                                            :: stepAfterSubject.triples
+                                }
+
+                _ ->
+                    case triple.object of
+                        Term (BlankNode labelObject) ->
+                            let
+                                ( stepAfterObject, nodeObject ) =
+                                    remintBlankNode labelObject step
+                            in
+                            renameBlankNodesHelp rest
+                                { stepAfterObject
+                                    | triples =
+                                        { subject = triple.subject
+                                        , predicate = triple.predicate
+                                        , object = Rdf.asBlankNodeOrIriOrLiteral nodeObject
+                                        }
+                                            :: stepAfterObject.triples
+                                }
+
+                        _ ->
+                            renameBlankNodesHelp rest
+                                { step | triples = triple :: step.triples }
+
+
+remintBlankNode : String -> Step -> ( Step, BlankNode )
+remintBlankNode label step =
+    case Dict.get label step.blankNodes of
+        Nothing ->
+            let
+                ( node, seedAfterMint ) =
+                    generateBlankNode step.seed
+            in
+            ( { step
+                | seed = seedAfterMint
+                , blankNodes = Dict.insert label node step.blankNodes
+              }
+            , node
+            )
+
+        Just node ->
+            ( step, node )
+
+
+
+-- RDFJS
+
+
+{-| A JSON decoder for decoding a [`Graph`](#Graph) from a JSON value according
+to the [RDFJS Specification](https://rdf.js.org/).
+-}
+decoder : Decoder Graph
+decoder =
+    Decode.list tripleDecoder
+        |> Decode.map fromTriples
+
+
+{-| Like [`decoder`](#decoder), but mint fresh blank node identifiers using the
+provided [`Seed`](#Seed).
+-}
+decoderSafe : Seed -> Decoder ( Graph, Seed )
+decoderSafe seed =
+    Decode.list tripleDecoder
+        |> Decode.map (fromTriplesSafe seed)
+
+
+{-| Encode a [`Graph`](#Graph) into a JSON value according to the [RDFJS
+Specification](https://rdf.js.org/).
+-}
+encode : Graph -> Value
+encode (Graph data) =
+    data.bySubjectByPredicate
+        |> Dict.values
+        |> List.concatMap Dict.values
+        |> List.concat
+        |> Encode.list encodeTriple
+
+
+
+-- QUERY
+
+
+{-| Determine if a [`Graph`](#Graph) is empty.
+
+    isEmpty empty
+    --> True
+
+-}
+isEmpty : Graph -> Bool
+isEmpty (Graph data) =
+    List.isEmpty data.triples
+
+
+
+-- TRANSFORM
+
+
+{-| Insert an RDF triple into the [`Graph`](#Graph).
 -}
 insert :
     IsBlankNodeOrIri compatible1
@@ -293,7 +1153,8 @@ insert subject predicate object (Graph graph) =
                                 >> Just
                             )
                         )
-                        >> Maybe.withDefault (Dict.singleton keyPredicate [ triple ])
+                        >> Maybe.withDefault
+                            (Dict.singleton keyPredicate [ triple ])
                         >> Just
                     )
                     graph.bySubjectByPredicate
@@ -313,16 +1174,18 @@ insert subject predicate object (Graph graph) =
         }
 
 
-{-| TODO Add documentation
+{-| Insert a property into the graph. If you provide a property path which does
+not just consist of a single IRI (or its inverse), intermediate blank nodes
+will be minted using the provided [`Seed`](#Seed).
 -}
-insertAt :
+insertProperty :
     IsBlankNodeOrIri compatible1
     -> IsPath compatible2
     -> IsBlankNodeOrIriOrLiteral compatible3
     -> Graph
     -> Seed
     -> ( Graph, Seed )
-insertAt subject (Term variant) object graph seed =
+insertProperty subject (Term variant) object graph seed =
     case variant of
         (Iri _) as predicate ->
             ( insert subject (Term predicate) object graph, seed )
@@ -384,10 +1247,10 @@ insertAtNext propertyPaths object idFocusNodeNext graphNext seedNext =
             ( graphNext, seedNext )
 
         [ first ] ->
-            insertAt idFocusNodeNext first object graphNext seedNext
+            insertProperty idFocusNodeNext first object graphNext seedNext
 
         (Term first) :: rest ->
-            insertAt idFocusNodeNext
+            insertProperty idFocusNodeNext
                 (Term (Sequence first (List.map toVariant rest)))
                 object
                 graphNext
@@ -408,7 +1271,11 @@ getBlankNodeOrIriObject subject predicate (Graph graph) =
             Nothing
 
 
-followPropertyPath : Data -> Iri -> IsBlankNodeOrIri compatible -> List BlankNodeOrIriOrLiteral
+followPropertyPath :
+    Data
+    -> Iri
+    -> IsBlankNodeOrIri compatible
+    -> List BlankNodeOrIriOrLiteral
 followPropertyPath data predicate subject =
     data.bySubjectByPredicate
         |> Dict.get (Rdf.serialize subject)
@@ -418,7 +1285,8 @@ followPropertyPath data predicate subject =
         |> List.map .object
 
 
-{-| TODO Add documentation
+{-| Create a blank node with a freshy minted identifier using the provided
+[`Seed`](#Seed).
 -}
 generateBlankNode : Seed -> ( BlankNode, Seed )
 generateBlankNode (Seed seed) =
@@ -431,7 +1299,164 @@ generateBlankNode (Seed seed) =
     )
 
 
-{-| TODO Add documentation
+{-| Mint new identifiers for all blank nodes in the graph using the provided
+[`Seed`](#Seed). This can be usefull before merging multiple
+[`Graph`](#Graph)'s with [`union`](#union).
+-}
+mintBlankNodes : Seed -> Graph -> ( Graph, Seed )
+mintBlankNodes seed (Graph data) =
+    let
+        ( triplesUpdated, seedUpdated ) =
+            renameBlankNodes seed data.triples
+    in
+    ( Graph
+        { data
+            | triples = triplesUpdated
+            , subjects = List.map .subject triplesUpdated
+            , objects = List.map .object triplesUpdated
+            , bySubjectByPredicate =
+                triplesUpdated
+                    |> List.map annotateWithIriSubject
+                    |> groupByTupleFirst
+                    |> List.map
+                        (\( ( iriSubject, tripleFirst ), rest ) ->
+                            ( iriSubject
+                            , (tripleFirst :: List.map Tuple.second rest)
+                                |> List.map annotateWithIriPredicate
+                                |> groupByTupleFirst
+                                |> dictFromGroups
+                            )
+                        )
+                    |> Dict.fromList
+            , byPredicateBySubject =
+                triplesUpdated
+                    |> List.map annotateWithIriPredicate
+                    |> groupByTupleFirst
+                    |> List.map
+                        (\( ( iriPredicate, tripleFirst ), rest ) ->
+                            ( iriPredicate
+                            , (tripleFirst :: List.map Tuple.second rest)
+                                |> List.map annotateWithIriSubject
+                                |> groupByTupleFirst
+                                |> dictFromGroups
+                            )
+                        )
+                    |> Dict.fromList
+        }
+    , seedUpdated
+    )
+
+
+
+-- BASE AND PREFIXES
+
+
+{-| Return the current base declaration.
+-}
+getBase : Graph -> Maybe String
+getBase (Graph data) =
+    data.base
+
+
+{-| Set the base declaration to the provided URL.
+-}
+setBase : String -> Graph -> Graph
+setBase base (Graph data) =
+    Graph { data | base = Just base }
+
+
+{-| Remove the base declaration.
+-}
+clearBase : Graph -> Graph
+clearBase (Graph data) =
+    Graph { data | base = Nothing }
+
+
+{-| Return all defined prefix declarations.
+-}
+getPrefixes : Graph -> Dict String String
+getPrefixes (Graph data) =
+    data.prefixes
+
+
+{-| Add one prefix declaration to the [`Graph`](#Graph). An existing
+declaration with the same name will be overwritten.
+-}
+addPrefix : String -> String -> Graph -> Graph
+addPrefix prefix value (Graph data) =
+    Graph { data | prefixes = Dict.insert prefix value data.prefixes }
+
+
+{-| Add some prefix declarations to the [`Graph`](#Graph). Existing prefixes
+with the same name will be overwritten.
+-}
+addPrefixes : Dict String String -> Graph -> Graph
+addPrefixes prefixes (Graph data) =
+    Graph { data | prefixes = Dict.union prefixes data.prefixes }
+
+
+{-| Remove all prefix declarations.
+-}
+clearPrefixes : Graph -> Graph
+clearPrefixes (Graph data) =
+    Graph { data | prefixes = Dict.empty }
+
+
+
+-- COMBINE
+
+
+{-| Merge two [`Graph`](#Graph)'s into one.
+
+**Important:** This will not mint new blank node identifiers, so you might get
+unwanted identifier collissions. Take a look at
+[`mintBlankNodes`](#mintBlankNodes) for a safer approach.
+
+-}
+union : Graph -> Graph -> Graph
+union (Graph g) (Graph h) =
+    let
+        merge :
+            Dict String (Dict String (List Triple))
+            -> Dict String (Dict String (List Triple))
+            -> Dict String (Dict String (List Triple))
+        merge dictLeft dictRight =
+            Dict.merge
+                Dict.insert
+                (\keyOuter valueLeftOuter valueRightOuter ->
+                    Dict.insert keyOuter
+                        (Dict.merge Dict.insert
+                            (\keyInner valueLeftInnter valueRightInner ->
+                                Dict.insert keyInner
+                                    (List.append valueLeftInnter valueRightInner)
+                            )
+                            Dict.insert
+                            valueLeftOuter
+                            valueRightOuter
+                            Dict.empty
+                        )
+                )
+                Dict.insert
+                dictLeft
+                dictRight
+                Dict.empty
+    in
+    Graph
+        { g
+            | triples = g.triples ++ h.triples
+            , subjects = g.subjects ++ h.subjects
+            , objects = g.objects ++ h.objects
+            , bySubjectByPredicate = merge g.bySubjectByPredicate h.bySubjectByPredicate
+            , byPredicateBySubject = merge g.byPredicateBySubject h.byPredicateBySubject
+        }
+
+
+
+-- EXPORT
+
+
+{-| Serialize a [`Graph`](#Graph) into the
+[N-Triples](https://www.w3.org/TR/n-triples/) format.
 -}
 serialize : Graph -> String
 serialize (Graph data) =
@@ -444,7 +1469,9 @@ serialize (Graph data) =
         |> String.join "\n"
 
 
-{-| TODO Add documentation
+{-| Serialize a [`Graph`](#Graph) into the
+[Turtle](https://www.w3.org/TR/turtle/) format. Take a look the [Base and
+prefixes section](#base-and-prefixes) to adjust the serialization.
 -}
 serializeTurtle : Graph -> String
 serializeTurtle (Graph data) =
@@ -682,807 +1709,3 @@ serializePredicateObjectWith config bySubjectByPredicate inlinedSubjects { predi
         serializeWith config object
     ]
         |> String.join " "
-
-
-{-| TODO Add documentation
--}
-decoder : Decoder Graph
-decoder =
-    Decode.list tripleDecoder
-        |> Decode.map fromTriples
-
-
-{-| TODO Add documentation
--}
-decoderSafe : Seed -> Decoder ( Graph, Seed )
-decoderSafe seed =
-    Decode.list tripleDecoder
-        |> Decode.map (fromTriplesSafe seed)
-
-
-{-| TODO Add documentation
--}
-encode : Graph -> Value
-encode (Graph data) =
-    data.bySubjectByPredicate
-        |> Dict.values
-        |> List.concatMap Dict.values
-        |> List.concat
-        |> Encode.list encodeTriple
-
-
-{-| Get all RDF Triples from a turtle text file.
--}
-parse : String -> Result Error Graph
-parse raw =
-    raw
-        |> Turtle.parse
-        |> Result.mapError ErrorParser
-        |> Result.andThen (collectTriples initialSeed)
-        |> Result.map
-            (\state ->
-                List.foldl (Tuple.apply addPrefix)
-                    (state.triples
-                        |> fromTriples
-                        |> (case state.base of
-                                Nothing ->
-                                    identity
-
-                                Just base ->
-                                    setBase base
-                           )
-                    )
-                    (Dict.toList state.prefixes)
-            )
-
-
-{-| TODO Add documentation
--}
-parseSafe : Seed -> String -> Result Error ( Graph, Seed )
-parseSafe seed raw =
-    raw
-        |> Turtle.parse
-        |> Result.mapError ErrorParser
-        |> Result.andThen (collectTriples seed)
-        |> Result.map
-            (\state ->
-                ( List.foldl (Tuple.apply addPrefix)
-                    (state.triples
-                        |> fromTriples
-                        |> (case state.base of
-                                Nothing ->
-                                    identity
-
-                                Just base ->
-                                    setBase base
-                           )
-                    )
-                    (Dict.toList state.prefixes)
-                , state.seed
-                )
-            )
-
-
-{-| TODO
--}
-type Error
-    = ErrorParser (List Parser.DeadEnd)
-    | MissingSubject
-    | MissingPredicate
-    | MissingBase
-    | CouldNotResolvePrefixedName String String
-
-
-{-| TODO
--}
-errorToString : String -> Error -> String
-errorToString raw error =
-    case error of
-        ErrorParser deadEnds ->
-            "I ran into a syntax error: I " ++ deadEndsToString raw deadEnds
-
-        MissingSubject ->
-            "I tried to create a triple, but no subject was set.  This is likely a bug in the turtle parser."
-
-        MissingPredicate ->
-            "I tried to create a triple, but no predicate was set.  This is likely a bug in the turtle parser."
-
-        MissingBase ->
-            "I tried to resolve an IRI of the form <name>, but no base was set for the document."
-
-        CouldNotResolvePrefixedName prefix name ->
-            "I tried to resolve " ++ prefix ++ ":" ++ name ++ ", but the prefix " ++ prefix ++ ": was not set."
-
-
-deadEndsToString : String -> List Parser.DeadEnd -> String
-deadEndsToString raw deadEnds =
-    let
-        lines : List String
-        lines =
-            String.lines raw
-    in
-    [ deadEnds
-        |> List.map deadEndToString
-        |> String.join ", "
-    , ":\n\n"
-    , deadEnds
-        |> List.filterMap (deadEndToCode lines)
-        |> String.join "\n"
-    ]
-        |> String.concat
-
-
-deadEndToString : Parser.DeadEnd -> String
-deadEndToString { row, col, problem } =
-    let
-        position : String
-        position =
-            [ "row "
-            , String.fromInt row
-            , " column "
-            , String.fromInt col
-            ]
-                |> String.concat
-    in
-    case problem of
-        Parser.Expecting expect ->
-            "expected '" ++ expect ++ "' at " ++ position
-
-        Parser.ExpectingInt ->
-            "expected an integer at " ++ position
-
-        Parser.ExpectingHex ->
-            "expected a hex at " ++ position
-
-        Parser.ExpectingOctal ->
-            "expected an octal at " ++ position
-
-        Parser.ExpectingBinary ->
-            "expected a binary at " ++ position
-
-        Parser.ExpectingFloat ->
-            "expected a float at " ++ position
-
-        Parser.ExpectingNumber ->
-            "expected a number at " ++ position
-
-        Parser.ExpectingVariable ->
-            "expected a variable at " ++ position
-
-        Parser.ExpectingSymbol expect ->
-            "expected the symbol '" ++ expect ++ "' at " ++ position
-
-        Parser.ExpectingKeyword expect ->
-            "expected the keyword '" ++ expect ++ "' at " ++ position
-
-        Parser.ExpectingEnd ->
-            "expected the end of the document at " ++ position
-
-        Parser.UnexpectedChar ->
-            "ran into an unexpected character at " ++ position
-
-        Parser.Problem text ->
-            text ++ " at " ++ position
-
-        Parser.BadRepeat ->
-            "bad repetition at " ++ position
-
-
-deadEndToCode : List String -> Parser.DeadEnd -> Maybe String
-deadEndToCode lines { row } =
-    [ List.getAt (row - 3) lines
-        |> Maybe.map (\line -> "  " ++ line)
-    , List.getAt (row - 2) lines
-        |> Maybe.map (\line -> "  " ++ line)
-    , List.getAt (row - 1) lines
-        |> Maybe.map (\line -> "> " ++ line)
-    ]
-        |> List.filterMap identity
-        |> String.join "\n"
-        |> Just
-
-
-type alias State =
-    { base : Maybe String
-    , prefixes : Dict String String
-    , triples : List Triple
-    , subjects : List BlankNodeOrIri
-    , predicates : List Iri
-    , seed : Seed
-    , blankNodes : Dict String BlankNode
-    }
-
-
-stateInitial : Seed -> State
-stateInitial seed =
-    { base = Nothing
-    , prefixes = Dict.empty
-    , triples = []
-    , subjects = []
-    , predicates = []
-    , seed = seed
-    , blankNodes = Dict.empty
-    }
-
-
-collectTriples : Seed -> List Turtle.Statement -> Result Error State
-collectTriples seed statements =
-    List.foldl
-        (\statement ->
-            Result.andThen (collectTriplesStep statement)
-        )
-        (Ok (stateInitial seed))
-        statements
-
-
-collectTriplesStep : Turtle.Statement -> State -> Result Error State
-collectTriplesStep statement state =
-    case statement of
-        Turtle.DirectivePrefixId prefix value ->
-            Ok { state | prefixes = Dict.insert prefix value state.prefixes }
-
-        Turtle.DirectiveBase base ->
-            Ok { state | base = Just base }
-
-        Turtle.DirectiveSparqlPrefix prefix value ->
-            Ok { state | prefixes = Dict.insert prefix value state.prefixes }
-
-        Turtle.DirectiveSparqlBase base ->
-            Ok { state | base = Just base }
-
-        Turtle.Triples (Turtle.TriplesSubject subject predicateObjectList) ->
-            collectTriplesSubject subject predicateObjectList state
-
-        Turtle.Triples (Turtle.TriplesBlankNodePropertyList predicateObjectListSubject predicateObjectList) ->
-            let
-                ( node, seed ) =
-                    generateBlankNode state.seed
-            in
-            (predicateObjectListSubject ++ predicateObjectList)
-                |> List.foldl
-                    (\predicateObject ->
-                        Result.andThen (collectPredicateObjectList predicateObject)
-                    )
-                    (Ok
-                        { state
-                            | subjects = asBlankNodeOrIri node :: state.subjects
-                            , seed = seed
-                        }
-                    )
-                |> Result.map dropSubject
-
-
-collectTriplesSubject : Turtle.Subject -> List Turtle.PredicateObjectList -> State -> Result Error State
-collectTriplesSubject subject predicateObjectList state =
-    case subject of
-        Turtle.SubjectIri iri ->
-            case resolveIri state iri of
-                Err error ->
-                    Err error
-
-                Ok url ->
-                    predicateObjectList
-                        |> List.foldl
-                            (\predicateObject ->
-                                Result.andThen (collectPredicateObjectList predicateObject)
-                            )
-                            (Ok { state | subjects = asBlankNodeOrIri (Rdf.iri url) :: state.subjects })
-                        |> Result.map dropSubject
-
-        Turtle.SubjectBlankNode (Turtle.BlankNodeLabel label) ->
-            case Dict.get label state.blankNodes of
-                Nothing ->
-                    let
-                        ( node, seed ) =
-                            generateBlankNode state.seed
-                    in
-                    predicateObjectList
-                        |> List.foldl
-                            (\predicateObject ->
-                                Result.andThen (collectPredicateObjectList predicateObject)
-                            )
-                            (Ok
-                                { state
-                                    | subjects = asBlankNodeOrIri node :: state.subjects
-                                    , seed = seed
-                                    , blankNodes = Dict.insert label node state.blankNodes
-                                }
-                            )
-                        |> Result.map dropSubject
-
-                Just node ->
-                    predicateObjectList
-                        |> List.foldl (\predicateObject -> Result.andThen (collectPredicateObjectList predicateObject))
-                            (Ok { state | subjects = asBlankNodeOrIri node :: state.subjects })
-                        |> Result.map dropSubject
-
-        Turtle.SubjectBlankNode Turtle.Anon ->
-            let
-                ( node, seed ) =
-                    generateBlankNode state.seed
-            in
-            predicateObjectList
-                |> List.foldl (\predicateObject -> Result.andThen (collectPredicateObjectList predicateObject))
-                    (Ok
-                        { state
-                            | subjects = asBlankNodeOrIri node :: state.subjects
-                            , seed = seed
-                        }
-                    )
-                |> Result.map dropSubject
-
-        Turtle.SubjectCollection objects ->
-            if List.isEmpty objects then
-                predicateObjectList
-                    |> List.foldl (\predicateObject -> Result.andThen (collectPredicateObjectList predicateObject))
-                        (Ok { state | subjects = asBlankNodeOrIri (rdf "nil") :: state.subjects })
-                    |> Result.map dropSubject
-
-            else
-                let
-                    ( node, seed ) =
-                        generateBlankNode state.seed
-                in
-                predicateObjectList
-                    |> List.foldl (\predicateObject -> Result.andThen (collectPredicateObjectList predicateObject))
-                        (Ok
-                            { state
-                                | subjects = asBlankNodeOrIri node :: state.subjects
-                                , seed = seed
-                            }
-                        )
-                    |> Result.andThen (addCollection node objects)
-                    |> Result.map dropSubject
-
-
-collectPredicateObjectList : Turtle.PredicateObjectList -> State -> Result Error State
-collectPredicateObjectList { verb, objects } state =
-    let
-        predicate : Result Error String
-        predicate =
-            case verb of
-                Turtle.Predicate iri ->
-                    resolveIri state iri
-
-                Turtle.A ->
-                    Ok "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
-    in
-    case predicate of
-        Err error ->
-            Err error
-
-        Ok url ->
-            objects
-                |> List.foldl (Result.andThen << collectObject)
-                    (Ok { state | predicates = Rdf.iri url :: state.predicates })
-                |> Result.map dropPredicate
-
-
-collectObject : Turtle.Object -> State -> Result Error State
-collectObject object state =
-    case object of
-        Turtle.ObjectIri iri ->
-            resolveIri state iri
-                |> Result.andThen (\url -> addTriple (asBlankNodeOrIriOrLiteral (Rdf.iri url)) state)
-
-        Turtle.ObjectBlankNode (Turtle.BlankNodeLabel label) ->
-            case Dict.get label state.blankNodes of
-                Nothing ->
-                    let
-                        ( node, seed ) =
-                            generateBlankNode state.seed
-                    in
-                    addTriple (asBlankNodeOrIriOrLiteral node)
-                        { state
-                            | seed = seed
-                            , blankNodes = Dict.insert label node state.blankNodes
-                        }
-
-                Just node ->
-                    addTriple (asBlankNodeOrIriOrLiteral node) state
-
-        Turtle.ObjectBlankNode Turtle.Anon ->
-            let
-                ( node, seed ) =
-                    generateBlankNode state.seed
-            in
-            addTriple (asBlankNodeOrIriOrLiteral node) { state | seed = seed }
-
-        Turtle.ObjectCollection objects ->
-            if List.isEmpty objects then
-                addTriple (asBlankNodeOrIriOrLiteral (rdf "nil")) state
-
-            else
-                let
-                    ( nodeFirst, seedFirst ) =
-                        generateBlankNode state.seed
-                in
-                { state | seed = seedFirst }
-                    |> addTriple (asBlankNodeOrIriOrLiteral nodeFirst)
-                    |> Result.andThen (addCollection nodeFirst objects)
-
-        Turtle.ObjectBlankNodePropertyList predicateObjects ->
-            let
-                ( node, seed ) =
-                    generateBlankNode state.seed
-            in
-            predicateObjects
-                |> List.foldl (Result.andThen << collectPredicateObjectList)
-                    (Ok
-                        { state
-                            | subjects = asBlankNodeOrIri node :: state.subjects
-                            , seed = seed
-                        }
-                    )
-                |> Result.map dropSubject
-                |> Result.andThen (addTriple (asBlankNodeOrIriOrLiteral node))
-
-        Turtle.ObjectLiteral (Turtle.LiteralString value) ->
-            addTriple (asBlankNodeOrIriOrLiteral (Rdf.string value)) state
-
-        Turtle.ObjectLiteral (Turtle.LiteralLangString value lang) ->
-            addTriple (asBlankNodeOrIriOrLiteral (Rdf.langString lang value)) state
-
-        Turtle.ObjectLiteral (Turtle.LiteralTyped value datatype) ->
-            resolveIri state datatype
-                |> Result.andThen (\url -> addTriple (asBlankNodeOrIriOrLiteral (Rdf.literal (Rdf.iri url) value)) state)
-
-        Turtle.ObjectLiteral (Turtle.LiteralInteger value) ->
-            addTriple (asBlankNodeOrIriOrLiteral (Rdf.integer value)) state
-
-        Turtle.ObjectLiteral (Turtle.LiteralDecimal value) ->
-            addTriple (asBlankNodeOrIriOrLiteral (Rdf.literal (xsd "decimal") value)) state
-
-        Turtle.ObjectLiteral (Turtle.LiteralDouble value) ->
-            addTriple (asBlankNodeOrIriOrLiteral (Rdf.literal (xsd "double") (String.fromFloat value))) state
-
-        Turtle.ObjectLiteral Turtle.LiteralTrue ->
-            addTriple (asBlankNodeOrIriOrLiteral (Rdf.boolean True)) state
-
-        Turtle.ObjectLiteral Turtle.LiteralFalse ->
-            addTriple (asBlankNodeOrIriOrLiteral (Rdf.boolean False)) state
-
-
-addTriple : BlankNodeOrIriOrLiteral -> State -> Result Error State
-addTriple object state =
-    Result.map3 Triple
-        (Result.fromMaybe MissingSubject (List.head state.subjects))
-        (Result.fromMaybe MissingPredicate (List.head state.predicates))
-        (Ok object)
-        |> Result.map (\triple -> { state | triples = triple :: state.triples })
-
-
-addCollection : BlankNode -> List Turtle.Object -> State -> Result Error State
-addCollection nodeFirst objects state =
-    case List.reverse objects of
-        [] ->
-            addTriple (asBlankNodeOrIriOrLiteral (rdf "nil")) state
-
-        last :: rest ->
-            rest
-                |> List.reverse
-                |> List.foldl
-                    (\obj result ->
-                        result
-                            |> Result.andThen
-                                (\( nodePrevious, stateNext ) ->
-                                    let
-                                        ( nodeNext, seedNext ) =
-                                            generateBlankNode stateNext.seed
-                                    in
-                                    { stateNext
-                                        | subjects = asBlankNodeOrIri nodePrevious :: stateNext.subjects
-                                        , predicates = rdf "first" :: stateNext.predicates
-                                        , seed = seedNext
-                                    }
-                                        |> collectObject obj
-                                        |> Result.map dropPredicate
-                                        |> Result.map
-                                            (\stateNextNext ->
-                                                { stateNextNext | predicates = rdf "rest" :: stateNextNext.predicates }
-                                            )
-                                        |> Result.andThen (addTriple (asBlankNodeOrIriOrLiteral nodeNext))
-                                        |> Result.map dropPredicate
-                                        |> Result.map dropSubject
-                                        |> Result.map (Tuple.pair nodeNext)
-                                )
-                    )
-                    (Ok ( nodeFirst, state ))
-                |> Result.andThen
-                    (\( nodePrevious, stateNext ) ->
-                        { stateNext
-                            | subjects = asBlankNodeOrIri nodePrevious :: stateNext.subjects
-                            , predicates = rdf "first" :: stateNext.predicates
-                        }
-                            |> collectObject last
-                            |> Result.map dropPredicate
-                            |> Result.map
-                                (\stateNextNext ->
-                                    { stateNextNext | predicates = rdf "rest" :: stateNextNext.predicates }
-                                )
-                            |> Result.andThen (addTriple (asBlankNodeOrIriOrLiteral (rdf "nil")))
-                            |> Result.map dropPredicate
-                            |> Result.map dropSubject
-                    )
-
-
-resolveIri : State -> Turtle.Iri -> Result Error String
-resolveIri state iri =
-    case iri of
-        Turtle.IriRef url ->
-            if Regex.contains regexScheme url then
-                Ok url
-
-            else
-                case state.base of
-                    Nothing ->
-                        Err MissingBase
-
-                    Just base ->
-                        Ok (base ++ url)
-
-        Turtle.PrefixedName prefix name ->
-            Dict.get prefix state.prefixes
-                |> Maybe.map (\url -> url ++ name)
-                |> Result.fromMaybe (CouldNotResolvePrefixedName prefix name)
-
-
-regexScheme : Regex
-regexScheme =
-    "^[a-z][a-z0-9+-.]*:"
-        |> Regex.fromStringWith
-            { caseInsensitive = True
-            , multiline = False
-            }
-        |> Maybe.withDefault Regex.never
-
-
-dropSubject : State -> State
-dropSubject state =
-    { state
-        | subjects =
-            state.subjects
-                |> List.tail
-                |> Maybe.withDefault []
-    }
-
-
-dropPredicate : State -> State
-dropPredicate state =
-    { state
-        | predicates =
-            state.predicates
-                |> List.tail
-                |> Maybe.withDefault []
-    }
-
-
-{-| TODO Add documentation
--}
-fromTriples : List Triple -> Graph
-fromTriples triples =
-    Graph
-        { base = Nothing
-        , prefixes = Dict.empty
-        , triples = triples
-        , subjects = List.map .subject triples
-        , objects = List.map .object triples
-        , bySubjectByPredicate =
-            triples
-                |> List.map annotateWithIriSubject
-                |> groupByTupleFirst
-                |> List.map
-                    (\( ( iriSubject, tripleFirst ), rest ) ->
-                        ( iriSubject
-                        , (tripleFirst :: List.map Tuple.second rest)
-                            |> List.map annotateWithIriPredicate
-                            |> groupByTupleFirst
-                            |> dictFromGroups
-                        )
-                    )
-                |> Dict.fromList
-        , byPredicateBySubject =
-            triples
-                |> List.map annotateWithIriPredicate
-                |> groupByTupleFirst
-                |> List.map
-                    (\( ( iriPredicate, tripleFirst ), rest ) ->
-                        ( iriPredicate
-                        , (tripleFirst :: List.map Tuple.second rest)
-                            |> List.map annotateWithIriSubject
-                            |> groupByTupleFirst
-                            |> dictFromGroups
-                        )
-                    )
-                |> Dict.fromList
-        }
-
-
-annotateWithIriSubject : Triple -> ( String, Triple )
-annotateWithIriSubject triple =
-    ( Rdf.serialize triple.subject, triple )
-
-
-annotateWithIriPredicate : Triple -> ( String, Triple )
-annotateWithIriPredicate triple =
-    ( Rdf.serialize triple.predicate, triple )
-
-
-groupByTupleFirst : List ( comparable, a ) -> List ( ( comparable, a ), List ( comparable, a ) )
-groupByTupleFirst =
-    List.sortBy Tuple.first
-        >> List.groupWhile (\( left, _ ) ( right, _ ) -> left == right)
-
-
-dictFromGroups : List ( ( comparable, a ), List ( comparable, a ) ) -> Dict comparable (List a)
-dictFromGroups =
-    List.map
-        (\( ( key, first ), rest ) ->
-            ( key
-            , first :: List.map Tuple.second rest
-            )
-        )
-        >> Dict.fromList
-
-
-{-| TODO Add documentation
--}
-fromTriplesSafe : Seed -> List Triple -> ( Graph, Seed )
-fromTriplesSafe seed triples =
-    triples
-        |> renameBlankNodes seed
-        |> Tuple.mapFirst fromTriples
-
-
-type alias Step =
-    { seed : Seed
-    , blankNodes : Dict String BlankNode
-    , triples : List Triple
-    }
-
-
-stepInitial : Seed -> Step
-stepInitial seed =
-    { seed = seed
-    , blankNodes = Dict.empty
-    , triples = []
-    }
-
-
-renameBlankNodes : Seed -> List Triple -> ( List Triple, Seed )
-renameBlankNodes seed triples =
-    let
-        stepFinal : Step
-        stepFinal =
-            renameBlankNodesHelp triples (stepInitial seed)
-    in
-    ( stepFinal.triples
-    , stepFinal.seed
-    )
-
-
-renameBlankNodesHelp : List Triple -> Step -> Step
-renameBlankNodesHelp triples step =
-    case triples of
-        [] ->
-            step
-
-        triple :: rest ->
-            case triple.subject of
-                Term (BlankNode labelSubject) ->
-                    let
-                        ( stepAfterSubject, nodeSubject ) =
-                            remintBlankNode labelSubject step
-                    in
-                    case triple.object of
-                        Term (BlankNode labelObject) ->
-                            let
-                                ( stepAfterObject, nodeObject ) =
-                                    remintBlankNode labelObject stepAfterSubject
-                            in
-                            renameBlankNodesHelp rest
-                                { stepAfterObject
-                                    | triples =
-                                        { subject = Rdf.asBlankNodeOrIri nodeSubject
-                                        , predicate = triple.predicate
-                                        , object = Rdf.asBlankNodeOrIriOrLiteral nodeObject
-                                        }
-                                            :: stepAfterObject.triples
-                                }
-
-                        _ ->
-                            renameBlankNodesHelp rest
-                                { stepAfterSubject
-                                    | triples =
-                                        { subject = Rdf.asBlankNodeOrIri nodeSubject
-                                        , predicate = triple.predicate
-                                        , object = triple.object
-                                        }
-                                            :: stepAfterSubject.triples
-                                }
-
-                _ ->
-                    case triple.object of
-                        Term (BlankNode labelObject) ->
-                            let
-                                ( stepAfterObject, nodeObject ) =
-                                    remintBlankNode labelObject step
-                            in
-                            renameBlankNodesHelp rest
-                                { stepAfterObject
-                                    | triples =
-                                        { subject = triple.subject
-                                        , predicate = triple.predicate
-                                        , object = Rdf.asBlankNodeOrIriOrLiteral nodeObject
-                                        }
-                                            :: stepAfterObject.triples
-                                }
-
-                        _ ->
-                            renameBlankNodesHelp rest
-                                { step | triples = triple :: step.triples }
-
-
-remintBlankNode : String -> Step -> ( Step, BlankNode )
-remintBlankNode label step =
-    case Dict.get label step.blankNodes of
-        Nothing ->
-            let
-                ( node, seedAfterMint ) =
-                    generateBlankNode step.seed
-            in
-            ( { step
-                | seed = seedAfterMint
-                , blankNodes = Dict.insert label node step.blankNodes
-              }
-            , node
-            )
-
-        Just node ->
-            ( step, node )
-
-
-{-| TODO Add documentation
--}
-mintBlankNodes : Seed -> Graph -> ( Graph, Seed )
-mintBlankNodes seed (Graph data) =
-    let
-        ( triplesUpdated, seedUpdated ) =
-            renameBlankNodes seed data.triples
-    in
-    ( Graph
-        { data
-            | triples = triplesUpdated
-            , subjects = List.map .subject triplesUpdated
-            , objects = List.map .object triplesUpdated
-            , bySubjectByPredicate =
-                triplesUpdated
-                    |> List.map annotateWithIriSubject
-                    |> groupByTupleFirst
-                    |> List.map
-                        (\( ( iriSubject, tripleFirst ), rest ) ->
-                            ( iriSubject
-                            , (tripleFirst :: List.map Tuple.second rest)
-                                |> List.map annotateWithIriPredicate
-                                |> groupByTupleFirst
-                                |> dictFromGroups
-                            )
-                        )
-                    |> Dict.fromList
-            , byPredicateBySubject =
-                triplesUpdated
-                    |> List.map annotateWithIriPredicate
-                    |> groupByTupleFirst
-                    |> List.map
-                        (\( ( iriPredicate, tripleFirst ), rest ) ->
-                            ( iriPredicate
-                            , (tripleFirst :: List.map Tuple.second rest)
-                                |> List.map annotateWithIriSubject
-                                |> groupByTupleFirst
-                                |> dictFromGroups
-                            )
-                        )
-                    |> Dict.fromList
-        }
-    , seedUpdated
-    )
