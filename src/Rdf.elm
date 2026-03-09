@@ -810,8 +810,7 @@ by providing a blank node identifier, e.g.
         blankNode "unnamed"
 
 **Warning**: When you are using this function directly, you have to ensure
-yourself, that you don't run into naming conflicts. TODO Add a public function
-to `Rdf.Graph` for minting blank nodes.
+yourself, that you don't run into naming conflicts.
 
 -}
 blankNode : String -> BlankNode
@@ -1739,7 +1738,10 @@ nonLocalized (StringOrLangString stringOrLangString) =
 
 {-| TODO Add documentation
 -}
-stringOrLangStringFrom : Maybe String -> List ( String, String ) -> StringOrLangString
+stringOrLangStringFrom :
+    Maybe String
+    -> List ( String, String )
+    -> StringOrLangString
 stringOrLangStringFrom maybeString langStrings =
     StringOrLangString
         { string = maybeString

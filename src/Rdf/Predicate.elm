@@ -3,7 +3,9 @@ module Rdf.Predicate exposing
     , fromPropertyPath, toIri
     )
 
-{-|
+{-| There are situations where one wants to only work with property paths of
+fixed length, which means they only consist of predicate, inverse, or
+sequence paths. This module provides a few helpers.
 
 @docs Predicate
 @docs fromPropertyPath, toIri
@@ -16,14 +18,14 @@ import Maybe.Extra as Maybe
 import Rdf exposing (Iri, IsPath)
 
 
-{-| TODO Add documentation
+{-| A segment of a fixed length property path.
 -}
 type Predicate
     = Predicate Iri
     | Inverse Iri
 
 
-{-| TODO Add documentation
+{-| Extract the `Iri` from a [`Predicate`](#Predicate)
 -}
 toIri : Predicate -> Iri
 toIri constructablePath =
@@ -35,11 +37,46 @@ toIri constructablePath =
             iri
 
 
-{-| XXX Normalizes a `PropertyPath` into a `NonEmpty Predicate`. Ideally, we
-distinguish between `PropertyPath` and `NonEmpty Predicate` in our code-base.
-But since we use the super-class `PropertyPath` everywhere, we have to special
-case the impossible variants, cf. `property` which is a no-op if it encounters
-a such special property path.
+{-| Normalize a `Path` into a `NonEmpty Predicate`. This will return `Nothing`
+for paths which are not of fixed length.
+
+    import Rdf exposing
+        ( iri, inverse, sequence, alternative
+        , zeroOrMore, zeroOrOne, oneOrMore
+        )
+
+    fromPropertyPath (iri "http://example.org")
+    --> Just ( Predicate (iri "http://example.org"), [] )
+
+    fromPropertyPath (inverse (iri "http://example.org"))
+    --> Just ( Inverse (iri "http://example.org"), [] )
+
+    fromPropertyPath
+        (sequence
+            (iri "http://example.org#a")
+            [ iri "http://example.org#b" ]
+        )
+    --> Just
+    -->     ( Predicate (iri "http://example.org#a")
+    -->     , [ Predicate (iri "http://example.org#b") ]
+    -->     )
+
+    fromPropertyPath
+        (alternative
+            (iri "http://example.org#a")
+            [ iri "http://example.org#b" ]
+        )
+    --> Nothing
+
+    fromPropertyPath (zeroOrMore (iri "http://example.org"))
+    --> Nothing
+
+    fromPropertyPath (zeroOrOne (iri "http://example.org"))
+    --> Nothing
+
+    fromPropertyPath (oneOrMore (iri "http://example.org"))
+    --> Nothing
+
 -}
 fromPropertyPath : IsPath compatible -> Maybe (NonEmpty Predicate)
 fromPropertyPath (Term variant) =
