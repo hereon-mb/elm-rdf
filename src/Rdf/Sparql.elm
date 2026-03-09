@@ -82,8 +82,8 @@ import Rdf
         , Prologue
         , Var
         , VarOrPath
+        , xsd
         )
-import Rdf.Namespaces exposing (xsd)
 
 
 {-| The `Query` type represents a SPARQL query.
@@ -280,8 +280,7 @@ values v vs =
 
 {-| Create a basic graph pattern which matches a set of triple patterns.
 
-    import Rdf exposing (iri, varQ)
-    import Rdf.Namespaces exposing (a, rdfs)
+    import Rdf exposing (iri, varQ, a, rdfs)
 
     construct []
         |> where_
@@ -311,8 +310,7 @@ triples =
 
 {-| Make a graph pattern optional.
 
-    import Rdf exposing (iri, varQ)
-    import Rdf.Namespaces exposing (a, rdfs)
+    import Rdf exposing (iri, varQ, a, rdfs)
 
     construct []
         |> where_
@@ -347,8 +345,7 @@ optional =
 
 {-| Create a graph pattern which matches the first **or** the second pattern.
 
-    import Rdf exposing (iri, varQ)
-    import Rdf.Namespaces exposing (a, rdfs)
+    import Rdf exposing (iri, varQ, a, rdfs)
 
     construct []
         |> where_
@@ -399,8 +396,7 @@ or left right =
 
 {-| Create a graph pattern which matches the first **and** the second pattern.
 
-    import Rdf exposing (iri, varQ)
-    import Rdf.Namespaces exposing (a, rdfs)
+    import Rdf exposing (iri, varQ, a, rdfs)
 
     construct []
         |> where_
@@ -446,8 +442,7 @@ and left right =
 
 {-| Add a filter expression.
 
-    import Rdf exposing (iri, string, varQ)
-    import Rdf.Namespaces exposing (a, rdfs)
+    import Rdf exposing (iri, string, varQ, a, rdfs)
 
     construct []
         |> where_
@@ -486,8 +481,7 @@ filter =
 
 {-| Bind the result of an expression to a query variable.
 
-    import Rdf exposing (iri, string, varQ)
-    import Rdf.Namespaces exposing (a, rdfs)
+    import Rdf exposing (iri, string, varQ, a, rdfs)
 
     construct []
         |> where_
@@ -750,8 +744,7 @@ triple subject predicate object =
 of triple patterns with IRI or variable predicates. The first argument is the
 prefix used for intermediate query variables.
 
-    import Rdf exposing (iri, inverse, sequence, varQ, asPath)
-    import Rdf.Namespaces exposing (a, rdfs)
+    import Rdf exposing (iri, inverse, sequence, varQ, asPath, a, rdfs)
 
     construct []
         |> where_

@@ -51,6 +51,11 @@ module Rdf exposing
     , serializeTriple
     , encodeTriple
     , tripleDecoder
+    , a
+    , rdf, rdfs, xsd
+    , owl, sh, dash
+    , dcterms, qudt, prov
+    , schema
     )
 
 {-| This module defines the types and helper functions to work with the basic
@@ -194,6 +199,21 @@ A few convenience functions for working with literals of type `xsd:string` and
 
 @docs encodeTriple
 @docs tripleDecoder
+
+
+# Utility
+
+@docs a
+
+
+## Namespaces
+
+A few helpers for commonly used IRI prefixes.
+
+@docs rdf, rdfs, xsd
+@docs owl, sh, dash
+@docs dcterms, qudt, prov
+@docs schema
 
 -}
 
@@ -1827,15 +1847,15 @@ flatten paths =
 {-| TODO Add documentation
 -}
 startsWith : IsPath compatible1 -> IsPath compatible2 -> Bool
-startsWith a b =
-    startsWithHelp (normalize a) (normalize b)
+startsWith left right =
+    startsWithHelp (normalize left) (normalize right)
 
 
 startsWithHelp : IsPath compatible1 -> IsPath compatible2 -> Bool
-startsWithHelp (Term a) (Term b) =
-    case a of
+startsWithHelp (Term left) (Term right) =
+    case left of
         Iri iriA ->
-            case b of
+            case right of
                 Iri iriB ->
                     iriA == iriB
 
@@ -1846,7 +1866,7 @@ startsWithHelp (Term a) (Term b) =
                     False
 
         Sequence (Iri iriA) restA ->
-            case b of
+            case right of
                 Iri _ ->
                     False
 
@@ -1872,8 +1892,8 @@ startsWithHelp (Term a) (Term b) =
 {-| TODO Add documentation
 -}
 rightOf : IsPath compatible1 -> IsPath compatible2 -> Maybe Path
-rightOf a b =
-    rightOfHelp (normalize a) (normalize b)
+rightOf left right =
+    rightOfHelp (normalize left) (normalize right)
 
 
 {-| TODO Add documentation
@@ -1900,10 +1920,10 @@ lastPredicatePath (Term variant) =
 
 
 rightOfHelp : IsPath compatible1 -> IsPath compatible2 -> Maybe Path
-rightOfHelp (Term a) (Term b) =
-    case a of
+rightOfHelp (Term left) (Term right) =
+    case left of
         Iri iriA ->
-            case b of
+            case right of
                 Iri _ ->
                     Nothing
 
@@ -1918,7 +1938,7 @@ rightOfHelp (Term a) (Term b) =
                     Nothing
 
         Sequence (Iri iriA) restA ->
-            case b of
+            case right of
                 Iri _ ->
                     Nothing
 
@@ -2314,6 +2334,88 @@ encodeLiteral data =
       )
     ]
         |> Encode.object
+
+
+
+-- UTILITY
+
+
+{-| The IRI `http://www.w3.org/1999/02/22-rdf-syntax-ns#type` which is used to
+state that a node is an instance of an RDFS or OWL class.
+-}
+a : Iri
+a =
+    rdf "type"
+
+
+{-| The prefix `http://www.w3.org/1999/02/22-rdf-syntax-ns#`.
+-}
+rdf : String -> Iri
+rdf name =
+    iri ("http://www.w3.org/1999/02/22-rdf-syntax-ns#" ++ name)
+
+
+{-| The prefix `http://www.w3.org/2000/01/rdf-schema#`.
+-}
+rdfs : String -> Iri
+rdfs name =
+    iri ("http://www.w3.org/2000/01/rdf-schema#" ++ name)
+
+
+{-| The prefix `http://www.w3.org/2001/XMLSchema#`.
+-}
+xsd : String -> Iri
+xsd name =
+    iri ("http://www.w3.org/2001/XMLSchema#" ++ name)
+
+
+{-| The prefix `http://www.w3.org/2002/07/owl#`.
+-}
+owl : String -> Iri
+owl name =
+    iri ("http://www.w3.org/2002/07/owl#" ++ name)
+
+
+{-| The prefix `http://www.w3.org/ns/shacl#`.
+-}
+sh : String -> Iri
+sh name =
+    iri ("http://www.w3.org/ns/shacl#" ++ name)
+
+
+{-| The prefix `http://datashapes.org/dash#`.
+-}
+dash : String -> Iri
+dash name =
+    iri ("http://datashapes.org/dash#" ++ name)
+
+
+{-| The prefix `http://purl.org/dc/terms/`.
+-}
+dcterms : String -> Iri
+dcterms name =
+    iri ("http://purl.org/dc/terms/" ++ name)
+
+
+{-| The prefix `http://qudt.org/schema/qudt/`.
+-}
+qudt : String -> Iri
+qudt name =
+    iri ("http://qudt.org/schema/qudt/" ++ name)
+
+
+{-| The prefix `http://www.w3.org/ns/prov#`.
+-}
+prov : String -> Iri
+prov name =
+    iri ("http://www.w3.org/ns/prov#" ++ name)
+
+
+{-| The prefix `http://schema.org/`.
+-}
+schema : String -> Iri
+schema name =
+    iri ("http://schema.org/" ++ name)
 
 
 

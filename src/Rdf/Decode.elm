@@ -139,8 +139,8 @@ import Rdf
         , Path
         , StringOrLangString
         , Triple
+        , rdf
         )
-import Rdf.Namespaces exposing (rdf)
 import Result.Extra as Result
 import Time
 
@@ -167,9 +167,8 @@ type alias State =
 
 {-| Decode an [IRI](https://www.w3.org/TR/rdf11-concepts/#section-IRIs).
 
-    import Rdf
+    import Rdf exposing (a)
     import Rdf.Graph as Rdf exposing (Graph)
-    import Rdf.Namespaces exposing (a)
 
     graph : Graph
     graph =
@@ -280,9 +279,8 @@ literal =
 Node](https://www.w3.org/TR/rdf11-concepts/#section-blank-nodes) or
 [IRI](https://www.w3.org/TR/rdf11-concepts/#section-IRIs).
 
-    import Rdf
+    import Rdf exposing (a)
     import Rdf.Graph as Rdf exposing (Graph)
-    import Rdf.Namespaces exposing (a)
 
     graph : Graph
     graph =
@@ -362,9 +360,8 @@ blankNodeOrIriOrLiteral =
 
 {-| Decode a Literal of type `xsd:string` into a `String`.
 
-    import Rdf
+    import Rdf exposing (a)
     import Rdf.Graph as Rdf exposing (Graph)
-    import Rdf.Namespaces exposing (a)
 
     graph : Graph
     graph =
@@ -441,9 +438,8 @@ stringOrLangString =
 
 {-| Decode a Literal of type `xsd:boolean` into a `Bool`.
 
-    import Rdf
+    import Rdf exposing (a)
     import Rdf.Graph as Rdf exposing (Graph)
-    import Rdf.Namespaces exposing (a)
 
     graph : Graph
     graph =
@@ -500,9 +496,8 @@ decimal =
 
 {-| Decode a Literal of type `xsd:integer` or `xsd:int` into a `Int`.
 
-    import Rdf
+    import Rdf exposing (a)
     import Rdf.Graph as Rdf exposing (Graph)
-    import Rdf.Namespaces exposing (a)
 
     graph : Graph
     graph =
@@ -544,9 +539,8 @@ int =
 
 {-| Decode a Literal of type `xsd:double` or `xsd:float` into a `Float`.
 
-    import Rdf
+    import Rdf exposing (a)
     import Rdf.Graph as Rdf exposing (Graph)
-    import Rdf.Namespaces exposing (a)
 
     graph : Graph
     graph =
@@ -599,9 +593,8 @@ number =
 
 {-| Decode a Literal of type `xsd:date` into a `Time.Posix`.
 
-    import Rdf
+    import Rdf exposing (a)
     import Rdf.Graph as Rdf exposing (Graph)
-    import Rdf.Namespaces exposing (a)
     import Time
 
     graph : Graph
@@ -639,9 +632,8 @@ date =
 
 {-| Decode a Literal of type `xsd:date` into a `Time.Posix`.
 
-    import Rdf
+    import Rdf exposing (a)
     import Rdf.Graph as Rdf exposing (Graph)
-    import Rdf.Namespaces exposing (a)
     import Time
 
     graph : Graph
@@ -836,9 +828,8 @@ oneOf fs =
 collections](https://www.w3.org/TR/rdf-schema/#ch_collectionvocab) into
 a `List`.
 
-    import Rdf
+    import Rdf exposing (a)
     import Rdf.Graph as Rdf exposing (Graph)
-    import Rdf.Namespaces exposing (a)
 
     graph : Graph
     graph =
@@ -1443,9 +1434,8 @@ lazy f =
 
 {-| Decode a required property.
 
-    import Rdf
+    import Rdf exposing (a)
     import Rdf.Graph as Rdf exposing (Graph)
-    import Rdf.Namespaces exposing (a)
     import Time
 
     graph : Graph
@@ -1487,9 +1477,8 @@ required path decoderA decoderF =
 
 {-| Decode an optional property.
 
-    import Rdf
+    import Rdf exposing (a)
     import Rdf.Graph as Rdf exposing (Graph)
-    import Rdf.Namespaces exposing (a)
     import Time
 
     graph : Graph
@@ -1539,9 +1528,8 @@ optional path decoderA defaultA decoderF =
 {-| Rather than decoding anything, use a fixed value for the next step in the
 pipeline. `harcoded` does not look at the RDF graph at all.
 
-    import Rdf
+    import Rdf exposing (a)
     import Rdf.Graph as Rdf exposing (Graph)
-    import Rdf.Namespaces exposing (a)
 
     graph : Graph
     graph =

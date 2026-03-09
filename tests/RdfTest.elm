@@ -1,9 +1,8 @@
 module RdfTest exposing (suite)
 
 import Expect
-import Rdf
+import Rdf exposing (rdf, xsd)
 import Rdf.Graph
-import Rdf.Namespaces exposing (rdf, xsd)
 import Test exposing (Test, describe, test)
 
 

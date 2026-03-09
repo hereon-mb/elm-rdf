@@ -299,8 +299,7 @@ inverse p (Encoder encoder) =
 
 {-| Encode a single RDF term.
 
-    import Rdf exposing (iri)
-    import Rdf.Namespaces exposing (a)
+    import Rdf exposing (iri, a)
     import Rdf.Graph exposing (initialSeed, serializeTurtle)
 
     blankNode

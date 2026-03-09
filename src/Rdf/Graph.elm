@@ -71,12 +71,13 @@ import Rdf
         , asBlankNodeOrIriOrLiteral
         , asIri
         , encodeTriple
+        , rdf
         , serializeTriple
         , serializeWith
         , toBlankNodeOrIri
         , tripleDecoder
+        , xsd
         )
-import Rdf.Namespaces exposing (rdf, xsd)
 import Regex exposing (Regex)
 import Set exposing (Set)
 import Tuple.Extra as Tuple

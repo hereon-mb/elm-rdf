@@ -4,7 +4,6 @@ import Expect exposing (Expectation)
 import Rdf
 import Rdf.Decode as Decode exposing (Decoder)
 import Rdf.Graph as Graph
-import Rdf.Namespaces as Rdf
 import Test exposing (Test, describe, test)
 
 

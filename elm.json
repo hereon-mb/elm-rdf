@@ -9,7 +9,6 @@
         "Rdf.Decode",
         "Rdf.Encode",
         "Rdf.Graph",
-        "Rdf.Namespaces",
         "Rdf.Predicate",
         "Rdf.Sparql"
     ],
