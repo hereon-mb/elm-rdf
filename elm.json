@@ -6,9 +6,9 @@
     "version": "1.0.0",
     "exposed-modules": [
         "Rdf",
-        "Rdf.Decode",
-        "Rdf.Encode",
         "Rdf.Graph",
+        "Rdf.Graph.Decode",
+        "Rdf.Graph.Encode",
         "Rdf.Predicate",
         "Rdf.Sparql"
     ],

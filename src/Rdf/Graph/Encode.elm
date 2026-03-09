@@ -1,4 +1,4 @@
-module Rdf.Encode exposing
+module Rdf.Graph.Encode exposing
     ( Encoder
     , encode
     , node, blankNode

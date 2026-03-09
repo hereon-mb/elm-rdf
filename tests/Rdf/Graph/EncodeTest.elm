@@ -1,9 +1,9 @@
-module Rdf.EncodeTest exposing (suite)
+module Rdf.Graph.EncodeTest exposing (suite)
 
 import Expect exposing (Expectation)
 import Rdf exposing (Path)
-import Rdf.Encode as Encode exposing (GraphEncoder)
 import Rdf.Graph as Graph
+import Rdf.Graph.Encode as Encode exposing (GraphEncoder)
 import Test exposing (Test, describe, test)
 
 

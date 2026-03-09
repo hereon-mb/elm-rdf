@@ -1,9 +1,9 @@
-module Rdf.DecodeTest exposing (suite)
+module Rdf.Graph.DecodeTest exposing (suite)
 
 import Expect exposing (Expectation)
 import Rdf
-import Rdf.Decode as Decode exposing (Decoder)
 import Rdf.Graph as Graph
+import Rdf.Graph.Decode as Decode exposing (Decoder)
 import Test exposing (Test, describe, test)
 
 

@@ -201,7 +201,7 @@ A few convenience functions for working with literals of type `xsd:string` and
 @docs tripleDecoder
 
 
-# Utility
+# Helper
 
 @docs a
 

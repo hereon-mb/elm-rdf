@@ -177,5 +177,4 @@ which could go in separate packages:
 
 This package is published under the [Apache License, Version
 2.0](http://www.apache.org/licenses/LICENSE-2.0). If you want to
-contribute, please reach out to us at
-[fabian.kirchner@hereon.de](mailto:fabian.kirchner@hereon.de).
+contribute, please reach out to us at fabian.kirchner@hereon.de.

@@ -1,4 +1,4 @@
-module Rdf.Decode exposing
+module Rdf.Graph.Decode exposing
     ( Decoder
     , iri
     , blankNode
