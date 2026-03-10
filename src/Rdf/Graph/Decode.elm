@@ -704,17 +704,17 @@ at nodes (Decoder f) =
 
 {-| Decode a list of focus nodes by the given decoder.
 
-Note that the position of `many` within a decode expression matters. Say, a focus node has multiple classes.
-
-The following decoder works as expected:
+Note that the position of `many` within a decode expression matters. Say,
+a focus node has multiple classes. The following decoder works as expected:
 
     property a (many class)
 
-Hoever, the following (type-valid) decoder does NOT work:
+However, the following (type-valid) decoder does **not** work:
 
     many (property a class)
 
-Note that `property a class` alone fails (since there are many classes), and so `many (property a class)` fails as a whole!
+Note that `property a class` alone fails (since there are many classes), and so
+`many (property a class)` fails as a whole!
 
 -}
 many : Decoder a -> Decoder (List a)

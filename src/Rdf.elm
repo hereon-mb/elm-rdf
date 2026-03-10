@@ -34,8 +34,8 @@ module Rdf exposing
     , serializeTriple
     , a
     , rdf, rdfs, xsd
-    , owl, sh, dash
-    , dcterms, qudt, prov
+    , owl, sh
+    , dcterms, prov
     , schema
     , Iri, IsIri, asIri
     , BlankNode, IsBlankNode, asBlankNode
@@ -155,8 +155,8 @@ A few helper functions to transform [`Iri`](#Iri)'s.
 A few helpers for commonly used IRI prefixes.
 
 @docs rdf, rdfs, xsd
-@docs owl, sh, dash
-@docs dcterms, qudt, prov
+@docs owl, sh
+@docs dcterms, prov
 @docs schema
 
 
@@ -2202,25 +2202,11 @@ sh name =
     iri ("http://www.w3.org/ns/shacl#" ++ name)
 
 
-{-| The prefix `http://datashapes.org/dash#`.
--}
-dash : String -> Iri
-dash name =
-    iri ("http://datashapes.org/dash#" ++ name)
-
-
 {-| The prefix `http://purl.org/dc/terms/`.
 -}
 dcterms : String -> Iri
 dcterms name =
     iri ("http://purl.org/dc/terms/" ++ name)
-
-
-{-| The prefix `http://qudt.org/schema/qudt/`.
--}
-qudt : String -> Iri
-qudt name =
-    iri ("http://qudt.org/schema/qudt/" ++ name)
 
 
 {-| The prefix `http://www.w3.org/ns/prov#`.
