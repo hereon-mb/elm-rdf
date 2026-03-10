@@ -716,6 +716,29 @@ However, the following (type-valid) decoder does **not** work:
 Note that `property a class` alone fails (since there are many classes), and so
 `many (property a class)` fails as a whole!
 
+    import Rdf exposing (a)
+    import Rdf.Graph as Graph exposing (Graph)
+
+    graph : Graph
+    graph =
+        """
+        @base <http://example.org/> .
+        <alice> a <#Person> , <#Author> .
+        """
+            |> Graph.parse
+            |> Result.withDefault Graph.empty
+
+    decode
+        (from
+            (Rdf.iri "http://example.org/alice")
+            (property a (many iri))
+        )
+        graph
+    --> Ok
+    -->   [ Rdf.iri "http://example.org/#Author"
+    -->   , Rdf.iri "http://example.org/#Person"
+    -->   ]
+
 -}
 many : Decoder a -> Decoder (List a)
 many (Decoder f) =
