@@ -1,9 +1,9 @@
 # RDF in Elm
 
 Work with [Resource Description
-Framework](https://www.w3.org/TR/rdf11-primer/) (RDF) data in Elm. This
-package helps you to convert between Elm values and RDF graphs, as well
-as build [SPARQL](https://www.w3.org/TR/sparql11-query/) queries.
+Framework](https://www.w3.org/TR/rdf11-primer/) (RDF) data in Elm. Use
+this package to convert Elm values into RDF graphs or vice versa, and
+build [SPARQL](https://www.w3.org/TR/sparql11-query/) queries.
 
 
 ## Example
@@ -22,33 +22,7 @@ import Rdf.Graph as Graph
 import Time
 
 
-persons : Result Decode.Error (List Person)
-persons =
-    data
-        |> Graph.parse
-        |> Result.withDefault Graph.emptyGraph
-        |> Decode.decode
-            (Decode.from (foaf "Person")
-                (Decode.property (Rdf.inverse Rdf.a)
-                    (Decode.many decoder)
-                )
-            )
-
-
-
---> Ok
--->   [ { iri = example "bob"
--->     , knows = [ example "alice" ]
--->     , birthDate = Time.millisToPosix 647049600000
--->     , topic_interest =
--->         { iri = wikidata "Q12418"
--->         , title = "Mona Lisa"
--->         , creator = dbpedia "Leonardo_da_Vinci"
--->         , subjectOf = [ Rdf.iri "http://data.europeana.eu/item/04802/243FA8618938F4117025F17A8B813C5F9AA4D619" ]
--->         }
--->     }
--->   ]
-
+-- Start with the RDF graph in Turtle
 
 data : String
 data =
@@ -74,6 +48,8 @@ data =
   """
 
 
+-- Define Elm types to model the data
+
 type alias Person =
     { iri : Iri
     , knows : List Iri
@@ -90,20 +66,60 @@ type alias Topic =
     }
 
 
-decoder : Decoder Person
+-- Write a decoder
+
+decoder : Decoder (List Person)
 decoder =
+    Decode.from (foaf "Person")
+        (Decode.property (Rdf.inverse Rdf.a)
+            (Decode.many decoderPerson)
+        )
+
+decoderPerson : Decoder Person
+decoderPerson =
     Decode.succeed Person
         |> Decode.custom Decode.iri
         |> Decode.required (foaf "knows") (Decode.many Decode.iri)
         |> Decode.required (schema "birthDate") Decode.date
-        |> Decode.required (foaf "topic_interest")
-            (Decode.succeed Topic
-                |> Decode.custom Decode.iri
-                |> Decode.required (terms "title") Decode.string
-                |> Decode.required (terms "creator") Decode.iri
-                |> Decode.required (Rdf.inverse (terms "subject"))
-                    (Decode.many Decode.iri)
+        |> Decode.required (foaf "topic_interest") decoderTopic
+
+decoderTopic : Decoder Topic
+decoderTopic =
+    Decode.succeed Topic
+        |> Decode.custom Decode.iri
+        |> Decode.required (terms "title") Decode.string
+        |> Decode.required (terms "creator") Decode.iri
+        |> Decode.required (Rdf.inverse (terms "subject"))
+            (Decode.many Decode.iri)
+
+
+-- Finally, parse the RDF graph and
+-- run the decoder to extract the data
+
+persons : Result Decode.Error (List Person)
+persons =
+    data
+        |> Graph.parse
+        |> Result.withDefault Graph.emptyGraph
+        |> Decode.decode
+            (Decode.from (foaf "Person")
+                (Decode.property (Rdf.inverse Rdf.a)
+                    (Decode.many decoder)
+                )
             )
+--> Ok
+-->   [ { iri = example "bob"
+-->     , knows = [ example "alice" ]
+-->     , birthDate = Time.millisToPosix 647049600000
+-->     , topic_interest =
+-->         { iri = wikidata "Q12418"
+-->         , title = "Mona Lisa"
+-->         , creator = dbpedia "Leonardo_da_Vinci"
+-->         , subjectOf = [ Rdf.iri "http://data.europeana.eu/item/04802/243FA8618938F4117025F17A8B813C5F9AA4D619" ]
+-->         }
+-->     }
+-->   ]
+
 
 
 dbpedia : String -> Iri
@@ -134,13 +150,14 @@ wikidata name =
 
 ## Features and future plans
 
-We don't consider this package feature complete. It is actively being
-developed as part of the semantic electronic lab notebook/research
-database [Herbie](http://codebase.helmholtz.cloud/hereon-mb/herbie).
-Currently, the following things is supported:
+We don't consider this package to be feature complete. It is being
+actively developed as part of the semantic electronic lab notebook and
+research database
+[Herbie](http://codebase.helmholtz.cloud/hereon-mb/herbie). Currently,
+the following things are supported:
 
 - Parsing of [Turtle](https://www.w3.org/TR/turtle/) and
-  [N-Triples](https://www.w3.org/TR/n-triples/) files and serialization
+  [N-Triples](https://www.w3.org/TR/n-triples/) files, and serialization
   into these formats.
 - Elm data model for RDF terms (`Iri`, `BlankNode`, `Literal`, ...) and
   graphs (`Graph`).
@@ -150,10 +167,10 @@ Currently, the following things is supported:
 - Combinators for building
   [SPARQL](https://www.w3.org/TR/sparql11-query/) queries.
 
-Here is an incomplete and unprioritized list of things which could go in
-this package:
+Here is an incomplete and unprioritized list of additional things which
+could go in this package:
 
-- Parser and serializer for all [RDF serialization
+- Parsers and serializers for all [RDF serialization
   formats](https://www.w3.org/TR/rdf11-primer/#section-graph-syntax).
 - JSON decoders and encoders for the [RDFJS](https://rdf.js.org/) data
   model.
@@ -167,7 +184,7 @@ this package:
   Protocol](https://www.w3.org/TR/sparql11-http-rdf-update/)
 
 And here is a list of other interesting topics concerning RDF and Elm,
-which could go in separate packages:
+which could go into separate packages:
 
 - [SHACL](https://www.w3.org/TR/shacl/) validator
 - SPARQL query engine
@@ -184,10 +201,11 @@ fabian.kirchner@hereon.de.
 Copyright 2024-2026 Helmholtz-Zentrum hereon GmbH
 
 Licensed under the Apache License, Version 2.0 (the "License"); you may
-not use this file except in compliance with the License. You may obtain
-a copy of the License at http://www.apache.org/licenses/LICENSE-2.0.
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+not use this package except in compliance with the License. You may
+obtain a copy of the License at
+http://www.apache.org/licenses/LICENSE-2.0. Unless required by
+applicable law or agreed to in writing, software distributed under the
+License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the License for
+the specific language governing permissions and limitations under the
+License.
