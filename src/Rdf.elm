@@ -1,18 +1,6 @@
 module Rdf exposing
     ( Triple
     , Term
-    , Iri, IsIri, asIri
-    , BlankNode, IsBlankNode, asBlankNode
-    , Literal, IsLiteral, asLiteral
-    , Var, IsVar, asVar
-    , Path, IsPath, asPath
-    , BlankNodeOrIri, IsBlankNodeOrIri, asBlankNodeOrIri
-    , BlankNodeOrIriOrLiteral, IsBlankNodeOrIriOrLiteral, asBlankNodeOrIriOrLiteral
-    , BlankNodeOrIriOrLiteralOrVar, IsBlankNodeOrIriOrLiteralOrVar, asBlankNodeOrIriOrLiteralOrVar
-    , BlankNodeOrIriOrVar, IsBlankNodeOrIriOrVar, asBlankNodeOrIriOrVar
-    , IriOrLiteralOrVar, IsIriOrLiteralOrVar, asIriOrLiteralOrVar
-    , VarOrPath, IsVarOrPath, asVarOrPath
-    , Compatible
     , iri
     , blankNode
     , literal
@@ -54,6 +42,18 @@ module Rdf exposing
     , owl, sh, dash
     , dcterms, qudt, prov
     , schema
+    , Iri, IsIri, asIri
+    , BlankNode, IsBlankNode, asBlankNode
+    , Literal, IsLiteral, asLiteral
+    , Var, IsVar, asVar
+    , Path, IsPath, asPath
+    , BlankNodeOrIri, IsBlankNodeOrIri, asBlankNodeOrIri
+    , BlankNodeOrIriOrLiteral, IsBlankNodeOrIriOrLiteral, asBlankNodeOrIriOrLiteral
+    , BlankNodeOrIriOrLiteralOrVar, IsBlankNodeOrIriOrLiteralOrVar, asBlankNodeOrIriOrLiteralOrVar
+    , BlankNodeOrIriOrVar, IsBlankNodeOrIriOrVar, asBlankNodeOrIriOrVar
+    , IriOrLiteralOrVar, IsIriOrLiteralOrVar, asIriOrLiteralOrVar
+    , VarOrPath, IsVarOrPath, asVarOrPath
+    , Compatible
     )
 
 {-| This module defines the types and helper functions to work with the basic
@@ -62,41 +62,10 @@ a look at the [RDF 1.1 Primer](https://www.w3.org/TR/rdf11-primer/) for
 a introduction on its data model.
 
 @docs Triple
-
-
-# RDF Terms
-
-
-## Types
-
 @docs Term
 
 
-### Basic
-
-@docs Iri, IsIri, asIri
-@docs BlankNode, IsBlankNode, asBlankNode
-@docs Literal, IsLiteral, asLiteral
-@docs Var, IsVar, asVar
-@docs Path, IsPath, asPath
-
-
-### Combinations
-
-@docs BlankNodeOrIri, IsBlankNodeOrIri, asBlankNodeOrIri
-@docs BlankNodeOrIriOrLiteral, IsBlankNodeOrIriOrLiteral, asBlankNodeOrIriOrLiteral
-@docs BlankNodeOrIriOrLiteralOrVar, IsBlankNodeOrIriOrLiteralOrVar, asBlankNodeOrIriOrLiteralOrVar
-@docs BlankNodeOrIriOrVar, IsBlankNodeOrIriOrVar, asBlankNodeOrIriOrVar
-@docs IriOrLiteralOrVar, IsIriOrLiteralOrVar, asIriOrLiteralOrVar
-@docs VarOrPath, IsVarOrPath, asVarOrPath
-
-
-### Utility
-
-@docs Compatible
-
-
-## Create
+# Create
 
 This section contains helper functions to create [`Term`](#Term)'s from Elm
 values.
@@ -108,28 +77,28 @@ values.
 @docs sequence, alternative, inverse, zeroOrMore, oneOrMore, zeroOrOne
 
 
-### Specific literals
+## Specific literals
 
 @docs string, langString
 @docs boolean
 
 
-#### Numerical
+### Numerical
 
 @docs decimal
 @docs integer, int
 @docs double, float
 
 
-#### Temporal
+### Temporal
 
 @docs date, dateTime
 
 
-## Conversions
+# Conversions
 
 
-### Specialize
+## Specialize
 
 This section contains helper functions to convert any [`Term`](#Term)'s into
 a more specific variant.
@@ -141,7 +110,7 @@ a more specific variant.
 @docs toBlankNodeOrIri, toBlankNodeOrIriOrLiteral
 
 
-### Elm values
+## Elm values
 
 This section contains helper functions to convert specific [`Term`](#Term)'s
 into Elm values.
@@ -154,7 +123,7 @@ into Elm values.
 @docs toBool
 
 
-### Transform IRI's
+## Transform IRI's
 
 A few helper functions to transform [`Iri`](#Iri)'s.
 
@@ -163,12 +132,12 @@ A few helper functions to transform [`Iri`](#Iri)'s.
 @docs setQueryParam
 
 
-### Transform query variables
+## Transform query variables
 
 @docs append
 
 
-### StringOrLangString
+# StringOrLangString
 
 A few convenience functions for working with literals of type `xsd:string` and
 `xsd:langString`.
@@ -180,14 +149,14 @@ A few convenience functions for working with literals of type `xsd:string` and
 @docs mergeStringOrLangStrings
 
 
-### Property paths
+# Property paths
 
 @docs startsWith
 @docs rightOf
 @docs lastPredicatePath
 
 
-## Serialization
+# Serialization
 
 @docs serialize, serializeWith, Prologue
 @docs serializeTriple
@@ -206,6 +175,33 @@ A few helpers for commonly used IRI prefixes.
 @docs owl, sh, dash
 @docs dcterms, qudt, prov
 @docs schema
+
+
+# Types
+
+
+## Basic
+
+@docs Iri, IsIri, asIri
+@docs BlankNode, IsBlankNode, asBlankNode
+@docs Literal, IsLiteral, asLiteral
+@docs Var, IsVar, asVar
+@docs Path, IsPath, asPath
+
+
+## Combinations
+
+@docs BlankNodeOrIri, IsBlankNodeOrIri, asBlankNodeOrIri
+@docs BlankNodeOrIriOrLiteral, IsBlankNodeOrIriOrLiteral, asBlankNodeOrIriOrLiteral
+@docs BlankNodeOrIriOrLiteralOrVar, IsBlankNodeOrIriOrLiteralOrVar, asBlankNodeOrIriOrLiteralOrVar
+@docs BlankNodeOrIriOrVar, IsBlankNodeOrIriOrVar, asBlankNodeOrIriOrVar
+@docs IriOrLiteralOrVar, IsIriOrLiteralOrVar, asIriOrLiteralOrVar
+@docs VarOrPath, IsVarOrPath, asVarOrPath
+
+
+## Utility
+
+@docs Compatible
 
 -}
 

@@ -14,11 +14,12 @@ module Rdf.Graph exposing
     , serialize, serializeTurtle
     )
 
-{-| This module defines the [`Graph`](#Graph) type which models an RDF graph,
+{-| This module defines the [`Graph`](#Graph) type which models an [RDF
+graph](https://www.w3.org/TR/rdf11-concepts/#section-rdf-graph),
 and helper functions for building, updating, parsing, serializing these. Take
 a look at the `Rdf.Graph.Decode` module if you want to extract Elm values from
 a `Graph`. On the other hand, the `Rdf.Graph.Encode` module deals with
-conveniently building `Graph`'s.
+conveniently building these `Graph`'s.
 
 @docs Graph
 
