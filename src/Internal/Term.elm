@@ -34,8 +34,6 @@ type Variant
     | ZeroOrOne Variant
 
 
-{-| TODO Add documentation
--}
 type alias DataLiteral =
     { value : String
     , datatype : String
