@@ -48,6 +48,9 @@ is for JSON values. Since generating RDF graphs potentially requires minting
 
 -}
 
+import Internal.Term as Internal exposing (Term(..))
+import List.NonEmpty as NonEmpty exposing (NonEmpty)
+import Maybe.Extra as Maybe
 import Rdf
     exposing
         ( BlankNodeOrIri
@@ -58,7 +61,6 @@ import Rdf
         , IsPath
         )
 import Rdf.Graph as Rdf exposing (Graph, Seed)
-import Rdf.Predicate as Predicate
 
 
 
@@ -196,7 +198,7 @@ current focus node will be the subject.
 -}
 property : IsPath compatible -> IsGraphOrTermEncoder object -> PropertyEncoder
 property propertyPath encoder =
-    case Predicate.fromPropertyPath propertyPath of
+    case pathToPredicates propertyPath of
         Just ( first, rest ) ->
             rest
                 |> List.foldr
@@ -220,16 +222,53 @@ property propertyPath encoder =
                 )
 
 
-encoderFromPredicate :
-    Predicate.Predicate
-    -> IsGraphOrTermEncoder object
-    -> PropertyEncoder
+type Predicate
+    = Predicate Iri
+    | Inverse Iri
+
+
+pathToPredicates : IsPath compatible -> Maybe (NonEmpty Predicate)
+pathToPredicates (Term variant) =
+    case variant of
+        (Internal.Iri _) as x ->
+            Just (NonEmpty.singleton (Predicate (Term x)))
+
+        Internal.Sequence firstPropertyPath otherPropertyPaths ->
+            Maybe.map NonEmpty.concat
+                (Maybe.map2 Tuple.pair
+                    (pathToPredicates (Term firstPropertyPath))
+                    (Maybe.combine (List.map (pathToPredicates << Term) otherPropertyPaths))
+                )
+
+        Internal.Alternative _ _ ->
+            Nothing
+
+        Internal.Inverse ((Internal.Iri _) as x) ->
+            Just (NonEmpty.singleton (Inverse (Term x)))
+
+        Internal.Inverse _ ->
+            Nothing
+
+        Internal.ZeroOrMore _ ->
+            Nothing
+
+        Internal.OneOrMore _ ->
+            Nothing
+
+        Internal.ZeroOrOne _ ->
+            Nothing
+
+        _ ->
+            Nothing
+
+
+encoderFromPredicate : Predicate -> IsGraphOrTermEncoder object -> PropertyEncoder
 encoderFromPredicate p encoder =
     case p of
-        Predicate.Predicate predicate_ ->
+        Predicate predicate_ ->
             predicate predicate_ encoder
 
-        Predicate.Inverse predicate_ ->
+        Inverse predicate_ ->
             inverse predicate_ encoder
 
 

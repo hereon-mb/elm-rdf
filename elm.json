@@ -9,7 +9,6 @@
         "Rdf.Graph",
         "Rdf.Graph.Decode",
         "Rdf.Graph.Encode",
-        "Rdf.Predicate",
         "Rdf.Sparql"
     ],
     "elm-version": "0.19.1 <= v < 0.20.0",
