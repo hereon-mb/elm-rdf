@@ -14,7 +14,6 @@ suite =
         , manyMany
         , manyWithInverse
         , manyWithInverseAndData
-        , stringOrLangString
         , describe "property"
             [ propertyWithCorrectObject
             , propertyWithIncorrectObject
@@ -122,32 +121,6 @@ manyWithInverseAndData =
                 |> expectAll
                     [ List.sort
                         >> Expect.equalLists [ "Alice Wonderland", "Bob Builder" ]
-                    ]
-
-
-stringOrLangString : Test
-stringOrLangString =
-    test "string or lang string" <|
-        \_ ->
-            { raw =
-                """
-                    @base <http://example.org/> .
-                    @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-                    <x> rdfs:label "de", "en"@en, "fr"@fr .
-                """
-            , decoder =
-                Decode.from (example "x")
-                    (Decode.property (Rdf.rdfs "label")
-                        Decode.stringOrLangString
-                    )
-            }
-                |> expectAll
-                    [ Expect.equal
-                        (Rdf.stringOrLangStringFrom (Just "de")
-                            [ ( "en", "en" )
-                            , ( "fr", "fr" )
-                            ]
-                        )
                     ]
 
 

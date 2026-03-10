@@ -4,7 +4,7 @@ module Rdf.Graph.Decode exposing
     , blankNode
     , literal
     , blankNodeOrIri, blankNodeOrIriOrLiteral
-    , string, langString, stringOrLangString
+    , string, langString
     , bool
     , decimal, int, float, number
     , date, dateTime
@@ -59,7 +59,7 @@ with a few differences:
 
 ## Specific literals
 
-@docs string, langString, stringOrLangString
+@docs string, langString
 @docs bool
 @docs decimal, int, float, number
 @docs date, dateTime
@@ -137,7 +137,6 @@ import Rdf
         , IsPath
         , Literal
         , Path
-        , StringOrLangString
         , Triple
         , rdf
         )
@@ -410,30 +409,6 @@ langString =
                     succeed val
         )
         literal
-
-
-{-| Decode a `StringOrLangString`.
--}
-stringOrLangString : Decoder StringOrLangString
-stringOrLangString =
-    many
-        (oneOf
-            [ map Err langString
-            , map Ok string
-            ]
-        )
-        |> andThen
-            (\stringsOrLangStrings ->
-                case Result.partition stringsOrLangStrings of
-                    ( [], langStrings ) ->
-                        succeed (Rdf.stringOrLangStringFrom Nothing langStrings)
-
-                    ( [ string_ ], langStrings ) ->
-                        succeed (Rdf.stringOrLangStringFrom (Just string_) langStrings)
-
-                    ( strings, _ ) ->
-                        err (TooManyStrings strings)
-            )
 
 
 {-| Decode a Literal of type `xsd:boolean` into a `Bool`.
@@ -1186,7 +1161,6 @@ type Problem
     | CustomError String
     | Failure String
     | FailureAt String (List BlankNodeOrIriOrLiteral)
-    | TooManyStrings (List String)
 
 
 {-| Turn a decoding error into a human friendly string.
@@ -1297,11 +1271,6 @@ problemToString problem =
                 , ""
                 , msg
                 ]
-
-        TooManyStrings stringsFound ->
-            "I expected a single string, but I found multiple strings "
-                ++ String.join ", " stringsFound
-                ++ "."
 
 
 indent : String -> String

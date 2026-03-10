@@ -27,11 +27,6 @@ module Rdf exposing
     , dropFragment, setFragment
     , setQueryParam
     , append
-    , StringOrLangString
-    , stringOrLangStringFrom, stringOrLangStringFromList
-    , stringOrLangStringInfo
-    , localize, nonLocalized
-    , mergeStringOrLangStrings
     , startsWith
     , rightOf
     , lastPredicatePath
@@ -137,18 +132,6 @@ A few helper functions to transform [`Iri`](#Iri)'s.
 @docs append
 
 
-# StringOrLangString
-
-A few convenience functions for working with literals of type `xsd:string` and
-`xsd:langString`.
-
-@docs StringOrLangString
-@docs stringOrLangStringFrom, stringOrLangStringFromList
-@docs stringOrLangStringInfo
-@docs localize, nonLocalized
-@docs mergeStringOrLangStrings
-
-
 # Property paths
 
 @docs startsWith
@@ -216,7 +199,6 @@ import Internal.Term as Internal
 import Iso8601
 import List.Extra as List
 import List.NonEmpty as NonEmpty
-import Maybe.Extra as Maybe
 import String.Extra as String
 import Time exposing (Posix)
 
@@ -1765,153 +1747,6 @@ append suffix ((Term variant) as term) =
 
         _ ->
             term
-
-
-
--- STRING OR LANG STRING
-
-
-{-| In RDF graphs you often encounter a situation like this:
-
-```turtle
-<apple> a ex:fruit ;
-    rdfs:label "app" ,
-               "apple"@en ,
-               "Apfel"@de ;
-```
-
-In this graph the `<apple>` node has three `rdfs:label`'s, an unlocalized
-`xsd:string` and two localized `rdf:langString`'s. It is often convenient two
-treat these together, so a `StringOrLangString` bundles multiple localized
-strings and an optional unlocalized string.
-
--}
-type StringOrLangString
-    = StringOrLangString
-        { string : Maybe String
-        , langStrings : Dict String String
-        }
-
-
-{-| Build a `StringOrLangString` by providing an unlocalized and multiple
-localized versions.
--}
-stringOrLangStringFrom :
-    Maybe String
-    -> List ( String, String )
-    -> StringOrLangString
-stringOrLangStringFrom maybeString langStrings =
-    StringOrLangString
-        { string = maybeString
-        , langStrings = Dict.fromList langStrings
-        }
-
-
-{-| Build a `StringOrLangString` by only providing localized versions.
--}
-stringOrLangStringFromList : List ( String, String ) -> StringOrLangString
-stringOrLangStringFromList langStrings =
-    StringOrLangString
-        { string = Nothing
-        , langStrings = Dict.fromList langStrings
-        }
-
-
-{-| Extract all string values from a `StringOrLangString`.
-
-    import Dict
-
-    stringOrLangStringFrom (Just "app")
-        [ ( "en", "apple" )
-        , ( "de", "Apfel" )
-        ]
-        |> stringOrLangStringInfo
-    --> { string = Just "app"
-    --> , langStrings =
-    -->     Dict.fromList
-    -->       [ ( "en", "apple" )
-    -->       , ( "de", "Apfel" )
-    -->       ]
-    --> }
-
--}
-stringOrLangStringInfo :
-    StringOrLangString
-    ->
-        { string : Maybe String
-        , langStrings : Dict String String
-        }
-stringOrLangStringInfo (StringOrLangString stringOrLangString) =
-    stringOrLangString
-
-
-{-| Return the string for the provided locale from a `StringOrLangString`. This
-will first default to the `en` locale and then to the unlocalized string if
-available.
-
-    localize "en"
-        (stringOrLangStringFrom (Just "app")
-            [ ( "en", "apple" )
-            , ( "de", "Apfel" )
-            ]
-        )
-    --> Just "apple"
-
-    localize "en"
-        (stringOrLangStringFrom (Just "pH") [])
-    --> Just "pH"
-
-    localize "de"
-        (stringOrLangStringFrom Nothing
-            [ ( "en", "banana" ) ]
-        )
-    --> Just "banana"
-
-    localize "en"
-        (stringOrLangStringFrom Nothing
-            [ ( "de", "Kirsche" ) ]
-        )
-    --> Nothing
-
--}
-localize : String -> StringOrLangString -> Maybe String
-localize locale (StringOrLangString stringOrLangString) =
-    [ Dict.get locale stringOrLangString.langStrings
-    , Dict.get "en" stringOrLangString.langStrings
-    , stringOrLangString.string
-    ]
-        |> Maybe.orList
-
-
-{-| Extract the unlocalized string from a `StringOrLangString` if available.
--}
-nonLocalized : StringOrLangString -> Maybe String
-nonLocalized (StringOrLangString stringOrLangString) =
-    stringOrLangString.string
-
-
-{-| Merge multiple `StringOrLangString`'s. The first occurrance for a locale
-wins.
--}
-mergeStringOrLangStrings : List StringOrLangString -> Maybe StringOrLangString
-mergeStringOrLangStrings stringOrLangStrings =
-    if List.isEmpty stringOrLangStrings then
-        Nothing
-
-    else
-        { string =
-            stringOrLangStrings
-                |> List.filterMap
-                    (\(StringOrLangString stringOrLangString) -> stringOrLangString.string)
-                |> List.head
-        , langStrings =
-            stringOrLangStrings
-                |> List.map
-                    (\(StringOrLangString stringOrLangString) -> stringOrLangString.langStrings)
-                |> List.foldr Dict.union Dict.empty
-        }
-            |> StringOrLangString
-            |> Just
 
 
 
