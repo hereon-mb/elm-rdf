@@ -74,9 +74,10 @@ conveniently building `Graph`'s.
 
 import Dict exposing (Dict)
 import Internal.Graph as Internal exposing (Data, Graph(..))
-import Internal.Term exposing (Term(..), Variant(..), toVariant)
+import Internal.Term exposing (DataLiteral, Term(..), Variant(..), toVariant)
 import Internal.Turtle as Turtle
 import Json.Decode as Decode exposing (Decoder)
+import Json.Decode.Pipeline as Decode
 import Json.Encode as Encode exposing (Value)
 import List.Extra as List
 import Maybe.Extra as Maybe
@@ -97,12 +98,10 @@ import Rdf
         , asBlankNodeOrIri
         , asBlankNodeOrIriOrLiteral
         , asIri
-        , encodeTriple
         , rdf
         , serializeTriple
         , serializeWith
         , toBlankNodeOrIri
-        , tripleDecoder
         , xsd
         )
 import Regex exposing (Regex)
@@ -1083,6 +1082,106 @@ decoderSafe seed =
         |> Decode.map (fromTriplesSafe seed)
 
 
+tripleDecoder : Decoder Triple
+tripleDecoder =
+    Decode.succeed Triple
+        |> Decode.required "subject" subjectDecoder
+        |> Decode.required "predicate" predicateDecoder
+        |> Decode.required "object" objectDecoder
+
+
+subjectDecoder : Decoder BlankNodeOrIri
+subjectDecoder =
+    [ blankNodeDecoder
+    , iriDecoder
+    ]
+        |> Decode.oneOf
+        |> Decode.map Term
+
+
+predicateDecoder : Decoder Iri
+predicateDecoder =
+    iriDecoder
+        |> Decode.map Term
+
+
+objectDecoder : Decoder BlankNodeOrIriOrLiteral
+objectDecoder =
+    [ blankNodeDecoder
+    , literalDecoder
+    , iriDecoder
+    ]
+        |> Decode.oneOf
+        |> Decode.map Term
+
+
+blankNodeDecoder : Decoder Variant
+blankNodeDecoder =
+    Decode.string
+        |> Decode.field "termType"
+        |> Decode.andThen
+            (\termType ->
+                if termType == "BlankNode" then
+                    Decode.string
+                        |> Decode.field "value"
+                        |> Decode.map BlankNode
+
+                else
+                    Decode.fail "not a blank node"
+            )
+
+
+iriDecoder : Decoder Variant
+iriDecoder =
+    Decode.map Iri urlDecoder
+
+
+urlDecoder : Decoder String
+urlDecoder =
+    Decode.string
+        |> Decode.field "termType"
+        |> Decode.andThen
+            (\termType ->
+                if termType == "NamedNode" then
+                    Decode.string
+                        |> Decode.field "value"
+
+                else
+                    Decode.fail "not a named node"
+            )
+
+
+literalDecoder : Decoder Variant
+literalDecoder =
+    Decode.string
+        |> Decode.field "termType"
+        |> Decode.andThen
+            (\termType ->
+                if termType == "Literal" then
+                    Decode.succeed DataLiteral
+                        |> Decode.required "value" Decode.string
+                        |> Decode.required "datatype" urlDecoder
+                        |> Decode.required "language"
+                            (Decode.oneOf
+                                [ Decode.null Nothing
+                                , Decode.string
+                                    |> Decode.map
+                                        (\languageTag ->
+                                            if languageTag == "" then
+                                                Nothing
+
+                                            else
+                                                Just languageTag
+                                        )
+                                ]
+                            )
+                        |> Decode.map Literal
+
+                else
+                    Decode.fail "not a literal node"
+            )
+
+
 {-| Encode a [`Graph`](#Graph) into a JSON value according to the [RDFJS
 Specification](https://rdf.js.org/).
 -}
@@ -1093,6 +1192,96 @@ encode (Graph data) =
         |> List.concatMap Dict.values
         |> List.concat
         |> Encode.list encodeTriple
+
+
+encodeTriple : Triple -> Value
+encodeTriple triple =
+    [ ( "subject", encodeSubject triple.subject )
+    , ( "predicate", encodePredicate triple.predicate )
+    , ( "object", encodeObject triple.object )
+    ]
+        |> Encode.object
+
+
+encodeSubject : BlankNodeOrIri -> Value
+encodeSubject (Term variant) =
+    case variant of
+        BlankNode name ->
+            encodeBlankNode name
+
+        Iri url ->
+            encodeIri url
+
+        Literal _ ->
+            Encode.null
+
+        _ ->
+            Encode.null
+
+
+encodePredicate : Iri -> Value
+encodePredicate (Term variant) =
+    case variant of
+        BlankNode _ ->
+            Encode.null
+
+        Iri url ->
+            encodeIri url
+
+        Literal _ ->
+            Encode.null
+
+        _ ->
+            Encode.null
+
+
+encodeObject : BlankNodeOrIriOrLiteral -> Value
+encodeObject (Term variant) =
+    case variant of
+        BlankNode name ->
+            encodeBlankNode name
+
+        Iri url ->
+            encodeIri url
+
+        Literal data ->
+            encodeLiteral data
+
+        _ ->
+            Encode.null
+
+
+encodeBlankNode : String -> Value
+encodeBlankNode name =
+    [ ( "termType", Encode.string "BlankNode" )
+    , ( "value", Encode.string name )
+    ]
+        |> Encode.object
+
+
+encodeIri : String -> Value
+encodeIri url =
+    [ ( "termType", Encode.string "NamedNode" )
+    , ( "value", Encode.string url )
+    ]
+        |> Encode.object
+
+
+encodeLiteral : DataLiteral -> Value
+encodeLiteral data =
+    [ ( "termType", Encode.string "Literal" )
+    , ( "value", Encode.string data.value )
+    , ( "datatype", encodeIri data.datatype )
+    , ( "language"
+      , case data.languageTag of
+            Nothing ->
+                Encode.null
+
+            Just languageTag ->
+                Encode.string languageTag
+      )
+    ]
+        |> Encode.object
 
 
 
