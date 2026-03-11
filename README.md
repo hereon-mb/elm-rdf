@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18960193.svg)](https://doi.org/10.5281/zenodo.18960193) [![pipeline status](https://codebase.helmholtz.cloud/hereon-mb/elm-rdf/badges/main/pipeline.svg)](https://codebase.helmholtz.cloud/hereon-mb/elm-rdf/-/commits/main)  [![Latest Release](https://codebase.helmholtz.cloud/hereon-mb/elm-rdf/-/badges/release.svg)](https://codebase.helmholtz.cloud/hereon-mb/elm-rdf/-/releases)
+
 # RDF in Elm
 
 Work with [Resource Description
