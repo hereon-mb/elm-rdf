@@ -75,3 +75,11 @@ licenses-nodejs:
     - git --no-pager diff
     - git update-index --refresh
     - git diff-index --quiet HEAD --
+
+elm-docs:
+  extends: .frontend
+  script:
+    - npx elm make --docs docs.json
+    - git --no-pager diff
+    - git update-index --refresh
+    - git diff-index --quiet HEAD --
