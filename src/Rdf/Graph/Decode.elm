@@ -28,7 +28,7 @@ module Rdf.Graph.Decode exposing
     , at
     , many, indexedMany
     , oneOf
-    , list, nonEmpty
+    , list
     , property
     , anyPredicate
     , noProperty
@@ -36,7 +36,7 @@ module Rdf.Graph.Decode exposing
     , decode
     , Error, Problem(..), errorToString
     , inContext
-    , succeed, fail, failWith
+    , succeed, fail
     , map, map2
     , andMap
     , andThen
@@ -99,7 +99,7 @@ with a few differences:
 
 ## Containers
 
-@docs list, nonEmpty
+@docs list
 
 
 ## Properties
@@ -119,7 +119,7 @@ with a few differences:
 
 # Transforming and chaining
 
-@docs succeed, fail, failWith
+@docs succeed, fail
 @docs map, map2
 @docs andMap
 @docs andThen
@@ -141,8 +141,6 @@ import Dict exposing (Dict)
 import Internal.Graph exposing (Graph(..))
 import Internal.Term exposing (Term(..), Variant(..))
 import List.Extra as List
-import List.NonEmpty as NonEmpty exposing (NonEmpty)
-import Maybe.Extra as Maybe
 import Rdf
     exposing
         ( BlankNodeOrIri
@@ -828,7 +826,7 @@ oneOf fs =
 
                 Err es ->
                     Err
-                        { error = ExpectedOneOf (List.reverse es)
+                        { error = ExpectedOneOf (List.reverse (List.map .error es))
                         , contextStack = state.context
                         }
         )
@@ -917,17 +915,6 @@ list (Decoder f) =
         )
 
 
-{-| Like [`list`](#list) but ensure that the resulting `List` is not empty.
--}
-nonEmpty : Decoder a -> Decoder (NonEmpty a)
-nonEmpty =
-    list
-        >> andThen
-            (NonEmpty.fromList
-                >> Maybe.unwrap (err UnexpectedEmptyList) succeed
-            )
-
-
 
 -- PREDICATES
 
@@ -982,10 +969,22 @@ property path (Decoder f) =
                     >> Result.combine
                 )
                 >> Result.andThen
-                    (List.map get
-                        >> Result.combine
-                        >> Result.map List.concat
-                        >> f state
+                    (\focusNodes ->
+                        focusNodes
+                            |> List.map get
+                            |> Result.combine
+                            |> Result.map List.concat
+                            |> f state
+                            |> Result.mapError
+                                (\error ->
+                                    { error
+                                        | error =
+                                            ProblemAt
+                                                focusNodes
+                                                (Rdf.asPath path)
+                                                error.error
+                                    }
+                                )
                     )
         )
 
@@ -1192,14 +1191,12 @@ type Problem
     | ExpectedBlankNodeOrIri BlankNodeOrIriOrLiteral
     | ExpectedOneNode (List BlankNodeOrIriOrLiteral)
     | ExpectedPath BlankNodeOrIri Path
+    | ProblemAt (List BlankNodeOrIri) Path Problem
     | ExpectedNoPath BlankNodeOrIri Path (List BlankNodeOrIriOrLiteral)
     | ExpectedPredicates BlankNodeOrIri
-    | ExpectedOneOf (List Error)
-      --
-    | UnexpectedEmptyList
-    | CustomError String
-    | Failure String
-    | FailureAt String (List BlankNodeOrIriOrLiteral)
+    | ExpectedOneOf (List Problem)
+    | Custom String
+    | CustomAt String (List BlankNodeOrIriOrLiteral)
 
 
 {-| Turn a decoding error into a human friendly string.
@@ -1268,6 +1265,16 @@ problemToString problem =
                 ++ Rdf.serialize path
                 ++ "."
 
+        ProblemAt focusNodes path nested ->
+            String.join "\n"
+                [ "There was a problem with the object at "
+                    ++ Rdf.serialize path
+                    ++ " starting at the nodes "
+                    ++ String.join ", " (List.map Rdf.serialize focusNodes)
+                    ++ ":"
+                , indent (problemToString nested)
+                ]
+
         ExpectedNoPath nodeFocus path objects ->
             "I expected that "
                 ++ Rdf.serialize nodeFocus
@@ -1284,25 +1291,19 @@ problemToString problem =
                 ++ Rdf.serialize nodeFocus
                 ++ " is the subject of any triple."
 
-        ExpectedOneOf errors ->
+        ExpectedOneOf problems ->
             String.join "\n\n"
                 [ "Decoding failed in one of the following ways:"
                 , indent
                     (String.join "\n\n"
-                        (List.map errorToString errors)
+                        (List.map problemToString problems)
                     )
                 ]
 
-        UnexpectedEmptyList ->
-            "Expected a non-empty list, but found an empty list."
-
-        CustomError s ->
-            s
-
-        Failure msg ->
+        Custom msg ->
             msg
 
-        FailureAt msg nodes ->
+        CustomAt msg nodes ->
             String.join "\n"
                 [ "Problem with the given value at"
                 , ""
@@ -1351,33 +1352,15 @@ fail msg =
             case resultNodes of
                 Err _ ->
                     Err
-                        { error = Failure msg
+                        { error = Custom msg
                         , contextStack = state.context
                         }
 
                 Ok nodes ->
                     Err
-                        { error = FailureAt msg nodes
+                        { error = CustomAt msg nodes
                         , contextStack = state.context
                         }
-
-
-{-| A decoder which always fails with the given message. This is like
-[`fail`](#fail), but you also get the list of current focus nodes when creating
-the error message.
--}
-failWith : (List BlankNodeOrIriOrLiteral -> String) -> Decoder a
-failWith toMsg =
-    Decoder
-        (\state ->
-            Result.andThen
-                (\nodes ->
-                    Err
-                        { error = CustomError (toMsg nodes)
-                        , contextStack = state.context
-                        }
-                )
-        )
 
 
 {-| Transform the decoded value by applying the provided function.

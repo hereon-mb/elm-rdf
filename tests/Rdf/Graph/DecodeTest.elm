@@ -175,9 +175,13 @@ propertyWithIncorrectObject =
             }
                 |> expectAllError
                     [ Expect.equal
-                        (Decode.ExpectedLiteralOf
-                            [ xsd "string" ]
-                            (Rdf.integer 42)
+                        (Decode.ProblemAt
+                            [ Rdf.asBlankNodeOrIri (example "x") ]
+                            (Rdf.asPath (example "hasString"))
+                            (Decode.ExpectedLiteralOf
+                                [ xsd "string" ]
+                                (Rdf.integer 42)
+                            )
                         )
                     ]
 
@@ -199,9 +203,13 @@ propertyMissing =
             }
                 |> expectAllError
                     [ Expect.equal
-                        (Decode.ExpectedPath
-                            (Rdf.asBlankNodeOrIri (example "x"))
+                        (Decode.ProblemAt
+                            [ Rdf.asBlankNodeOrIri (example "x") ]
                             (Rdf.asPath (example "hasString"))
+                            (Decode.ExpectedPath
+                                (Rdf.asBlankNodeOrIri (example "x"))
+                                (Rdf.asPath (example "hasString"))
+                            )
                         )
                     ]
 
@@ -312,11 +320,15 @@ combineOneFails =
             }
                 |> expectAllError
                     [ Expect.equal
-                        (Decode.ExpectedLiteralOf
-                            [ xsd "integer"
-                            , xsd "int"
-                            ]
-                            (Rdf.string "string")
+                        (Decode.ProblemAt
+                            [ Rdf.asBlankNodeOrIri (example "x") ]
+                            (Rdf.asPath (example "hasIntegerB"))
+                            (Decode.ExpectedLiteralOf
+                                [ xsd "integer"
+                                , xsd "int"
+                                ]
+                                (Rdf.string "string")
+                            )
                         )
                     ]
 
