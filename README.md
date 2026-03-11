@@ -193,7 +193,8 @@ which could go into separate packages:
 ## Contributing
 
 If you want to contribute, please reach out to us at
-fabian.kirchner@hereon.de.
+fabian.kirchner@hereon.de. You can open issues or merge requests on
+https://codebase.helmholtz.cloud/hereon-mb/elm-rdf.
 
 
 ## License information
