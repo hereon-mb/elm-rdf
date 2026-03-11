@@ -1,0 +1,28 @@
+abstract: "Work with RDF data in Elm. Use this package to convert Elm values into RDF graphs or vice versa, and build SPARQL queries."
+authors:
+  - affiliation: Helmholtz-Zentrum Hereon
+    family-names: Kirchner
+    given-names: Fabian
+    orcid: 0009-0001-1369-5572
+  - family-names: Foremny
+    given-names: Alexander
+    orcid: 0009-0002-6756-9536
+cff-version: 1.2.0
+contact:
+  - affiliation: Helmholtz-Zentrum Hereon
+    family-names: Kirchner
+    given-names: Fabian
+    orcid: 0009-0001-1369-5572
+date-released: '2026-03-11'
+doi: 10.5281/zenodo.18960193
+keywords:
+  - Elm
+  - RDF
+  - SPARQL
+license: Apache-2.0
+license-url: http://www.apache.org/licenses/LICENSE-2.0
+message: "If you use this software, please cite it using the metadata from this file."
+repository-code: "https://codebase.helmholtz.cloud/hereon-mb/elm-rdf"
+title: hereon-mb/elm-rdf
+type: software
+version: "1.0.0"
