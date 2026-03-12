@@ -13,8 +13,8 @@ contact:
     family-names: Kirchner
     given-names: Fabian
     orcid: 0009-0001-1369-5572
-date-released: '2026-03-11'
-doi: 10.5281/zenodo.18960193
+date-released: '2026-03-12'
+doi: 10.5281/zenodo.18978208
 keywords:
   - Elm
   - RDF
@@ -25,4 +25,4 @@ message: "If you use this software, please cite it using the metadata from this 
 repository-code: "https://codebase.helmholtz.cloud/hereon-mb/elm-rdf"
 title: hereon-mb/elm-rdf
 type: software
-version: "1.0.0"
+version: "1.1.0"
