@@ -21,7 +21,7 @@ module Rdf exposing
     , blankNode
     , literal
     , varQ, varD
-    , sequence, alternative, inverse, zeroOrMore, oneOrMore, zeroOrOne
+    , inverse, sequence, alternative, zeroOrMore, oneOrMore, zeroOrOne
     , string, langString
     , boolean
     , decimal
@@ -34,6 +34,7 @@ module Rdf exposing
     , toVar
     , toBlankNodeOrIri, toBlankNodeOrIriOrLiteral
     , toUrl
+    , PropertyPath(..), toPropertyPath
     , lexicalForm, datatype
     , toString, toLangString
     , toInt, toFloat, toDecimal
@@ -85,7 +86,7 @@ values.
 @docs blankNode
 @docs literal
 @docs varQ, varD
-@docs sequence, alternative, inverse, zeroOrMore, oneOrMore, zeroOrOne
+@docs inverse, sequence, alternative, zeroOrMore, oneOrMore, zeroOrOne
 
 
 ## Specific literals
@@ -127,6 +128,7 @@ This section contains helper functions to convert specific [`Term`](#Term)'s
 into Elm values.
 
 @docs toUrl
+@docs PropertyPath, toPropertyPath
 @docs lexicalForm, datatype
 @docs toString, toLangString
 @docs toInt, toFloat, toDecimal
@@ -209,7 +211,7 @@ import Dict exposing (Dict)
 import Internal.Term as Internal
     exposing
         ( Term(..)
-        , Variant(..)
+        , Variant
         , toVariant
         )
 import Iso8601
@@ -813,7 +815,7 @@ Identifier) by providing its string representation, e.g.
 -}
 iri : String -> Iri
 iri value =
-    Term (Iri value)
+    Term (Internal.Iri value)
 
 
 {-| Create a [blank
@@ -830,7 +832,7 @@ yourself, that you don't run into naming conflicts.
 -}
 blankNode : String -> BlankNode
 blankNode value =
-    Term (BlankNode value)
+    Term (Internal.BlankNode value)
 
 
 {-| Create
@@ -854,7 +856,7 @@ datatypes](https://www.w3.org/TR/rdf11-concepts/#xsd-datatypes).
 literal : Iri -> String -> Literal
 literal datatype_ value =
     Term
-        (Literal
+        (Internal.Literal
             { value = value
             , datatype = toUrl datatype_
             , languageTag = Nothing
@@ -868,7 +870,7 @@ form `?name`.
 -}
 varQ : String -> Var
 varQ name =
-    Term (VarQ name)
+    Term (Internal.VarQ name)
 
 
 {-| Create a [query
@@ -877,23 +879,7 @@ form `$name`.
 -}
 varD : String -> Var
 varD name =
-    Term (VarD name)
-
-
-{-| Create a sequence [property
-path](https://www.w3.org/TR/sparql11-query/#propertypaths).
--}
-sequence : IsPath compatible1 -> List (IsPath compatible2) -> Path
-sequence (Term first) rest =
-    Term (Sequence first (List.map toVariant rest))
-
-
-{-| Create an alternative [property
-path](https://www.w3.org/TR/sparql11-query/#propertypaths).
--}
-alternative : IsPath compatible1 -> List (IsPath compatible2) -> Path
-alternative (Term first) rest =
-    Term (Alternative first (List.map toVariant rest))
+    Term (Internal.VarD name)
 
 
 {-| Create an inverse [property
@@ -901,7 +887,23 @@ path](https://www.w3.org/TR/sparql11-query/#propertypaths).
 -}
 inverse : IsPath compatible1 -> Path
 inverse (Term nested) =
-    Term (Inverse nested)
+    Term (Internal.Inverse nested)
+
+
+{-| Create a sequence [property
+path](https://www.w3.org/TR/sparql11-query/#propertypaths).
+-}
+sequence : IsPath compatible1 -> List (IsPath compatible2) -> Path
+sequence (Term first) rest =
+    Term (Internal.Sequence first (List.map toVariant rest))
+
+
+{-| Create an alternative [property
+path](https://www.w3.org/TR/sparql11-query/#propertypaths).
+-}
+alternative : IsPath compatible1 -> List (IsPath compatible2) -> Path
+alternative (Term first) rest =
+    Term (Internal.Alternative first (List.map toVariant rest))
 
 
 {-| Create a zero or more [property
@@ -909,7 +911,7 @@ path](https://www.w3.org/TR/sparql11-query/#propertypaths).
 -}
 zeroOrMore : IsPath compatible1 -> Path
 zeroOrMore (Term nested) =
-    Term (ZeroOrMore nested)
+    Term (Internal.ZeroOrMore nested)
 
 
 {-| Create a one or more [property
@@ -917,7 +919,7 @@ path](https://www.w3.org/TR/sparql11-query/#propertypaths).
 -}
 oneOrMore : IsPath compatible1 -> Path
 oneOrMore (Term nested) =
-    Term (OneOrMore nested)
+    Term (Internal.OneOrMore nested)
 
 
 {-| Create a zero or one [property
@@ -925,7 +927,7 @@ path](https://www.w3.org/TR/sparql11-query/#propertypaths).
 -}
 zeroOrOne : IsPath compatible1 -> Path
 zeroOrOne (Term nested) =
-    Term (ZeroOrOne nested)
+    Term (Internal.ZeroOrOne nested)
 
 
 
@@ -945,7 +947,7 @@ a [literal](https://www.w3.org/TR/rdf11-concepts/#dfn-literal) with datatype
 string : String -> Literal
 string value =
     Term
-        (Literal
+        (Internal.Literal
             { value = value
             , datatype = urlXsdString
             , languageTag = Nothing
@@ -967,7 +969,7 @@ actual string.
 langString : String -> String -> Literal
 langString languageTag value =
     Term
-        (Literal
+        (Internal.Literal
             { value = value
             , datatype = urlRdfLangString
             , languageTag = Just languageTag
@@ -988,7 +990,7 @@ a [literal](https://www.w3.org/TR/rdf11-concepts/#dfn-literal) with datatype
 boolean : Bool -> Literal
 boolean value =
     Term
-        (Literal
+        (Internal.Literal
             { value =
                 if value then
                     "true"
@@ -1031,7 +1033,7 @@ package.
 decimal : Decimal -> Literal
 decimal value =
     Term
-        (Literal
+        (Internal.Literal
             { value = Decimal.toString value
             , datatype = urlXsdDecimal
             , languageTag = Nothing
@@ -1052,7 +1054,7 @@ a [literal](https://www.w3.org/TR/rdf11-concepts/#dfn-literal) with datatype
 integer : Int -> Literal
 integer value =
     Term
-        (Literal
+        (Internal.Literal
             { value = String.fromInt value
             , datatype = urlXsdInteger
             , languageTag = Nothing
@@ -1073,7 +1075,7 @@ a [literal](https://www.w3.org/TR/rdf11-concepts/#dfn-int) with datatype
 int : Int -> Literal
 int value =
     Term
-        (Literal
+        (Internal.Literal
             { value = String.fromInt value
             , datatype = urlXsdInt
             , languageTag = Nothing
@@ -1094,7 +1096,7 @@ a [literal](https://www.w3.org/TR/rdf11-concepts/#dfn-literal) with datatype
 double : Float -> Literal
 double value =
     Term
-        (Literal
+        (Internal.Literal
             { value = String.fromFloat value
             , datatype = urlXsdDouble
             , languageTag = Nothing
@@ -1115,7 +1117,7 @@ a [literal](https://www.w3.org/TR/rdf11-concepts/#dfn-literal) with datatype
 float : Float -> Literal
 float value =
     Term
-        (Literal
+        (Internal.Literal
             { value = String.fromFloat value
             , datatype = urlXsdFloat
             , languageTag = Nothing
@@ -1142,7 +1144,7 @@ a [literal](https://www.w3.org/TR/rdf11-concepts/#dfn-literal) with datatype
 date : Posix -> Literal
 date value =
     Term
-        (Literal
+        (Internal.Literal
             { value = String.left (4 + 1 + 2 + 1 + 2) (Iso8601.fromTime value)
             , datatype = urlXsdDate
             , languageTag = Nothing
@@ -1165,7 +1167,7 @@ a [literal](https://www.w3.org/TR/rdf11-concepts/#dfn-literal) with datatype
 dateTime : Posix -> Literal
 dateTime value =
     Term
-        (Literal
+        (Internal.Literal
             { value = Iso8601.fromTime value
             , datatype = urlXsdDateTime
             , languageTag = Nothing
@@ -1182,7 +1184,7 @@ dateTime value =
 toIri : Term compatible -> Maybe Iri
 toIri (Term node) =
     case node of
-        Iri _ ->
+        Internal.Iri _ ->
             Just (Term node)
 
         _ ->
@@ -1194,7 +1196,7 @@ toIri (Term node) =
 toBlankNode : Term compatible -> Maybe BlankNode
 toBlankNode (Term variant) =
     case variant of
-        BlankNode _ ->
+        Internal.BlankNode _ ->
             Just (Term variant)
 
         _ ->
@@ -1207,7 +1209,7 @@ possible.
 toLiteral : Term compatible -> Maybe Literal
 toLiteral (Term variant) =
     case variant of
-        Literal _ ->
+        Internal.Literal _ ->
             Just (Term variant)
 
         _ ->
@@ -1220,10 +1222,10 @@ possible.
 toVar : Term compatible -> Maybe Var
 toVar (Term variant) =
     case variant of
-        VarQ _ ->
+        Internal.VarQ _ ->
             Just (Term variant)
 
-        VarD _ ->
+        Internal.VarD _ ->
             Just (Term variant)
 
         _ ->
@@ -1236,10 +1238,10 @@ possible.
 toBlankNodeOrIri : Term compatible -> Maybe BlankNodeOrIri
 toBlankNodeOrIri (Term variant) =
     case variant of
-        BlankNode _ ->
+        Internal.BlankNode _ ->
             Just (Term variant)
 
-        Iri _ ->
+        Internal.Iri _ ->
             Just (Term variant)
 
         _ ->
@@ -1252,10 +1254,10 @@ a [`BlankNodeOrIriOrLiteral`](#BlankNodeOrIriOrLiteral) if possible.
 toBlankNodeOrIriOrLiteral : Term compatible -> Maybe BlankNodeOrIriOrLiteral
 toBlankNodeOrIriOrLiteral (Term variant) =
     case variant of
-        BlankNode _ ->
+        Internal.BlankNode _ ->
             Just (Term variant)
 
-        Iri _ ->
+        Internal.Iri _ ->
             Just (Term variant)
 
         _ ->
@@ -1275,11 +1277,69 @@ toBlankNodeOrIriOrLiteral (Term variant) =
 toUrl : Iri -> String
 toUrl (Term variant) =
     case variant of
-        Iri url ->
+        Internal.Iri url ->
             url
 
         _ ->
             ""
+
+
+{-| A `PropertyPath` models the inner structure of a [`Path`](#Path).
+-}
+type PropertyPath
+    = Predicate Iri
+    | Inverse PropertyPath
+    | Sequence PropertyPath (List PropertyPath)
+    | Alternative PropertyPath (List PropertyPath)
+    | ZeroOrMore PropertyPath
+    | OneOrMore PropertyPath
+    | ZeroOrOne PropertyPath
+
+
+{-| Turn a [`Path`](#Path) into a [`PropertyPath`](#PropertyPath) to work with
+its individual path segments.
+
+    toPropertyPath (iri "http://example.org")
+    --> Predicate (iri "http://example.org")
+
+    toPropertyPath (inverse (iri "http://example.org"))
+    --> Inverse (Predicate (iri "http://example.org"))
+
+-}
+toPropertyPath : IsPath compatible -> PropertyPath
+toPropertyPath (Term variant) =
+    toPropertyPathHelp variant
+
+
+toPropertyPathHelp : Variant -> PropertyPath
+toPropertyPathHelp variant =
+    case variant of
+        Internal.Iri _ ->
+            Predicate (Term variant)
+
+        Internal.Sequence first rest ->
+            Sequence (toPropertyPathHelp first)
+                (List.map toPropertyPathHelp rest)
+
+        Internal.Alternative first rest ->
+            Alternative (toPropertyPathHelp first)
+                (List.map toPropertyPathHelp rest)
+
+        Internal.Inverse nested ->
+            Inverse (toPropertyPathHelp nested)
+
+        Internal.ZeroOrMore nested ->
+            ZeroOrMore (toPropertyPathHelp nested)
+
+        Internal.OneOrMore nested ->
+            OneOrMore (toPropertyPathHelp nested)
+
+        Internal.ZeroOrOne nested ->
+            ZeroOrOne (toPropertyPathHelp nested)
+
+        _ ->
+            -- this should never happen
+            Predicate (iri "")
 
 
 {-| Turn [`Literal`](#Literal) into it's [lexical
@@ -1298,7 +1358,7 @@ form](https://www.w3.org/TR/rdf11-concepts/#section-Graph-Literal).
 lexicalForm : Literal -> String
 lexicalForm (Term variant) =
     case variant of
-        Literal { value } ->
+        Internal.Literal { value } ->
             value
 
         _ ->
@@ -1320,7 +1380,7 @@ lexicalForm (Term variant) =
 datatype : Literal -> Iri
 datatype (Term variant) =
     case variant of
-        Literal data ->
+        Internal.Literal data ->
             iri data.datatype
 
         _ ->
@@ -1340,7 +1400,7 @@ with datatype `xsd:string`.
 toString : Term compatible -> Maybe String
 toString (Term variant) =
     case variant of
-        Literal data ->
+        Internal.Literal data ->
             if data.datatype == urlXsdString then
                 Just data.value
 
@@ -1364,7 +1424,7 @@ it is a literal with datatype `xsd:langString`.
 toLangString : Term compatible -> Maybe ( String, String )
 toLangString (Term variant) =
     case variant of
-        Literal data ->
+        Internal.Literal data ->
             if data.datatype == urlRdfLangString then
                 Maybe.map2 Tuple.pair data.languageTag (Just data.value)
 
@@ -1391,7 +1451,7 @@ with datatype `xsd:integer` or `xsd:int`.
 toInt : Term compatible -> Maybe Int
 toInt (Term variant) =
     case variant of
-        Literal data ->
+        Internal.Literal data ->
             if data.datatype == urlXsdInt then
                 String.toInt data.value
 
@@ -1421,7 +1481,7 @@ with datatype `xsd:double` or `xsd:float`.
 toFloat : Term compatible -> Maybe Float
 toFloat (Term variant) =
     case variant of
-        Literal data ->
+        Internal.Literal data ->
             if data.datatype == urlXsdDouble then
                 String.toFloat data.value
 
@@ -1453,7 +1513,7 @@ with datatype `xsd:decimal`.
 toDecimal : Term compatible -> Maybe Decimal
 toDecimal (Term variant) =
     case variant of
-        Literal data ->
+        Internal.Literal data ->
             if data.datatype == urlXsdDecimal then
                 Decimal.fromString data.value
 
@@ -1470,7 +1530,7 @@ with datatype `xsd:date`.
 toDate : Term compatible -> Maybe Posix
 toDate (Term variant) =
     case variant of
-        Literal data ->
+        Internal.Literal data ->
             if data.datatype == urlXsdDate then
                 (data.value ++ "T00:00:00.000Z")
                     |> Iso8601.toTime
@@ -1489,7 +1549,7 @@ with datatype `xsd:dateTime`.
 toDateTime : Term compatible -> Maybe Posix
 toDateTime (Term variant) =
     case variant of
-        Literal data ->
+        Internal.Literal data ->
             if data.datatype == urlXsdDateTime then
                 data.value
                     |> Iso8601.toTime
@@ -1512,7 +1572,7 @@ with datatype `xsd:boolean`.
 toBool : Term compatible -> Maybe Bool
 toBool (Term variant) =
     case variant of
-        Literal data ->
+        Internal.Literal data ->
             if data.datatype == urlXsdBoolean then
                 case data.value of
                     "true" ->
@@ -1550,32 +1610,32 @@ toBool (Term variant) =
 appendPath : String -> IsIri compatible -> Iri
 appendPath segment (Term variant) =
     case variant of
-        Iri url ->
+        Internal.Iri url ->
             case String.split "?" url of
                 [ _ ] ->
                     case String.split "#" url of
                         [ _ ] ->
-                            Term (Iri (url ++ segment))
+                            Term (Internal.Iri (url ++ segment))
 
                         [ beforeFragment, fragment ] ->
-                            Term (Iri (beforeFragment ++ segment ++ "#" ++ fragment))
+                            Term (Internal.Iri (beforeFragment ++ segment ++ "#" ++ fragment))
 
                         _ ->
-                            Term (Iri (url ++ segment))
+                            Term (Internal.Iri (url ++ segment))
 
                 [ beforeQuery, rest ] ->
                     case String.split "#" rest of
                         [ _ ] ->
-                            Term (Iri (beforeQuery ++ segment ++ "?" ++ rest))
+                            Term (Internal.Iri (beforeQuery ++ segment ++ "?" ++ rest))
 
                         [ query, fragment ] ->
-                            Term (Iri (beforeQuery ++ segment ++ "?" ++ query ++ "#" ++ fragment))
+                            Term (Internal.Iri (beforeQuery ++ segment ++ "?" ++ query ++ "#" ++ fragment))
 
                         _ ->
-                            Term (Iri (url ++ segment))
+                            Term (Internal.Iri (url ++ segment))
 
                 _ ->
-                    Term (Iri (url ++ segment))
+                    Term (Internal.Iri (url ++ segment))
 
         _ ->
             Term variant
@@ -1590,13 +1650,13 @@ appendPath segment (Term variant) =
 dropFragment : IsIri compatible -> Iri
 dropFragment (Term variant) =
     case variant of
-        Iri url ->
+        Internal.Iri url ->
             case String.split "#" url of
                 [ _ ] ->
                     Term variant
 
                 [ beforeFragment, _ ] ->
-                    Term (Iri beforeFragment)
+                    Term (Internal.Iri beforeFragment)
 
                 _ ->
                     Term variant
@@ -1617,13 +1677,13 @@ dropFragment (Term variant) =
 setFragment : String -> IsIri compatible -> Iri
 setFragment fragment (Term variant) =
     case variant of
-        Iri url ->
+        Internal.Iri url ->
             case String.split "#" url of
                 [ _ ] ->
-                    Term (Iri (url ++ "#" ++ fragment))
+                    Term (Internal.Iri (url ++ "#" ++ fragment))
 
                 [ beforeFragment, _ ] ->
-                    Term (Iri (beforeFragment ++ "#" ++ fragment))
+                    Term (Internal.Iri (beforeFragment ++ "#" ++ fragment))
 
                 _ ->
                     Term variant
@@ -1644,7 +1704,7 @@ setFragment fragment (Term variant) =
 setQueryParam : String -> String -> IsIri compatible -> Iri
 setQueryParam name value (Term variant) =
     case variant of
-        Iri url ->
+        Internal.Iri url ->
             case String.split "?" url of
                 [ beforeQuery ] ->
                     let
@@ -1654,7 +1714,7 @@ setQueryParam name value (Term variant) =
                                 |> serializeQuery
                     in
                     Term
-                        (Iri
+                        (Internal.Iri
                             (beforeQuery
                                 ++ "?"
                                 ++ queryString
@@ -1674,7 +1734,7 @@ setQueryParam name value (Term variant) =
                                         |> serializeQuery
                             in
                             Term
-                                (Iri
+                                (Internal.Iri
                                     (beforeQuery
                                         ++ "?"
                                         ++ queryStringUpdated
@@ -1691,7 +1751,7 @@ setQueryParam name value (Term variant) =
                                         |> serializeQuery
                             in
                             Term
-                                (Iri
+                                (Internal.Iri
                                     (beforeQuery
                                         ++ "?"
                                         ++ queryStringUpdated
@@ -1755,11 +1815,11 @@ serializeQuery query =
 append : String -> IsVar compatible -> IsVar compatible
 append suffix ((Term variant) as term) =
     case variant of
-        VarQ var ->
-            Term (VarQ (var ++ suffix))
+        Internal.VarQ var ->
+            Term (Internal.VarQ (var ++ suffix))
 
-        VarD var ->
-            Term (VarD (var ++ suffix))
+        Internal.VarD var ->
+            Term (Internal.VarD (var ++ suffix))
 
         _ ->
             term
@@ -1799,23 +1859,23 @@ startsWith left right =
 startsWithHelp : IsPath compatible1 -> IsPath compatible2 -> Bool
 startsWithHelp (Term left) (Term right) =
     case left of
-        Iri iriA ->
+        Internal.Iri iriA ->
             case right of
-                Iri iriB ->
+                Internal.Iri iriB ->
                     iriA == iriB
 
-                Sequence (Iri iriB) _ ->
+                Internal.Sequence (Internal.Iri iriB) _ ->
                     iriA == iriB
 
                 _ ->
                     False
 
-        Sequence (Iri iriA) restA ->
+        Internal.Sequence (Internal.Iri iriA) restA ->
             case right of
-                Iri _ ->
+                Internal.Iri _ ->
                     False
 
-                Sequence (Iri iriB) restB ->
+                Internal.Sequence (Internal.Iri iriB) restB ->
                     (iriA == iriB)
                         && (List.zip restA restB
                                 |> List.map
@@ -1876,10 +1936,10 @@ path](https://www.w3.org/TR/sparql11-query/#propertypaths).
 lastPredicatePath : IsPath compatible -> Maybe Iri
 lastPredicatePath (Term variant) =
     case variant of
-        Iri _ ->
+        Internal.Iri _ ->
             Just (Term variant)
 
-        Sequence first rest ->
+        Internal.Sequence first rest ->
             case rest of
                 [] ->
                     lastPredicatePath (Term first)
@@ -1897,14 +1957,14 @@ lastPredicatePath (Term variant) =
 rightOfHelp : IsPath compatible1 -> IsPath compatible2 -> Maybe Path
 rightOfHelp (Term left) (Term right) =
     case left of
-        Iri iriA ->
+        Internal.Iri iriA ->
             case right of
-                Iri _ ->
+                Internal.Iri _ ->
                     Nothing
 
-                Sequence (Iri iriB) (firstB :: restB) ->
+                Internal.Sequence (Internal.Iri iriB) (firstB :: restB) ->
                     if iriA == iriB then
-                        Just (Term (Sequence firstB restB))
+                        Just (Term (Internal.Sequence firstB restB))
 
                     else
                         Nothing
@@ -1912,12 +1972,12 @@ rightOfHelp (Term left) (Term right) =
                 _ ->
                     Nothing
 
-        Sequence (Iri iriA) restA ->
+        Internal.Sequence (Internal.Iri iriA) restA ->
             case right of
-                Iri _ ->
+                Internal.Iri _ ->
                     Nothing
 
-                Sequence (Iri iriB) restB ->
+                Internal.Sequence (Internal.Iri iriB) restB ->
                     if
                         (iriA == iriB)
                             && (List.zip restA restB
@@ -1930,7 +1990,7 @@ rightOfHelp (Term left) (Term right) =
                     then
                         case List.drop (List.length restA) restB of
                             firstB :: restRestB ->
-                                Just (Term (Sequence firstB restRestB))
+                                Just (Term (Internal.Sequence firstB restRestB))
 
                             _ ->
                                 Nothing
@@ -1950,10 +2010,10 @@ rightOfHelp (Term left) (Term right) =
 normalize : IsPath compatible -> Path
 normalize ((Term variant) as path) =
     case variant of
-        Iri _ ->
+        Internal.Iri _ ->
             asPath path
 
-        Sequence first rest ->
+        Internal.Sequence first rest ->
             case rest of
                 [] ->
                     normalize (Term first)
@@ -1965,26 +2025,26 @@ normalize ((Term variant) as path) =
                         |> Maybe.map
                             (\( firstFlat, restFlat ) ->
                                 Term
-                                    (Sequence
+                                    (Internal.Sequence
                                         (toVariant (normalize (Term firstFlat)))
                                         (List.map (Term >> normalize >> toVariant) restFlat)
                                     )
                             )
                         |> Maybe.withDefault (asPath path)
 
-        Alternative _ _ ->
+        Internal.Alternative _ _ ->
             asPath path
 
-        Inverse _ ->
+        Internal.Inverse _ ->
             asPath path
 
-        ZeroOrMore _ ->
+        Internal.ZeroOrMore _ ->
             asPath path
 
-        OneOrMore _ ->
+        Internal.OneOrMore _ ->
             asPath path
 
-        ZeroOrOne _ ->
+        Internal.ZeroOrOne _ ->
             asPath path
 
         _ ->
@@ -1996,7 +2056,7 @@ flatten paths =
     List.concatMap
         (\path ->
             case path of
-                Sequence first rest ->
+                Internal.Sequence first rest ->
                     first :: rest
 
                 _ ->
@@ -2043,10 +2103,10 @@ serializeWithHelp config variant =
 serializeVariantWith : Prologue -> Variant -> String
 serializeVariantWith config variant =
     case variant of
-        BlankNode value ->
+        Internal.BlankNode value ->
             "_:" ++ value
 
-        Iri url ->
+        Internal.Iri url ->
             if url == "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" then
                 "a"
 
@@ -2080,7 +2140,7 @@ serializeVariantWith config variant =
                                 Just ( prefix, value ) ->
                                     prefix ++ ":" ++ String.rightOf value url
 
-        Literal data ->
+        Internal.Literal data ->
             let
                 replaceLineBreaks : String -> String
                 replaceLineBreaks =
@@ -2126,34 +2186,34 @@ serializeVariantWith config variant =
                 ]
                     |> String.concat
 
-        VarQ name ->
+        Internal.VarQ name ->
             "?" ++ name
 
-        VarD name ->
+        Internal.VarD name ->
             "$" ++ name
 
-        Sequence first rest ->
+        Internal.Sequence first rest ->
             serializeVariantWith config first
                 ++ " / "
                 ++ String.join " / "
                     (List.map (serializeVariantWith config) rest)
 
-        Alternative first rest ->
+        Internal.Alternative first rest ->
             serializeVariantWith config first
                 ++ " | "
                 ++ String.join " | "
                     (List.map (serializeVariantWith config) rest)
 
-        Inverse nested ->
+        Internal.Inverse nested ->
             "^" ++ serializeVariantWith config nested
 
-        ZeroOrMore nested ->
+        Internal.ZeroOrMore nested ->
             serializeVariantWith config nested ++ "*"
 
-        OneOrMore nested ->
+        Internal.OneOrMore nested ->
             serializeVariantWith config nested ++ "+"
 
-        ZeroOrOne nested ->
+        Internal.ZeroOrOne nested ->
             serializeVariantWith config nested ++ "?"
 
 
