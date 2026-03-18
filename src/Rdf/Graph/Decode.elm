@@ -1764,10 +1764,11 @@ followPropertyPath data ((Term variant) as path) nodeFocusCompatible =
 
             else
                 focusNodes
-                    |> List.filterMap Rdf.toBlankNodeOrIri
-                    |> List.map asBlankNodeOrIriCompatible
-                    |> List.concatMap
-                        (followPropertyPath data path)
+                    ++ (focusNodes
+                            |> List.filterMap Rdf.toBlankNodeOrIri
+                            |> List.map asBlankNodeOrIriCompatible
+                            |> List.concatMap (followPropertyPath data path)
+                       )
 
         ZeroOrOne propertyPathNested ->
             Rdf.asBlankNodeOrIriOrLiteral nodeFocus
