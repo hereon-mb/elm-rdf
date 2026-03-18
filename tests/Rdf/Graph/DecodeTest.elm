@@ -44,6 +44,12 @@ suite =
             [ combineSuccess
             , combineOneFails
             ]
+        , describe "path"
+            [ pathAlternative
+            , pathInverseSequenceSingle
+            , pathInverseSequenceTwo
+            , pathInverseSequenceThree
+            ]
         ]
 
 
@@ -330,6 +336,110 @@ combineOneFails =
                                 (Rdf.string "string")
                             )
                         )
+                    ]
+
+
+pathAlternative : Test
+pathAlternative =
+    test "alternative" <|
+        \_ ->
+            { raw =
+                """
+                    @base <http://example.org/> .
+                    <x> <hasA> <a> ; <hasB> <b> .
+                """
+            , decoder =
+                Decode.from (example "x")
+                    (Decode.property
+                        (Rdf.alternative
+                            (example "hasA")
+                            [ example "hasB" ]
+                        )
+                        (Decode.many
+                            Decode.iri
+                        )
+                    )
+            }
+                |> expectAll
+                    [ Expect.equal [ example "a", example "b" ]
+                    ]
+
+
+pathInverseSequenceSingle : Test
+pathInverseSequenceSingle =
+    test "inverse sequence single" <|
+        \_ ->
+            { raw =
+                """
+                    @base <http://example.org/> .
+                    <x> <hasA> <a> .
+                """
+            , decoder =
+                Decode.from (example "a")
+                    (Decode.property
+                        (Rdf.inverse (Rdf.sequence (example "hasA") []))
+                        Decode.iri
+                    )
+            }
+                |> expectAll
+                    [ Expect.equal (example "x")
+                    ]
+
+
+pathInverseSequenceTwo : Test
+pathInverseSequenceTwo =
+    test "inverse sequence two" <|
+        \_ ->
+            { raw =
+                """
+                    @base <http://example.org/> .
+                    <x> <hasA> <a> .
+                    <a> <hasB> <b> .
+                """
+            , decoder =
+                Decode.from (example "b")
+                    (Decode.property
+                        (Rdf.inverse
+                            (Rdf.sequence
+                                (example "hasA")
+                                [ example "hasB" ]
+                            )
+                        )
+                        Decode.iri
+                    )
+            }
+                |> expectAll
+                    [ Expect.equal (example "x")
+                    ]
+
+
+pathInverseSequenceThree : Test
+pathInverseSequenceThree =
+    test "inverse sequence three" <|
+        \_ ->
+            { raw =
+                """
+                    @base <http://example.org/> .
+                    <x> <hasA> <a> .
+                    <a> <hasB> <b> .
+                    <b> <hasC> <c> .
+                """
+            , decoder =
+                Decode.from (example "c")
+                    (Decode.property
+                        (Rdf.inverse
+                            (Rdf.sequence
+                                (example "hasA")
+                                [ example "hasB"
+                                , example "hasC"
+                                ]
+                            )
+                        )
+                        Decode.iri
+                    )
+            }
+                |> expectAll
+                    [ Expect.equal (example "x")
                     ]
 
 

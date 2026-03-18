@@ -1663,6 +1663,14 @@ followPropertyPath data ((Term variant) as path) nodeFocusCompatible =
                 |> Maybe.withDefault []
                 |> List.map .object
 
+        Alternative first rest ->
+            followPropertyPath data (Term first) nodeFocusCompatible
+                ++ List.concatMap
+                    (\next ->
+                        followPropertyPath data (Term next) nodeFocusCompatible
+                    )
+                    rest
+
         Inverse ((Iri _) as nested) ->
             data.byPredicateBySubject
                 |> Dict.get (Rdf.serialize (Term nested))
@@ -1686,6 +1694,25 @@ followPropertyPath data ((Term variant) as path) nodeFocusCompatible =
                             triples
                     )
                 |> List.map Rdf.asBlankNodeOrIriOrLiteral
+
+        Inverse (Sequence first rest) ->
+            case List.reverse rest of
+                [] ->
+                    followPropertyPath data (Term (Inverse first)) nodeFocusCompatible
+
+                last :: restInverse ->
+                    followPropertyPath data
+                        (Term
+                            (Sequence (Inverse last)
+                                [ Inverse
+                                    (Sequence
+                                        first
+                                        (List.reverse restInverse)
+                                    )
+                                ]
+                            )
+                        )
+                        nodeFocusCompatible
 
         Sequence first rest ->
             let
