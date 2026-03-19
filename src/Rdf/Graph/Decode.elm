@@ -139,7 +139,7 @@ with a few differences:
 import Decimal exposing (Decimal)
 import Dict exposing (Dict)
 import Internal.Graph exposing (Graph(..))
-import Internal.Term exposing (Term(..), Variant(..))
+import Internal.Term as Internal exposing (Term(..), Variant(..))
 import List.Extra as List
 import Rdf
     exposing
@@ -1630,9 +1630,9 @@ getObjectsAt :
     -> IsPath compatible2
     -> Graph
     -> List BlankNodeOrIriOrLiteral
-getObjectsAt nodeFocus path (Graph data) =
+getObjectsAt nodeFocus (Term variant) (Graph data) =
     nodeFocus
-        |> followPropertyPath data path
+        |> followPropertyPath data variant
         |> List.unique
 
 
@@ -1645,10 +1645,10 @@ type alias GraphData rest =
 
 followPropertyPath :
     GraphData rest
-    -> IsPath compatible1
-    -> IsBlankNodeOrIri compatible2
+    -> Variant
+    -> IsBlankNodeOrIri compatible
     -> List BlankNodeOrIriOrLiteral
-followPropertyPath data ((Term variant) as path) nodeFocusCompatible =
+followPropertyPath data variant nodeFocusCompatible =
     let
         nodeFocus : BlankNodeOrIri
         nodeFocus =
@@ -1659,15 +1659,15 @@ followPropertyPath data ((Term variant) as path) nodeFocusCompatible =
             data.bySubjectByPredicate
                 |> Dict.get (Rdf.serialize nodeFocus)
                 |> Maybe.withDefault Dict.empty
-                |> Dict.get (Rdf.serialize path)
+                |> Dict.get (Internal.serializeVariant variant)
                 |> Maybe.withDefault []
                 |> List.map .object
 
         Alternative first rest ->
-            followPropertyPath data (Term first) nodeFocusCompatible
+            followPropertyPath data first nodeFocusCompatible
                 ++ List.concatMap
                     (\next ->
-                        followPropertyPath data (Term next) nodeFocusCompatible
+                        followPropertyPath data next nodeFocusCompatible
                     )
                     rest
 
@@ -1698,19 +1698,17 @@ followPropertyPath data ((Term variant) as path) nodeFocusCompatible =
         Inverse (Sequence first rest) ->
             case List.reverse rest of
                 [] ->
-                    followPropertyPath data (Term (Inverse first)) nodeFocusCompatible
+                    followPropertyPath data (Inverse first) nodeFocusCompatible
 
                 last :: restInverse ->
                     followPropertyPath data
-                        (Term
-                            (Sequence (Inverse last)
-                                [ Inverse
-                                    (Sequence
-                                        first
-                                        (List.reverse restInverse)
-                                    )
-                                ]
-                            )
+                        (Sequence (Inverse last)
+                            [ Inverse
+                                (Sequence
+                                    first
+                                    (List.reverse restInverse)
+                                )
+                            ]
                         )
                         nodeFocusCompatible
 
@@ -1718,7 +1716,7 @@ followPropertyPath data ((Term variant) as path) nodeFocusCompatible =
             let
                 nodesAtFirst : List BlankNodeOrIriOrLiteral
                 nodesAtFirst =
-                    followPropertyPath data (Term first) nodeFocusCompatible
+                    followPropertyPath data first nodeFocusCompatible
 
                 step :
                     Variant
@@ -1728,57 +1726,62 @@ followPropertyPath data ((Term variant) as path) nodeFocusCompatible =
                     nodes
                         |> List.filterMap Rdf.toBlankNodeOrIri
                         |> List.map asBlankNodeOrIriCompatible
-                        |> List.concatMap (followPropertyPath data (Term next))
+                        |> List.concatMap (followPropertyPath data next)
             in
             List.foldl step nodesAtFirst rest
 
         ZeroOrMore propertyPathNested ->
-            let
-                focusNodes : List BlankNodeOrIriOrLiteral
-                focusNodes =
-                    nodeFocusCompatible
-                        |> followPropertyPath data (Term propertyPathNested)
-                        |> List.filter ((/=) (Rdf.asBlankNodeOrIriOrLiteral nodeFocus))
-            in
-            if List.isEmpty focusNodes then
+            followPropertyPathRepeat data
+                propertyPathNested
+                [ nodeFocus ]
                 [ Rdf.asBlankNodeOrIriOrLiteral nodeFocus ]
 
-            else
-                Rdf.asBlankNodeOrIriOrLiteral nodeFocus
-                    :: (focusNodes
-                            |> List.filterMap Rdf.toBlankNodeOrIri
-                            |> List.map asBlankNodeOrIriCompatible
-                            |> List.concatMap (followPropertyPath data path)
-                       )
-
         OneOrMore propertyPathNested ->
-            let
-                focusNodes : List BlankNodeOrIriOrLiteral
-                focusNodes =
-                    nodeFocusCompatible
-                        |> followPropertyPath data (Term propertyPathNested)
-                        |> List.filter ((/=) (Rdf.asBlankNodeOrIriOrLiteral nodeFocus))
-            in
-            if List.isEmpty focusNodes then
+            followPropertyPathRepeat data
+                propertyPathNested
+                [ nodeFocus ]
                 []
-
-            else
-                focusNodes
-                    ++ (focusNodes
-                            |> List.filterMap Rdf.toBlankNodeOrIri
-                            |> List.map asBlankNodeOrIriCompatible
-                            |> List.concatMap (followPropertyPath data path)
-                       )
 
         ZeroOrOne propertyPathNested ->
             Rdf.asBlankNodeOrIriOrLiteral nodeFocus
                 :: (nodeFocusCompatible
-                        |> followPropertyPath data (Term propertyPathNested)
+                        |> followPropertyPath data propertyPathNested
                         |> List.filter ((/=) (Rdf.asBlankNodeOrIriOrLiteral nodeFocus))
                    )
 
         _ ->
             []
+
+
+followPropertyPathRepeat :
+    GraphData rest
+    -> Variant
+    -> List BlankNodeOrIri
+    -> List BlankNodeOrIriOrLiteral
+    -> List BlankNodeOrIriOrLiteral
+followPropertyPathRepeat data variant nodeFocuses collected =
+    let
+        collectedNext : List BlankNodeOrIriOrLiteral
+        collectedNext =
+            nodeFocuses
+                |> List.concatMap (followPropertyPath data variant)
+                |> List.filter (not << alreadyCollected)
+
+        alreadyCollected : BlankNodeOrIriOrLiteral -> Bool
+        alreadyCollected term =
+            List.member term collected
+    in
+    if List.isEmpty collectedNext then
+        collected
+
+    else
+        followPropertyPathRepeat data
+            variant
+            (collectedNext
+                |> List.filterMap Rdf.toBlankNodeOrIri
+                |> List.map asBlankNodeOrIriCompatible
+            )
+            (collectedNext ++ collected)
 
 
 asBlankNodeOrIriCompatible : BlankNodeOrIri -> IsBlankNodeOrIri compatible

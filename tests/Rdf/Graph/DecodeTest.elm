@@ -50,7 +50,9 @@ suite =
             , pathInverseSequenceTwo
             , pathInverseSequenceThree
             , pathZeroOrMore
+            , pathZeroOrMoreLoop
             , pathOneOrMore
+            , pathOneOrMoreLoop
             , pathZeroOrOne
             ]
         ]
@@ -466,10 +468,35 @@ pathZeroOrMore =
             }
                 |> expectAll
                     [ Expect.equal
-                        [ example "x"
-                        , example "a"
+                        [ example "c"
                         , example "b"
-                        , example "c"
+                        , example "a"
+                        , example "x"
+                        ]
+                    ]
+
+
+pathZeroOrMoreLoop : Test
+pathZeroOrMoreLoop =
+    test "zero or more with loop" <|
+        \_ ->
+            { raw =
+                """
+                    @base <http://example.org/> .
+                    <x> <has> <a> .
+                    <a> <has> <x> .
+                """
+            , decoder =
+                Decode.from (example "x")
+                    (Decode.property
+                        (Rdf.zeroOrMore (example "has"))
+                        (Decode.many Decode.iri)
+                    )
+            }
+                |> expectAll
+                    [ Expect.equal
+                        [ example "a"
+                        , example "x"
                         ]
                     ]
 
@@ -494,9 +521,35 @@ pathOneOrMore =
             }
                 |> expectAll
                     [ Expect.equal
-                        [ example "a"
+                        [ example "c"
                         , example "b"
-                        , example "c"
+                        , example "a"
+                        ]
+                    ]
+
+
+pathOneOrMoreLoop : Test
+pathOneOrMoreLoop =
+    test "one or more with loop" <|
+        \_ ->
+            { raw =
+                """
+                    @base <http://example.org/> .
+                    <x> <has> <a> .
+                    <a> <has> <b> .
+                    <b> <has> <a> .
+                """
+            , decoder =
+                Decode.from (example "x")
+                    (Decode.property
+                        (Rdf.oneOrMore (example "has"))
+                        (Decode.many Decode.iri)
+                    )
+            }
+                |> expectAll
+                    [ Expect.equal
+                        [ example "b"
+                        , example "a"
                         ]
                     ]
 
